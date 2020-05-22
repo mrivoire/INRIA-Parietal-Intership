@@ -95,18 +95,19 @@ def cyclic_coordinate_descent(X, y, n_iter=10):
         # One cyclicly updates the i^{th} coordinate corresponding to the rest
         # in the Euclidean division by the number of features
         # This allows to always selecting an index between 1 and n_features
-        i = k % n_features + 1
+        i = k % n_features
 
         old_beta_i = beta[i].copy()
         step = 1/lips_const[i]
         reg = old_beta_i * X[:, i]
-        grad = (X[:, i].T).dot(residuals + reg)
+        grad = np.dot(X[:, i], residuals)
 
         # Update of the parameters
         beta[i] += step*grad
 
         # Update of the residuals
-        residuals += np.dot(X[:, i], old_beta_i - beta[i])
+        if old_beta_i != beta[i]:
+            residuals += np.dot(X[:, i], old_beta_i - beta[i])
 
         if k % n_features == 0:
             # If k % n_features == 0 then we have updated all the coordinates
@@ -635,9 +636,8 @@ def main():
     # print("Target vector y : ", y)
 
     # Minimization of the Primal Problem with Coordinate Descent Algorithm
-    beta_hat_cyclic_cd, objs_cyclic_cd = cyclic_coordinate_descent(X,
-                                                                   y,
-                                                                   n_iter=10)
+    beta_hat_cyclic_cd, objs_cyclic_cd = \
+        cyclic_coordinate_descent(X, y, n_iter=5000)
 
     # print("Beta hat cyclic coordinate descent : ", beta_hat_cyclic_cd)
     # print("Objective function at the optimum cd: ", objs_cyclic_cd)
