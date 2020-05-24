@@ -99,6 +99,7 @@ def cyclic_coordinate_descent(X, y, n_iter=10):
 
         old_beta_i = beta[i].copy()
         step = 1/lips_const[i]
+        reg = old_beta_i * X[:, i]
         grad = np.dot(X[:, i], residuals)
 
         # Update of the parameters
