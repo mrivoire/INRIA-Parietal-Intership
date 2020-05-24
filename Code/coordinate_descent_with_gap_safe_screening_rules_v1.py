@@ -1,5 +1,5 @@
 import numpy as np
-# import matplotlib.pyplot as plt
+import matplotlib.pyplot as plt
 # from scipy import linalg
 from numpy.random import multivariate_normal
 from scipy.linalg.special_matrices import toeplitz
@@ -95,18 +95,18 @@ def cyclic_coordinate_descent(X, y, n_iter=10):
         # One cyclicly updates the i^{th} coordinate corresponding to the rest
         # in the Euclidean division by the number of features
         # This allows to always selecting an index between 1 and n_features
-        i = k % n_features + 1
+        i = k % n_features
 
         old_beta_i = beta[i].copy()
         step = 1/lips_const[i]
-        reg = old_beta_i * X[:, i]
-        grad = (X[:, i].T).dot(residuals + reg)
+        grad = np.dot(X[:, i], residuals)
 
         # Update of the parameters
         beta[i] += step*grad
 
         # Update of the residuals
-        residuals += np.dot(X[:, i], old_beta_i - beta[i])
+        if old_beta_i != beta[i]:
+            residuals += np.dot(X[:, i], old_beta_i - beta[i])
 
         if k % n_features == 0:
             # If k % n_features == 0 then we have updated all the coordinates
@@ -527,25 +527,35 @@ def duality_gap(P_lmbda, D_lmbda):
 ##########################################################
 
 
-def gap_safe_sphere(c, r):
+def gap_safe_sphere(X, c, r):
     """
     Parameters
     ----------
 
+    X: numpy.ndarray, shape = (n_samples, n_features)
+       features matrix
+
     c: numpy.array, shape = (n_samples,)
-      center of the sphere
+       center of the sphere
 
     r: float
-      radius of the sphere
+       radius of the sphere
 
     Returns
     -------
 
     C_k: interval
-        sphere of center c and of radius r
+         sphere of center c and of radius r
     """
 
-    C_k = np.linalg.norm(np.subtract(np.indices(r).T, np.asarray(c)), axis=2)
+    n, p = X.shape
+
+    C_k = []
+
+    for j in range(p):
+        if np.linalg.norm(X[:, j] - c) <= r:
+            C_k.append(j)
+
     return C_k
 
 
@@ -635,9 +645,8 @@ def main():
     # print("Target vector y : ", y)
 
     # Minimization of the Primal Problem with Coordinate Descent Algorithm
-    beta_hat_cyclic_cd, objs_cyclic_cd = cyclic_coordinate_descent(X,
-                                                                   y,
-                                                                   n_iter=10)
+    beta_hat_cyclic_cd, objs_cyclic_cd = \
+        cyclic_coordinate_descent(X, y, n_iter=5000)
 
     # print("Beta hat cyclic coordinate descent : ", beta_hat_cyclic_cd)
     # print("Objective function at the optimum cd: ", objs_cyclic_cd)
@@ -701,11 +710,26 @@ def main():
     print("Duality gap at the optimum : ", G_lmbda)
 
     # Gap Safe Sphere : Equation 18
-    r = np.ones(theta_hat.shape[0])
+    r = r_lmbda
     c = theta_hat
-    gap_safe_sphere(c, r)
+    C_k = gap_safe_sphere(X, c, r)
+
+    print("Safe Sphere : ", C_k)
 
     # Coordinate Descent With Gap Safe Rules Algorithm : Algorithm 1
+
+    # Plot Objective CD
+    y = objs_cyclic_cd
+
+    x = np.arange(1, len(y)+1)
+
+    plt.plot(x, y, label='cyclic_cd', color='blue')
+    plt.yscale('log')
+    plt.title("Cyclic cd objective")
+    plt.xlabel('n_iter')
+    plt.ylabel('f obj')
+    plt.legend(loc='best')
+    plt.show()
 
 
 if __name__ == "__main__":
