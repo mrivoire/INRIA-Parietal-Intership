@@ -5,6 +5,7 @@ from numpy.random import multivariate_normal
 from scipy.linalg.special_matrices import toeplitz
 from numpy.random import randn
 
+
 ######################################################################
 #     Iterative Solver With Gap Safe Rules
 ######################################################################
