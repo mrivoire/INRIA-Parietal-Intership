@@ -51,7 +51,7 @@ def simu(beta, n_samples=1000, corr=0.5, for_logreg=False):
 ##############################################################################
 
 
-def cyclic_coordinate_descent(X, y, n_iter=10):
+def cyclic_coordinate_descent(X, y, lmbda, n_iter=10):
     """Solver : cyclic coordinate descent
 
     Parameters
@@ -63,6 +63,9 @@ def cyclic_coordinate_descent(X, y, n_iter=10):
     y: numpy.array, shape (n_samples, )
        target labels vector
 
+    lmbda: float
+           regularization parameter
+
     n_iter: int, default = 10
             number of iterations
 
@@ -70,7 +73,16 @@ def cyclic_coordinate_descent(X, y, n_iter=10):
     -------
 
     beta: numpy.array, shape(n_features,)
-          parameters vector
+          primal parameters vector
+
+    theta: numpy.array, shape(n_samples, )
+           dual parameters vector
+
+    P_lmbda: float
+             primal value
+    
+    D_lmbda: float
+             dual value
 
     all_objs: numpy.array, shape(n_features)
               residuals vector
@@ -83,6 +95,7 @@ def cyclic_coordinate_descent(X, y, n_iter=10):
     all_objs = []
 
     beta = np.zeros(n_features)
+    theta = np.zeros(n_samples)
     residuals = y - X.dot(beta)
 
     # Computation of the lipschitz constants vector
@@ -105,6 +118,18 @@ def cyclic_coordinate_descent(X, y, n_iter=10):
         # Update of the parameters
         beta[i] += step*grad
 
+        # Computation of theta
+        theta = compute_theta_k(X, y, beta, lmbda)
+
+        # Computation of the primal problem
+        P_lmbda = primal_pb(X,y, beta, lmbda)
+
+        # Computation of the dual problem
+        D_lmbda = dual_pb(y, theta, lmbda)
+
+        # Computation of the dual gap 
+        G_lmbda = duality_gap(P_lmbda, D_lmbda)
+
         # Update of the residuals
         if old_beta_i != beta[i]:
             residuals += np.dot(X[:, i], old_beta_i - beta[i])
@@ -115,7 +140,8 @@ def cyclic_coordinate_descent(X, y, n_iter=10):
             # One computes the objective function
             all_objs.append((residuals**2).sum()/2.)
 
-    return beta, np.array(all_objs)
+
+    return beta, all_objs, theta, P_lmbda, D_lmbda, G_lmbda
 
 
 ###########################################################################
@@ -639,6 +665,7 @@ def main():
     np.random.seed(0)
     n_features = 100
     beta = np.random.randn(n_features)
+    lmbda = 0.1
 
     X, y = simu(beta, n_samples=1000, corr=0.5, for_logreg=False)
 
@@ -646,17 +673,21 @@ def main():
     # print("Target vector y : ", y)
 
     # Minimization of the Primal Problem with Coordinate Descent Algorithm
-    beta_hat_cyclic_cd, objs_cyclic_cd = \
-        cyclic_coordinate_descent(X, y, n_iter=5000)
+    beta_hat_cyclic_cd, objs_cyclic_cd, theta_hat_cyclic_cd, P_lmbda, D_lmbda, G_lmbda = \
+        cyclic_coordinate_descent(X, y, lmbda, n_iter=5000)
 
     # print("Beta hat cyclic coordinate descent : ", beta_hat_cyclic_cd)
     # print("Objective function at the optimum cd: ", objs_cyclic_cd)
+    print("Theta hat cyclic coordinate descent : ", theta_hat_cyclic_cd)
+    print("Primal value : ", P_lmbda)
+    print("Dual value : ", D_lmbda)
+    print("Duality Gap : ", G_lmbda)
+
     beta_hat_ols, objs_ols, _, _ = np.linalg.lstsq(X, y)
 
     # print("Beta hat OLS : \n", beta_hat_ols)
     # print("Objective function for the optimum parameters ols: ", objs_ols)
     # Computation of theta_k : equation 11
-    lmbda = 0.1
     theta_k = compute_theta_k(X, y, beta_k=beta, lmbda=lmbda)
 
     # print("Dual optimal paramters vector : ", theta_k)
@@ -734,30 +765,28 @@ def main():
 
     # Plot convergence duality gap 
 
-    beta_hat_set = []
-    dual_gap_grid = []
-    theta_lmbda = dual_solver(X, y, beta, lmbda)
-    n_max_iter = 100
-    for n_iter in range(10,n_max_iter): 
-        beta_hat, _ = cyclic_coordinate_descent(X, y, n_iter)
-        beta_hat_set.append(beta_hat)
-        P_lmbda = primal_pb(X, y, beta_hat, lmbda) 
-        print("Primal value :", P_lmbda)
-        D_lmbda = dual_pb(y, theta_lmbda, lmbda)
-        print("Dual value :", D_lmbda)
-        G_lmbda = duality_gap(P_lmbda, D_lmbda)
-        print("Dual gap value :", G_lmbda)
-        dual_gap_grid.append(G_lmbda)
+    range_iters = [1000, 2000, 3000, 4000, 50000, 6000, 7000, 8000, 9000, 10000]
+
+    for i in range_iters:
+        beta_hat_cyclic_cd, objs_cyclic_cd, theta_hat_cyclic_cd, P_lmbda, D_lmbda, G_lmbda = \
+        cyclic_coordinate_descent(X, y, lmbda, n_iter=i)
+        print("For n_iter = ", i)
+        print("beta hat : ", beta_hat_cyclic_cd)
+        print("theta hat : ", theta_hat_cyclic_cd)
+        print("primal value : ", P_lmbda)
+        print("dual value : ", D_lmbda)
+        print("duality gap : ", G_lmbda)
+
     
-    # print("Decrease of the dual gap", dual_gap_grid)
-    x = range(10,n_max_iter)
-    plt.plot(x, dual_gap_grid, label='dual gap progress', color='blue')
-    plt.yscale('log')
-    plt.title("Convergence of the duality gap")
-    plt.xlabel('number of iterations')
-    plt.ylabel('dual gap')
-    plt.legend(loc='best')
-    plt.show()
+    # # print("Decrease of the dual gap", dual_gap_grid)
+    # x = range(10,n_max_iter)
+    # plt.plot(x, dual_gap_grid, label='dual gap progress', color='blue')
+    # plt.yscale('log')
+    # plt.title("Convergence of the duality gap")
+    # plt.xlabel('number of iterations')
+    # plt.ylabel('dual gap')
+    # plt.legend(loc='best')
+    # plt.show()
 
 if __name__ == "__main__":
     main()
