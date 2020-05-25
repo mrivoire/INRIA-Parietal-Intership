@@ -720,11 +720,11 @@ def main():
     # Coordinate Descent With Gap Safe Rules Algorithm : Algorithm 1
 
     # Plot Objective CD
-    y = objs_cyclic_cd
+    obj = objs_cyclic_cd
 
-    x = np.arange(1, len(y)+1)
+    x = np.arange(1, len(obj)+1)
 
-    plt.plot(x, y, label='cyclic_cd', color='blue')
+    plt.plot(x, obj, label='cyclic_cd', color='blue')
     plt.yscale('log')
     plt.title("Cyclic cd objective")
     plt.xlabel('n_iter')
@@ -732,6 +732,32 @@ def main():
     plt.legend(loc='best')
     plt.show()
 
+    # Plot convergence duality gap 
+
+    beta_hat_set = []
+    dual_gap_grid = []
+    theta_lmbda = dual_solver(X, y, beta, lmbda)
+    n_max_iter = 100
+    for n_iter in range(10,n_max_iter): 
+        beta_hat, _ = cyclic_coordinate_descent(X, y, n_iter)
+        beta_hat_set.append(beta_hat)
+        P_lmbda = primal_pb(X, y, beta_hat, lmbda) 
+        print("Primal value :", P_lmbda)
+        D_lmbda = dual_pb(y, theta_lmbda, lmbda)
+        print("Dual value :", D_lmbda)
+        G_lmbda = duality_gap(P_lmbda, D_lmbda)
+        print("Dual gap value :", G_lmbda)
+        dual_gap_grid.append(G_lmbda)
+    
+    # print("Decrease of the dual gap", dual_gap_grid)
+    x = range(10,n_max_iter)
+    plt.plot(x, dual_gap_grid, label='dual gap progress', color='blue')
+    plt.yscale('log')
+    plt.title("Convergence of the duality gap")
+    plt.xlabel('number of iterations')
+    plt.ylabel('dual gap')
+    plt.legend(loc='best')
+    plt.show()
 
 if __name__ == "__main__":
     main()
