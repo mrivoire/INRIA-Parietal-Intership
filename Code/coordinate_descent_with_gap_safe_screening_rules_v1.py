@@ -110,15 +110,14 @@ def cyclic_coordinate_descent(X, y, lmbda, n_iter=5000):
         i = k % n_features
 
         old_beta_i = beta[i].copy()
-        step = 1/lips_const[i]
-        # reg = old_beta_i * X[:, i]
+        step = 1 / lips_const[i]
         grad = np.dot(X[:, i], residuals)
 
         # Update of the parameters
-        beta[i] += step*grad
+        beta[i] += step * grad
 
         # Apply proximal operator
-        beta[i] = np.sign(beta[i]) * max(abs(beta[i]) - step * lmbda, 0)
+        beta[i] = soft_thresholding(step * lmbda, beta[i])
 
         # Update of the residuals
         if old_beta_i != beta[i]:
@@ -143,53 +142,6 @@ def cyclic_coordinate_descent(X, y, lmbda, n_iter=5000):
             all_objs.append(P_lmbda)
 
     return beta, all_objs, theta, P_lmbda, D_lmbda, G_lmbda
-
-
-###########################################################################
-#                      Theta Computation : Equation 11
-###########################################################################
-
-
-def compute_theta_k(X, y, beta_k, lmbda):
-    """Iterative computation of the dual optimal solution theta
-      Dynamic Safe Rules
-
-    Parameters
-    ----------
-
-    X: numpy.ndarray, shape = (n_samples, n_features)
-      features matrix
-
-    y: numpy.array, shape = (n_features, )
-      target labels vector
-
-    lmbda: numpy.array, shape = (n_iter, )
-          regularization parameters vector
-
-    beta_k: numpy.array, shape = (n_features, )
-            primal optimal parameters vector
-
-    Returns
-    -------
-
-    theta_k: float
-            dual optimal parameters vector
-
-    """
-
-    # Initialization of the parameters
-    # Residuals vector
-    rho_k = y - np.dot(X, beta_k)
-    # Proportionality constant
-    a_k = np.dot(y.T, rho_k)/(lmbda*np.linalg.norm(rho_k)**2)
-    b_k = -1/np.linalg.norm(np.dot(X.T, rho_k), np.inf)
-    c_k = 1/np.linalg.norm(np.dot(X.T, rho_k), np.inf)
-
-    alpha_k = min(max(a_k, b_k), c_k)
-    # Dual optimal parameters vector
-    theta_k = alpha_k * rho_k
-
-    return theta_k
 
 
 ###########################################################################
@@ -221,7 +173,7 @@ def R_primal(X, y, beta, lmbda):
                  primal radius of the dome
     """
 
-    R_hat_lmbda = ((1/lmbda)*np.max(np.linalg.norm(y)**2
+    R_hat_lmbda = ((1 / lmbda)*np.max(np.linalg.norm(y)**2
                    - np.linalg.norm(np.dot(X, beta) - y)**2
                    - 2*lmbda*np.linalg.norm(beta, 1), 0)**(1/2))
 
@@ -237,24 +189,21 @@ def R_dual(y, theta, lmbda):
     """
     Parameters
     ----------
-
     y: numpy.array, shape=(n_samples, )
-       target labels vector
+        target labels vector
 
     theta: numpy.array, shape=(n_features, )
-           dual optimal parameters vector
+        dual optimal parameters vector
 
     lmbda: float
-           regularization parameter
+        regularization parameter
 
     Returns
     -------
-
     R_inv_hat_lmbda: float
-                     dual radius of the dome
+       dual radius of the dome
     """
-
-    R_inv_hat_lmbda = np.linalg.norm(theta - y/lmbda)
+    R_inv_hat_lmbda = np.linalg.norm(theta - y / lmbda)
 
     return R_inv_hat_lmbda
 
@@ -270,15 +219,15 @@ def radius_thm2(R_hat_lmbda, R_inv_hat_lmbda):
     ----------
 
     R_hat_lmbda: float
-                 primal radius of the safe dome region
+        primal radius of the safe dome region
 
     R_inv_hat_lmbda: float
-                     dual radius of the safe dome region
+        dual radius of the safe dome region
 
     Returns
     -------
     r_lmbda: float
-             radius of the safe sphere region
+        radius of the safe sphere region
     """
 
     r_lmbda = np.sqrt(R_inv_hat_lmbda**2 - R_hat_lmbda**2)
@@ -320,11 +269,11 @@ def mu_B(x_j, c, r):
 
 
 ###############################################################
-#    Maximization of the dual problem : Equation 2
+#    compute dual point
 ###############################################################
 
 
-def dual_solver(X, y, beta_hat, lmbda):
+def compute_theta_k(X, y, beta_hat, lmbda):
     """Maximization of the dual problem
        Orthogonal projection of the center of the safe sphere
        onto the feasible set
@@ -448,7 +397,7 @@ def soft_thresholding(u, x):
 
     """
 
-    ST = sign(x)*np.max(np.abs(x) - u, 0)
+    ST = np.sign(x) * max(abs(x) - u, 0)
 
     return ST
 
@@ -481,8 +430,8 @@ def primal_pb(X, y, beta, lmbda):
              value of the primal problem for a given beta vector
     """
 
-    P_lmbda = ((1/2)*np.linalg.norm(np.dot(X, beta) - y, 2)**2
-               + lmbda*np.linalg.norm(beta, 1))
+    P_lmbda = 0.5 * np.linalg.norm(np.dot(X, beta) - y, 2)**2
+    P_lmbda += lmbda * np.linalg.norm(beta, 1)
 
     return P_lmbda
 
@@ -506,13 +455,11 @@ def dual_pb(y, theta, lmbda):
 
     Returns
     -------
-
     D_lmbda: float
              value of the dual problem for a given theta vector
     """
-
-    D_lmbda = ((1/2)*np.linalg.norm(y, ord=2)**2
-               - ((lmbda**2)/2)*np.linalg.norm(theta - y/lmbda, ord=2)**2)
+    D_lmbda = 0.5*np.linalg.norm(y, ord=2)**2
+    D_lmbda -= ((lmbda**2) / 2) * np.linalg.norm(theta - y / lmbda, ord=2)**2
 
     return D_lmbda
 
@@ -676,11 +623,11 @@ def cd_with_gap_safe_rules(X, y, epsilon, K, f, lmbda):
 def main():
     # Data Simulation
     np.random.seed(0)
-    n_features = 100
+    n_samples, n_features = 10, 30
     beta = np.random.randn(n_features)
     lmbda = 0.1
 
-    X, y = simu(beta, n_samples=1000, corr=0.5, for_logreg=False)
+    X, y = simu(beta, n_samples=n_samples, corr=0.5, for_logreg=False)
 
     # print("Features matrix X : ", X)
     # print("Target vector y : ", y)
@@ -695,23 +642,18 @@ def main():
 
     # print("Beta hat cyclic coordinate descent : ", beta_hat_cyclic_cd)
 
-    test = max(abs(np.dot(X.T , y - np.dot(X, beta_hat_cyclic_cd))))
+    test = max(abs(np.dot(X.T, y - np.dot(X, beta_hat_cyclic_cd))))
     print("labmda :", lmbda)
     print("KKT Test : ", test)
-    # print("coefs : ", beta_hat_cyclic_cd)
 
-    # print("Objective function at the optimum cd: ", objs_cyclic_cd)
-    # print("Theta hat cyclic coordinate descent : ", theta_hat_cyclic_cd)
-    # print("Primal value : ", P_lmbda)
-    # print("Dual value : ", D_lmbda)
-    # print("Duality Gap : ", G_lmbda)
+    print("Objective function at the optimum cd: ", objs_cyclic_cd)
+    print("Theta hat cyclic coordinate descent : ", theta_hat_cyclic_cd)
+    print("Primal value : ", P_lmbda)
+    print("Dual value : ", D_lmbda)
+    print("Duality Gap : ", G_lmbda)
 
-    beta_hat_ols, objs_ols, _, _ = np.linalg.lstsq(X, y)
-
-    # print("Beta hat OLS : \n", beta_hat_ols)
-    # print("Objective function for the optimum parameters ols: ", objs_ols)
     # Computation of theta_k : equation 11
-    theta_k = compute_theta_k(X, y, beta_k=beta_hat_cyclic_cd, lmbda=lmbda)
+    theta_k = compute_theta_k(X, y, beta_hat_cyclic_cd, lmbda)
 
     # print("Dual optimal paramters vector : ", theta_k)
 
@@ -739,7 +681,7 @@ def main():
     print("mu value : ", mu)
 
     # Maximization of the dual problem : Equation 2s
-    theta_hat = dual_solver(X, y, beta_hat_cyclic_cd, lmbda)
+    theta_hat = compute_theta_k(X, y, beta_hat_cyclic_cd, lmbda)
     # print("Dual optimal parameters vector theta_hat : ", theta_hat)
 
     # Active set and zero set : Equation 7
@@ -790,7 +732,7 @@ def main():
     plt.xlabel('n_iter')
     plt.ylabel('f obj')
     plt.legend(loc='best')
-    plt.show()   
+    plt.show()
 
 if __name__ == "__main__":
     main()
