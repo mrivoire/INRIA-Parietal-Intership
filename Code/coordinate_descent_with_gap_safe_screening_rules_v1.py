@@ -38,7 +38,7 @@ def simu(beta, n_samples=1000, corr=0.5, for_logreg=False):
     X = multivariate_normal(np.zeros(n_features), cov, size=n_samples)
 
     # Target labels vector with noise
-    y = X.dot(beta) + randn(n_samples)
+    y = np.dot(X, beta) + randn(n_samples)
 
     if for_logreg:
         y = np.sign(y)
@@ -51,7 +51,7 @@ def simu(beta, n_samples=1000, corr=0.5, for_logreg=False):
 ##############################################################################
 
 
-def cyclic_coordinate_descent(X, y, lmbda, n_iter=10):
+def cyclic_coordinate_descent(X, y, lmbda, n_iter=5000):
     """Solver : cyclic coordinate descent
 
     Parameters
@@ -80,7 +80,7 @@ def cyclic_coordinate_descent(X, y, lmbda, n_iter=10):
 
     P_lmbda: float
              primal value
-    
+
     D_lmbda: float
              dual value
 
@@ -104,7 +104,6 @@ def cyclic_coordinate_descent(X, y, lmbda, n_iter=10):
 
     # Iterations of the algorithm
     for k in range(n_iter):
-
         # One cyclicly updates the i^{th} coordinate corresponding to the rest
         # in the Euclidean division by the number of features
         # This allows to always selecting an index between 1 and n_features
@@ -118,18 +117,6 @@ def cyclic_coordinate_descent(X, y, lmbda, n_iter=10):
         # Update of the parameters
         beta[i] += step*grad
 
-        # Computation of theta
-        theta = compute_theta_k(X, y, beta, lmbda)
-
-        # Computation of the primal problem
-        P_lmbda = primal_pb(X,y, beta, lmbda)
-
-        # Computation of the dual problem
-        D_lmbda = dual_pb(y, theta, lmbda)
-
-        # Computation of the dual gap 
-        G_lmbda = duality_gap(P_lmbda, D_lmbda)
-
         # Update of the residuals
         if old_beta_i != beta[i]:
             residuals += np.dot(X[:, i], old_beta_i - beta[i])
@@ -140,6 +127,17 @@ def cyclic_coordinate_descent(X, y, lmbda, n_iter=10):
             # One computes the objective function
             all_objs.append((residuals**2).sum()/2.)
 
+    # Computation of theta
+    theta = compute_theta_k(X, y, beta, lmbda)
+
+    # Computation of the primal problem
+    P_lmbda = primal_pb(X, y, beta, lmbda)
+
+    # Computation of the dual problem
+    D_lmbda = dual_pb(y, theta, lmbda)
+
+    # Computation of the dual gap
+    G_lmbda = duality_gap(P_lmbda, D_lmbda)
 
     return beta, all_objs, theta, P_lmbda, D_lmbda, G_lmbda
 
@@ -550,7 +548,7 @@ def duality_gap(P_lmbda, D_lmbda):
 
 
 ##########################################################
-#                  Gap Safe Sphere : Equation 18
+#              Gap Safe Sphere : Equation 18
 ##########################################################
 
 
@@ -590,9 +588,9 @@ def gap_safe_sphere(X, c, r):
 #    Coordinate Descent With Gap Safe Rules Algorithm : Algorithm 1
 #########################################################################
 
-"""
-def cd_with_gap_safe_rules(X, y, epsilon, K, f, lmbda, T, lmbda_max):
-    """"""Coordinate descent with gap safe rules
+
+def cd_with_gap_safe_rules(X, y, epsilon, K, f, lmbda):
+    """Coordinate descent with gap safe rules
 
     Parameters
     ----------
@@ -603,10 +601,7 @@ def cd_with_gap_safe_rules(X, y, epsilon, K, f, lmbda, T, lmbda_max):
        target labels vector
 
     epsilon: float
-             accuracy
-
-    T: int
-       number of epochs
+             stopping criterion
 
     K: int
        number of iterations
@@ -614,50 +609,65 @@ def cd_with_gap_safe_rules(X, y, epsilon, K, f, lmbda, T, lmbda_max):
     f: int
        frequency
 
-    lmbda: numpy.array, shape = (T-1, )
-           regularization parameters vector
+    lmbda: float (T dimensional vector if we iterate over a grid)
+           regularization parameter
 
     Returns
     -------
 
     beta_lmbda: numpy.array, shape = (n_features, )
                 primal optimal parameters vector
-                for the regularization parameter lmbda_t for t from 1 to T-1
 
-    """"""
+    """
 
     # Initialization
-    lmbda = []
-    lmbda[0] = lmbda_max
-    beta = dict()
-    beta["lmbda0"] = 0
+    n, p = X.shape
+    beta_lmbda = np.zeros(p)
+    theta_lmbda = np.zeros(n)
 
-    for t in range(T-1):
-        beta = beta["lambda" & (t-1)]
+    for k in range(K):
+        # One compute the active set every f iterations
+        # k % f == 1 corresponds to the case where the rest
+        # in the Euclidean division of k by f is equal to 1
+        if k % f == 1:
+            # Compute theta_k :  center of the gap safe sphere
+            theta_lmbda = compute_theta_k(X, y, beta_lmbda, lmbda)
 
-        for k in range(K):
-            if k % f == 1:
+            R_hat_lmbda = R_primal(X, y, beta_lmbda, lmbda)
+            R_chech_lmbda = R_dual(y, theta_lmbda, lmbda)
 
-              # Computation of theta
-              # Equation 11
-              theta_k = compute_theta_k(X, y, beta, lmbda)
-              # Equation 18 : Safe Sphere
+            # Radius of the gap safe sphere
+            r_lmbda = radius_thm2(R_hat_lmbda, R_chech_lmbda)
 
-              # Equation Active Set Theorem 1
-              A_C, Z_C = active_set_vs_zero_set(X)
+            # Gap Safe Sphere
+            # C = gap_safe_sphere(X, theta_lmbda, r_lmbda)
 
+            # Compute the active set and the zero set
+            A_C, Z_C = active_set_vs_zero_set(X, theta_lmbda, r_lmbda)
 
-            if G_lmbda(beta, theta) <= epsilon:
-                beta_lmbda = beta
+            # Compute primal problem
+            P_lmbda = primal_pb(X, y, beta_lmbda, lmbda)
+
+            # Compute dual problem
+            D_lmbda = dual_pb(y, theta_lmbda, lmbda)
+
+            # Compute the duality gap
+            G_lmbda = duality_gap(P_lmbda, D_lmbda)
+
+            if G_lmbda <= epsilon:
+                beta_lmbda, _, _, _, _, _ = \
+                 cyclic_coordinate_descent(X, y, lmbda, n_iter=5000)
+
                 break
 
-        for j in A_C:
-            beta_j = soft_thresholding(lmbda_t/np.linalg.norm(X[:,j])**2,
-                     beta_j - (np.dot(X[:,j].T,
-                     (np.dot(X, beta) - y))/np.linalg.norm(X[:,j])**2))
+            for j in A_C:
+                u_j = (lmbda**2)/(np.linalg.norm(X[:, j])**2)
+                v_j = np.dot(X[:, j].T, beta_lmbda[j]
+                        - ((np.dot(X, beta_lmbda) - y))
+                            / (np.linalg.norm(X[:, j])**2))
+                beta_lmbda[j] = soft_thresholding(u_j, v_j)
 
-    return beta_lmbda_t
-"""
+    return beta_lmbda
 
 
 def main():
@@ -673,27 +683,37 @@ def main():
     # print("Target vector y : ", y)
 
     # Minimization of the Primal Problem with Coordinate Descent Algorithm
-    beta_hat_cyclic_cd, objs_cyclic_cd, theta_hat_cyclic_cd, P_lmbda, D_lmbda, G_lmbda = \
-        cyclic_coordinate_descent(X, y, lmbda, n_iter=5000)
+    (beta_hat_cyclic_cd,
+        objs_cyclic_cd,
+        theta_hat_cyclic_cd,
+        P_lmbda,
+        D_lmbda,
+        G_lmbda) = cyclic_coordinate_descent(X, y, lmbda, n_iter=100000)
 
     # print("Beta hat cyclic coordinate descent : ", beta_hat_cyclic_cd)
+
+    test = max(abs(np.dot(X.T , y - np.dot(X, beta_hat_cyclic_cd))))
+    print("labmda :", lmbda)
+    print("KKT Test : ", test)
+    # print("coefs : ", beta_hat_cyclic_cd)
+
     # print("Objective function at the optimum cd: ", objs_cyclic_cd)
-    print("Theta hat cyclic coordinate descent : ", theta_hat_cyclic_cd)
-    print("Primal value : ", P_lmbda)
-    print("Dual value : ", D_lmbda)
-    print("Duality Gap : ", G_lmbda)
+    # print("Theta hat cyclic coordinate descent : ", theta_hat_cyclic_cd)
+    # print("Primal value : ", P_lmbda)
+    # print("Dual value : ", D_lmbda)
+    # print("Duality Gap : ", G_lmbda)
 
     beta_hat_ols, objs_ols, _, _ = np.linalg.lstsq(X, y)
 
     # print("Beta hat OLS : \n", beta_hat_ols)
     # print("Objective function for the optimum parameters ols: ", objs_ols)
     # Computation of theta_k : equation 11
-    theta_k = compute_theta_k(X, y, beta_k=beta, lmbda=lmbda)
+    theta_k = compute_theta_k(X, y, beta_k=beta_hat_cyclic_cd, lmbda=lmbda)
 
     # print("Dual optimal paramters vector : ", theta_k)
 
     # Computation of R hat : Theorem 2
-    R_hat_lmbda = R_primal(X, y, beta, lmbda)
+    R_hat_lmbda = R_primal(X, y, beta_hat_cyclic_cd, lmbda)
 
     print("R primal (R_hat_lmbda) : \n", R_hat_lmbda)
 
@@ -749,6 +769,12 @@ def main():
     print("Safe Sphere : ", C_k)
 
     # Coordinate Descent With Gap Safe Rules Algorithm : Algorithm 1
+    # epsilon = 0.1
+    # K = 100
+    # f = 10
+    # beta_hat_with_gap_safe_rules
+    # = cd_with_gap_safe_rules(X, y, epsilon, K, f, lmbda)
+    # print("Beta hat with gap safe rules : ", beta_hat_with_gap_safe_rules)
 
     # Plot Objective CD
     obj = objs_cyclic_cd
@@ -761,32 +787,7 @@ def main():
     plt.xlabel('n_iter')
     plt.ylabel('f obj')
     plt.legend(loc='best')
-    plt.show()
-
-    # Plot convergence duality gap 
-
-    range_iters = [1000, 2000, 3000, 4000, 50000, 6000, 7000, 8000, 9000, 10000]
-
-    for i in range_iters:
-        beta_hat_cyclic_cd, objs_cyclic_cd, theta_hat_cyclic_cd, P_lmbda, D_lmbda, G_lmbda = \
-        cyclic_coordinate_descent(X, y, lmbda, n_iter=i)
-        print("For n_iter = ", i)
-        print("beta hat : ", beta_hat_cyclic_cd)
-        print("theta hat : ", theta_hat_cyclic_cd)
-        print("primal value : ", P_lmbda)
-        print("dual value : ", D_lmbda)
-        print("duality gap : ", G_lmbda)
-
-    
-    # # print("Decrease of the dual gap", dual_gap_grid)
-    # x = range(10,n_max_iter)
-    # plt.plot(x, dual_gap_grid, label='dual gap progress', color='blue')
-    # plt.yscale('log')
-    # plt.title("Convergence of the duality gap")
-    # plt.xlabel('number of iterations')
-    # plt.ylabel('dual gap')
-    # plt.legend(loc='best')
-    # plt.show()
+    plt.show()   
 
 if __name__ == "__main__":
     main()
