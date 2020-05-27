@@ -117,27 +117,30 @@ def cyclic_coordinate_descent(X, y, lmbda, n_iter=5000):
         # Update of the parameters
         beta[i] += step*grad
 
+        # Apply proximal operator
+        beta[i] = np.sign(beta[i]) * max(abs(beta[i]) - step * lmbda, 0)
+
         # Update of the residuals
         if old_beta_i != beta[i]:
             residuals += np.dot(X[:, i], old_beta_i - beta[i])
 
-        if k % n_features == 0:
+        if (k % n_features == 0) or (k == (n_iter - 1)):
             # If k % n_features == 0 then we have updated all the coordinates
             # This means that we have performed a whole cycle
-            # One computes the objective function
-            all_objs.append((residuals**2).sum()/2.)
 
-    # Computation of theta
-    theta = compute_theta_k(X, y, beta, lmbda)
+            # Computation of theta
+            theta = compute_theta_k(X, y, beta, lmbda)
 
-    # Computation of the primal problem
-    P_lmbda = primal_pb(X, y, beta, lmbda)
+            # Computation of the primal problem
+            P_lmbda = primal_pb(X, y, beta, lmbda)
 
-    # Computation of the dual problem
-    D_lmbda = dual_pb(y, theta, lmbda)
+            # Computation of the dual problem
+            D_lmbda = dual_pb(y, theta, lmbda)
 
-    # Computation of the dual gap
-    G_lmbda = duality_gap(P_lmbda, D_lmbda)
+            # Computation of the dual gap
+            G_lmbda = duality_gap(P_lmbda, D_lmbda)
+
+            all_objs.append(P_lmbda)
 
     return beta, all_objs, theta, P_lmbda, D_lmbda, G_lmbda
 
