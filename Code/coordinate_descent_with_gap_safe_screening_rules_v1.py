@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 from numpy.random import multivariate_normal
 from scipy.linalg.special_matrices import toeplitz
 from numpy.random import randn
+# import seaborn as sns
 
 ######################################################################
 #     Iterative Solver With Gap Safe Rules
@@ -51,7 +52,8 @@ def simu(beta, n_samples=1000, corr=0.5, for_logreg=False):
 ##############################################################################
 
 
-def cyclic_coordinate_descent(X, y, lmbda, epsilon, f, n_epochs=5000):
+def cyclic_coordinate_descent(X, y, lmbda, epsilon, f, n_epochs=5000,
+                              screening=True):
     """Solver : cyclic coordinate descent
 
     Parameters
@@ -74,6 +76,9 @@ def cyclic_coordinate_descent(X, y, lmbda, epsilon, f, n_epochs=5000):
 
     n_epochs: int, default = 5000
               number of iterations
+
+    screening: bool, default = True
+               defines whether or not one adds screening to the solver
 
     Returns
     -------
@@ -103,6 +108,14 @@ def cyclic_coordinate_descent(X, y, lmbda, epsilon, f, n_epochs=5000):
     beta = np.zeros(n_features)
     theta = np.zeros(n_samples)
     A_C = np.zeros(n_features)
+
+    nb_active_features = []
+    r_list = []
+    primal_hist = []
+    dual_hist = []
+    gap_hist = []
+    theta_hist = []
+
     residuals = y - X.dot(beta)
 
     # Computation of the lipschitz constants vector
@@ -132,41 +145,53 @@ def cyclic_coordinate_descent(X, y, lmbda, epsilon, f, n_epochs=5000):
         if (k % f == 1) or (k == 0):
             # Computation of theta
             theta = compute_theta_k(X, y, beta, lmbda)
+            theta_hist.append(theta)
 
             # Computation of the primal problem
             P_lmbda = primal_pb(X, y, beta, lmbda)
+            primal_hist.append(P_lmbda)
 
             # Computation of the dual problem
             D_lmbda = dual_pb(y, theta, lmbda)
+            dual_hist.append(D_lmbda)
 
             # Computation of the dual gap
             G_lmbda = duality_gap(P_lmbda, D_lmbda)
+            gap_hist.append(G_lmbda)
 
             # Objective function related to the primal
             all_objs.append(P_lmbda)
 
-            # Computation of R_hat
-            R_hat = R_primal(X, y, beta, lmbda)
+            if screening:
 
-            # Computation of R_chech
-            R_chech = R_dual(y, theta, lmbda)
+                # Computation of R_hat
+                # R_hat = R_primal(X, y, beta, lmbda)
 
-            # Computation of the radius of the gap safe sphere
-            r = radius_thm2(R_hat, R_chech)
+                # Computation of R_chech
+                # R_chech = R_dual(y, theta, lmbda)
 
-            # Computation of the active set
-            A_C, _ = active_set_vs_zero_set(X, theta, r)
+                # Computation of the radius of the gap safe sphere
+                # r = radius_thm2(R_hat, R_chech)
+                r = radius(G_lmbda, lmbda)
+                r_list.append(r)
 
-            if G_lmbda <= epsilon:
-                break
+                # Computation of the active set
+                A_C, _ = active_set_vs_zero_set(X, theta, r)
+                nb_active_features.append(len(A_C))
 
-        for j in A_C:
-            u_j = lmbda/np.linalg.norm(X[:, j])**2
-            v_j = (beta[j] - (np.dot(X[:, j].T, np.dot(X, beta) - y))
-                   / np.linalg.norm(X[:, j])**2)
-            beta[j] = soft_thresholding(u_j, v_j)
+                if G_lmbda <= epsilon:
+                    break
 
-    return beta, all_objs, theta, P_lmbda, D_lmbda, G_lmbda
+        if screening:
+            for j in A_C:
+                u_j = lmbda/np.linalg.norm(X[:, j])**2
+                v_j = (beta[j] - (np.dot(X[:, j].T, np.dot(X, beta) - y))
+                       / np.linalg.norm(X[:, j])**2)
+                beta[j] = soft_thresholding(u_j, v_j)
+
+    return (beta, primal_hist, dual_hist, gap_hist, theta_hist,
+            r_list, nb_active_features,
+            all_objs, theta, P_lmbda, D_lmbda, G_lmbda)
 
 
 ###########################################################################
@@ -260,6 +285,26 @@ def radius_thm2(R_hat_lmbda, R_inv_hat_lmbda):
     return r_lmbda
 
 
+def radius(G_lmbda, lmbda):
+    """
+    Parameters
+    ----------
+    G_lmbda: float
+             duality gap
+
+    lmbda: float
+           regularization parameter
+
+    Returns
+    -------
+    r: float
+       radius of the safe sphere
+    """
+
+    r = np.sqrt(2*G_lmbda)/lmbda
+    return r
+
+
 ############################################################################
 #   Mu Function applied to the safe sphere in closed form : Equation 9
 ############################################################################
@@ -288,7 +333,7 @@ def mu_B(x_j, c, r):
         and theta and -x_j
     """
 
-    mu = abs(np.dot(x_j.T, c)) + r*np.linalg.norm(x_j)
+    mu = np.abs(np.dot(x_j.T, c)) + r * np.linalg.norm(x_j)
 
     return mu
 
@@ -568,15 +613,18 @@ def main():
 
     X, y = simu(beta, n_samples=n_samples, corr=0.5, for_logreg=False)
 
-    # print("Features matrix X : ", X)
-    # print("Target vector y : ", y)
-
     # Minimization of the Primal Problem with Coordinate Descent Algorithm
     epsilon = 0.0000001
     f = 10
-    (beta_hat_cyclic_cd,
+    (beta_hat_cyclic_cd_true,
+        primal_hist,
+        dual_hist,
+        gap_hist,
+        theta_hist,
+        r_list,
+        n_active_features_true,
         objs_cyclic_cd,
-        theta_hat_cyclic_cd,
+        theta_hat_cyclic_cdq,
         P_lmbda,
         D_lmbda,
         G_lmbda) = cyclic_coordinate_descent(X,
@@ -584,82 +632,21 @@ def main():
                                              lmbda,
                                              epsilon,
                                              f,
-                                             n_epochs=1000)
+                                             n_epochs=1000,
+                                             screening=True)
 
     # print("Beta hat cyclic coordinate descent : ", beta_hat_cyclic_cd)
-
-    test = max(abs(np.dot(X.T, y - np.dot(X, beta_hat_cyclic_cd))))
-    print("labmda :", lmbda)
-    print("KKT Test : ", test)
-
-    print("Objective function at the optimum cd: ", objs_cyclic_cd)
-    print("Theta hat cyclic coordinate descent : ", theta_hat_cyclic_cd)
-    print("Primal value : ", P_lmbda)
-    print("Dual value : ", D_lmbda)
-    print("Duality Gap : ", G_lmbda)
-
-    # Computation of theta_k : equation 11
-    theta_k = compute_theta_k(X, y, beta_hat_cyclic_cd, lmbda)
-
-    # print("Dual optimal paramters vector : ", theta_k)
-
-    # Computation of R hat : Theorem 2
-    R_hat_lmbda = R_primal(X, y, beta_hat_cyclic_cd, lmbda)
-
-    print("R primal (R_hat_lmbda) : \n", R_hat_lmbda)
-
-    # Computation of R chech : Theorem 2
-    R_inv_hat_lmbda = R_dual(y, theta_k, lmbda)
-
-    print("R dual (R_inv_hat_lmbda) : \n", R_inv_hat_lmbda)
-
-    # Radius of the safe sphere in closed form : Theorem 2
-    r_lmbda = radius_thm2(R_hat_lmbda, R_inv_hat_lmbda)
-
-    print("Radius of the safe sphere region r_lmbda : ", r_lmbda)
-
-    # Mu Function applied to the safe sphere in closed form : Equation 9
-    x_1 = X[:, 1]
-    c = np.random.randn(x_1.shape[0])
-    r = 1
-    mu = mu_B(x_1, c, r)
-
-    print("mu value : ", mu)
-
-    # Maximization of the dual problem : Equation 2s
-    theta_hat = compute_theta_k(X, y, beta_hat_cyclic_cd, lmbda)
-    # print("Dual optimal parameters vector theta_hat : ", theta_hat)
-
-    # Active set and zero set : Equation 7
-    c = theta_hat
-    r = 0.00000001
+    # print("Number of active features : ", n_active_features_true)
+    # print("r list :", r_list)
+    # Test mu
+    c = np.ones(X.shape[0])
+    r = 0.05
     A_C, Z_C = active_set_vs_zero_set(X, c, r)
+    mu_1 = mu_B(X[:, 1], c, r)
+    print("mu 1 :", mu_1)
+    print("active set :", A_C)
 
-    print("Active Set : ", A_C)
-    print("Zero Set : ", Z_C)
-
-    # Primal Problem : Equation 1
-    P_lmbda = primal_pb(X, y, beta_hat_cyclic_cd, lmbda)
-
-    print("Value of the primal problem at the optimum : ", P_lmbda)
-
-    # Dual Problem : Equation 2
-    D_lmbda = dual_pb(y, theta_hat, lmbda)
-    print("Value of the dual problem at the optimum : ", D_lmbda)
-
-    # Duality Gap
-    G_lmbda = duality_gap(P_lmbda, D_lmbda)
-
-    print("Duality gap at the optimum : ", G_lmbda)
-
-    # Gap Safe Sphere : Equation 18
-    r = r_lmbda
-    c = theta_hat
-    C_k = gap_safe_sphere(X, c, r)
-
-    print("Safe Sphere : ", C_k)
-
-    # Plot Objective CD
+    # Plot Objective CD = Primal history
     obj = objs_cyclic_cd
 
     x = np.arange(1, len(obj)+1)
@@ -669,6 +656,40 @@ def main():
     plt.title("Cyclic cd objective")
     plt.xlabel('n_iter')
     plt.ylabel('f obj')
+    plt.legend(loc='best')
+    plt.show()
+
+    # Plots
+    list_epochs = []
+    for i in range(len(dual_hist)):
+        list_epochs.append(10*i)
+
+    # Plot Dual history vs Primal history
+    plt.plot(list_epochs, dual_hist, label='dual', color='red')
+    plt.plot(list_epochs, obj, label='primal', color='blue')
+    plt.yscale('log')
+    plt.title("Primal vs dual monitoring")
+    plt.xlabel('n_epochs')
+    plt.ylabel('optimization problem')
+    plt.legend(loc='best')
+    plt.show()
+
+    # Plot Dual gap
+    plt.plot(list_epochs, gap_hist, label='dual gap', color='cyan')
+    plt.yscale('log')
+    plt.title("Duality gap evolution")
+    plt.xlabel('n_epochs')
+    plt.ylabel('Duality gap')
+    plt.legend(loc='best')
+    plt.show()
+
+    # Plot number of features in active set
+    plt.plot(list_epochs, n_active_features_true,
+             label='n_active_feat', color='magenta')
+    plt.yscale('log')
+    plt.title("Evolution of the number of active features")
+    plt.xlabel('n_epochs')
+    plt.ylabel('Number of active features')
     plt.legend(loc='best')
     plt.show()
 
