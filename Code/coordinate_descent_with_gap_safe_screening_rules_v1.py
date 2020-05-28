@@ -179,7 +179,7 @@ def cyclic_coordinate_descent(X, y, lmbda, epsilon, f, n_epochs=5000,
                 A_C, _ = active_set_vs_zero_set(X, theta, r)
                 nb_active_features.append(len(A_C))
 
-                if G_lmbda <= epsilon:
+                if np.abs(G_lmbda) <= epsilon:
                     break
 
         if screening:
@@ -301,7 +301,7 @@ def radius(G_lmbda, lmbda):
        radius of the safe sphere
     """
 
-    r = np.sqrt(2*G_lmbda)/lmbda
+    r = np.sqrt(2*np.abs(G_lmbda))/lmbda
     return r
 
 
@@ -614,8 +614,29 @@ def main():
     X, y = simu(beta, n_samples=n_samples, corr=0.5, for_logreg=False)
 
     # Minimization of the Primal Problem with Coordinate Descent Algorithm
-    epsilon = 0.0000001
+    epsilon = 10**(-14)
     f = 10
+
+    (beta_hat_cyclic_cd_false,
+        primal_hist,
+        dual_hist,
+        gap_hist,
+        theta_hist,
+        r_list,
+        n_active_features_true,
+        objs_cyclic_cd,
+        theta_hat_cyclic_cdq,
+        P_lmbda,
+        D_lmbda,
+        G_lmbda) = cyclic_coordinate_descent(X,
+                                             y,
+                                             lmbda,
+                                             epsilon,
+                                             f,
+                                             n_epochs=1000,
+                                             screening=False)
+
+
     (beta_hat_cyclic_cd_true,
         primal_hist,
         dual_hist,
@@ -633,11 +654,13 @@ def main():
                                              epsilon,
                                              f,
                                              n_epochs=1000,
-                                             screening=True)
-
-    # print("Beta hat cyclic coordinate descent : ", beta_hat_cyclic_cd)
+                                             screening=True)  
+    
+    print("Beta hat cyclic cd true : ", beta_hat_cyclic_cd_true)
+    print("Beta hat cyclic cd false : ", beta_hat_cyclic_cd_false)
     # print("Number of active features : ", n_active_features_true)
-    # print("r list :", r_list)
+    print("r list :", r_list)
+    print("Dual gap : ", G_lmbda)
     # Test mu
     c = np.ones(X.shape[0])
     r = 0.05
