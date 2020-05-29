@@ -123,9 +123,11 @@ def cyclic_coordinate_descent(X, y, lmbda, epsilon, f, n_epochs=5000,
 
     lips_const = np.linalg.norm(X, axis=0)**2
 
+    A_c = range(n_features)
+
     # Iterations of the algorithm
     for k in range(n_epochs):
-        for i in range(n_features):
+        for i in A_c:
             # One cyclicly updates the i^{th} coordinate corresponding to the
             # rest in the Euclidean division by the number of features
             # This allows to always selecting an index between 1 and n_features
@@ -175,13 +177,6 @@ def cyclic_coordinate_descent(X, y, lmbda, epsilon, f, n_epochs=5000,
 
                 if np.abs(G_lmbda) <= epsilon:
                     break
-
-        if screening:
-            for j in A_C:
-                u_j = lmbda/np.linalg.norm(X[:, j])**2
-                v_j = (beta[j] - (np.dot(X[:, j].T, np.dot(X, beta) - y))
-                       / np.linalg.norm(X[:, j])**2)
-                beta[j] = soft_thresholding(u_j, v_j)
 
     return (beta, A_C_hist, primal_hist, dual_hist, gap_hist, theta_hist,
             r_list, nb_active_features,
