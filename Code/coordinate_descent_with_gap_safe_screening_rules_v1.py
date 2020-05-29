@@ -115,6 +115,7 @@ def cyclic_coordinate_descent(X, y, lmbda, epsilon, f, n_epochs=5000,
     dual_hist = []
     gap_hist = []
     theta_hist = []
+    A_C_hist = []
 
     residuals = y - X.dot(beta)
 
@@ -163,21 +164,14 @@ def cyclic_coordinate_descent(X, y, lmbda, epsilon, f, n_epochs=5000,
             all_objs.append(P_lmbda)
 
             if screening:
-
-                # Computation of R_hat
-                # R_hat = R_primal(X, y, beta, lmbda)
-
-                # Computation of R_chech
-                # R_chech = R_dual(y, theta, lmbda)
-
                 # Computation of the radius of the gap safe sphere
-                # r = radius_thm2(R_hat, R_chech)
                 r = radius(G_lmbda, lmbda)
                 r_list.append(r)
 
                 # Computation of the active set
                 A_C, _ = active_set_vs_zero_set(X, theta, r)
                 nb_active_features.append(len(A_C))
+                A_C_hist.append(A_C)
 
                 if np.abs(G_lmbda) <= epsilon:
                     break
@@ -189,7 +183,7 @@ def cyclic_coordinate_descent(X, y, lmbda, epsilon, f, n_epochs=5000,
                        / np.linalg.norm(X[:, j])**2)
                 beta[j] = soft_thresholding(u_j, v_j)
 
-    return (beta, primal_hist, dual_hist, gap_hist, theta_hist,
+    return (beta, A_C_hist, primal_hist, dual_hist, gap_hist, theta_hist,
             r_list, nb_active_features,
             all_objs, theta, P_lmbda, D_lmbda, G_lmbda)
 
@@ -618,14 +612,15 @@ def main():
     f = 10
 
     (beta_hat_cyclic_cd_false,
+        A_C_hist_false,
         primal_hist,
         dual_hist,
         gap_hist,
-        theta_hist,
+        theta_hist_false,
         r_list,
         n_active_features_true,
         objs_cyclic_cd,
-        theta_hat_cyclic_cdq,
+        theta_hat_cyclic_cd,
         P_lmbda,
         D_lmbda,
         G_lmbda) = cyclic_coordinate_descent(X,
@@ -636,16 +631,26 @@ def main():
                                              n_epochs=1000,
                                              screening=False)
 
+    print("Beta without screening : ", beta_hat_cyclic_cd_false)
+    # Test KKT for theta without screening
+    # kkt_list = []
+    # for j in range(X.shape[1]):
+    #     kkt = np.dot(X[:, j].T, theta_hat_cyclic_cd)
+    #     kkt_list.append(kkt)
+
+    # print("kkt list : ", kkt_list)
+    # print("beta :", beta_hat_cyclic_cd_false)
 
     (beta_hat_cyclic_cd_true,
+        A_C_hist_true,
         primal_hist,
         dual_hist,
         gap_hist,
-        theta_hist,
+        theta_hist_true,
         r_list,
         n_active_features_true,
         objs_cyclic_cd,
-        theta_hat_cyclic_cdq,
+        theta_hat_cyclic_cd,
         P_lmbda,
         D_lmbda,
         G_lmbda) = cyclic_coordinate_descent(X,
@@ -654,29 +659,26 @@ def main():
                                              epsilon,
                                              f,
                                              n_epochs=1000,
-                                             screening=True)  
-    
-    print("Beta hat cyclic cd true : ", beta_hat_cyclic_cd_true)
-    print("Beta hat cyclic cd false : ", beta_hat_cyclic_cd_false)
-    # print("Number of active features : ", n_active_features_true)
-    print("r list :", r_list)
-    print("Dual gap : ", G_lmbda)
-    # Test mu
-    c = np.ones(X.shape[0])
-    r = 0.05
-    A_C, Z_C = active_set_vs_zero_set(X, c, r)
-    mu_1 = mu_B(X[:, 1], c, r)
-    print("mu 1 :", mu_1)
-    print("active set :", A_C)
+                                             screening=True)
 
-    # Plot Objective CD = Primal history
+    print("Beta with screening : ", beta_hat_cyclic_cd_true)
+
+    # Test KKT with screening
+    # kkt_list_true = []
+    # for j in range(X.shape[1]):
+    #     kkt = np.dot(X[:, j].T, theta_hat_cyclic_cd)
+    #     kkt_list_true.append(kkt)
+
+    # print("kkt list true : ", kkt_list_true)
+    # print("beta :", beta_hat_cyclic_cd_true)
+
     obj = objs_cyclic_cd
 
     x = np.arange(1, len(obj)+1)
 
     plt.plot(x, obj, label='cyclic_cd', color='blue')
     plt.yscale('log')
-    plt.title("Cyclic cd objective")
+    plt.title("Cyclic CD Objective")
     plt.xlabel('n_iter')
     plt.ylabel('f obj')
     plt.legend(loc='best')
@@ -687,11 +689,20 @@ def main():
     for i in range(len(dual_hist)):
         list_epochs.append(10*i)
 
+    # Plot history of the radius
+    plt.plot(list_epochs, r_list, label='radius', color='red')
+    plt.yscale('log')
+    plt.title("Convergence of the radius of the safe sphere")
+    plt.xlabel("n_epochs")
+    plt.ylabel("Radius")
+    plt.legend(loc='best')
+    plt.show()
+
     # Plot Dual history vs Primal history
     plt.plot(list_epochs, dual_hist, label='dual', color='red')
     plt.plot(list_epochs, obj, label='primal', color='blue')
     plt.yscale('log')
-    plt.title("Primal vs dual monitoring")
+    plt.title("Primal VS Dual Monitoring")
     plt.xlabel('n_epochs')
     plt.ylabel('optimization problem')
     plt.legend(loc='best')
@@ -700,7 +711,7 @@ def main():
     # Plot Dual gap
     plt.plot(list_epochs, gap_hist, label='dual gap', color='cyan')
     plt.yscale('log')
-    plt.title("Duality gap evolution")
+    plt.title("Convergence of the Duality Gap")
     plt.xlabel('n_epochs')
     plt.ylabel('Duality gap')
     plt.legend(loc='best')
@@ -708,7 +719,7 @@ def main():
 
     # Plot number of features in active set
     plt.plot(list_epochs, n_active_features_true,
-             label='n_active_feat', color='magenta')
+             label='number of active features', color='magenta')
     plt.yscale('log')
     plt.title("Evolution of the number of active features")
     plt.xlabel('n_epochs')
