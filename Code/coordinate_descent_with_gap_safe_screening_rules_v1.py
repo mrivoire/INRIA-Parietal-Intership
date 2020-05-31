@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 from numpy.random import multivariate_normal
 from scipy.linalg.special_matrices import toeplitz
 from numpy.random import randn
-# import seaborn as sns
+import pytest
 
 ######################################################################
 #     Iterative Solver With Gap Safe Rules
@@ -74,7 +74,13 @@ def cyclic_coordinate_descent(X, y, lmbda, epsilon, f, n_epochs=5000,
     f: int
        frequency
 
-    n_epochs: int, default = 5000
+    n_epochs: int, defa
+def inc(x):
+    return x + 1
+
+
+def test_answer():
+    assert inc(3) == 5ult = 5000
               number of iterations
 
     screening: bool, default = True
@@ -123,9 +129,11 @@ def cyclic_coordinate_descent(X, y, lmbda, epsilon, f, n_epochs=5000,
 
     lips_const = np.linalg.norm(X, axis=0)**2
 
+    A_c = range(n_features)
+
     # Iterations of the algorithm
     for k in range(n_epochs):
-        for i in range(n_features):
+        for i in A_c:
             # One cyclicly updates the i^{th} coordinate corresponding to the
             # rest in the Euclidean division by the number of features
             # This allows to always selecting an index between 1 and n_features
@@ -175,13 +183,6 @@ def cyclic_coordinate_descent(X, y, lmbda, epsilon, f, n_epochs=5000,
 
                 if np.abs(G_lmbda) <= epsilon:
                     break
-
-        if screening:
-            for j in A_C:
-                u_j = lmbda/np.linalg.norm(X[:, j])**2
-                v_j = (beta[j] - (np.dot(X[:, j].T, np.dot(X, beta) - y))
-                       / np.linalg.norm(X[:, j])**2)
-                beta[j] = soft_thresholding(u_j, v_j)
 
     return (beta, A_C_hist, primal_hist, dual_hist, gap_hist, theta_hist,
             r_list, nb_active_features,
@@ -598,6 +599,33 @@ def gap_safe_sphere(X, c, r):
     return C_k
 
 
+class TestClass:
+
+    def __init__(self, X, y, lmbda, epsilon, f, n_epochs, screening):
+        self.X = X
+        self.y = y
+        self.lmbda = lmbda
+        self.epsilon = epsilon
+        self.f = f
+        self.n_epochs = n_epochs
+        self.screening = screening
+
+    def test_dual_gap(self):
+        (_, _, _, _, _, _, _, _, _, _, _, _, G_lmbda) = \
+            cyclic_coordinate_descent(self.X, self.y, self.lmbda, self.epsilon,
+                                      self.f, self.n_epochs, self.screening)
+
+        assert G_lmbda <= 10**(-11)
+
+    def test_solver_scikit(self):
+        (beta_hat_cyclic_cd, _, _, _, _, _, _, _, _, _, _, _, _) = \
+         cyclic_coordinate_descent(self.X, self.y, self.lmbda, self.epsilon,
+                                   self.f, self.n_epochs, self.screening)
+
+        lasso = sklearn.linear_model.Lasso(alpha=0.1)
+        assert beta_hat_cyclic_cd == lasso.coef_
+
+
 def main():
     # Data Simulation
     np.random.seed(0)
@@ -608,7 +636,7 @@ def main():
     X, y = simu(beta, n_samples=n_samples, corr=0.5, for_logreg=False)
 
     # Minimization of the Primal Problem with Coordinate Descent Algorithm
-    epsilon = 10**(-14)
+    epsilon = 10**(-20)
     f = 10
 
     (beta_hat_cyclic_cd_false,
@@ -631,15 +659,7 @@ def main():
                                              n_epochs=1000,
                                              screening=False)
 
-    print("Beta without screening : ", beta_hat_cyclic_cd_false)
-    # Test KKT for theta without screening
-    # kkt_list = []
-    # for j in range(X.shape[1]):
-    #     kkt = np.dot(X[:, j].T, theta_hat_cyclic_cd)
-    #     kkt_list.append(kkt)
-
-    # print("kkt list : ", kkt_list)
-    # print("beta :", beta_hat_cyclic_cd_false)
+    # print("Beta without screening : ", beta_hat_cyclic_cd_false)
 
     (beta_hat_cyclic_cd_true,
         A_C_hist_true,
@@ -661,16 +681,18 @@ def main():
                                              n_epochs=1000,
                                              screening=True)
 
-    print("Beta with screening : ", beta_hat_cyclic_cd_true)
+    test = TestClass(X, y, lmbda, epsilon, f, n_epochs=1000, screening=True)
+    test.test_dual_gap()
+    test.test_solver_scikit()
 
-    # Test KKT with screening
-    # kkt_list_true = []
-    # for j in range(X.shape[1]):
-    #     kkt = np.dot(X[:, j].T, theta_hat_cyclic_cd)
-    #     kkt_list_true.append(kkt)
+    # print("Beta with screening : ", beta_hat_cyclic_cd_true)
 
-    # print("kkt list true : ", kkt_list_true)
-    # print("beta :", beta_hat_cyclic_cd_true)
+    # Test Lasso with sckit learn
+    # lasso = Lasso(alpha=lmbda / len(X), fit_intercept=False, normalize=False,
+    #               tol=1e-10).fit(X, y)
+    # coef_ = lasso.coef_
+
+    # print("Lasso ref coeffs : ", coef_)
 
     obj = objs_cyclic_cd
 
