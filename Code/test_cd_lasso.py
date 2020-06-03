@@ -46,5 +46,6 @@ def test_cd_lasso(screening):
     assert G_lmbda < 1e-11
     assert kkt.all() <= 1
     if screening:
-        assert r_list[-1] <= 1
+        assert r_list[-1] < 1e-5
+
     np.testing.assert_allclose(beta_hat_cyclic_cd_true, lasso.coef_, rtol=1)
