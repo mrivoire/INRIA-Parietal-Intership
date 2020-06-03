@@ -16,11 +16,9 @@ def test_cd_lasso_kkt():
     f = 10
 
     (beta_hat_cyclic_cd_false,
-        A_C_hist_false,
         primal_hist,
         dual_hist,
         gap_hist,
-        theta_hist_false,
         r_list,
         n_active_features_true,
         objs_cyclic_cd,
@@ -35,4 +33,4 @@ def test_cd_lasso_kkt():
                                              n_epochs=4000,
                                              screening=False)
 
-    assert gap_hist[-1] < 1e-12
+    assert G_lmbda < 1e-12
