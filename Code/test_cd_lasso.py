@@ -1,20 +1,23 @@
+import pytest
 import numpy as np
 
 from cd_solver_lasso import simu, cyclic_coordinate_descent
 from sklearn.linear_model import Lasso as sklearn_Lasso
 
 
-def test_cd_lasso():
+@pytest.mark.parametrize('screening', [True, False])
+def test_cd_lasso(screening):
     # Data Simulation
     rng = np.random.RandomState(0)
     n_samples, n_features = 10, 30
     beta = rng.randn(n_features)
-    lmbda = 0.1
+    lmbda = 1.
 
     X, y = simu(beta, n_samples=n_samples, corr=0.5, for_logreg=False)
 
     epsilon = 1e-14
     f = 10
+    n_epochs = 100000
 
     (beta_hat_cyclic_cd_true,
         primal_hist,
@@ -31,15 +34,17 @@ def test_cd_lasso():
                                              lmbda,
                                              epsilon,
                                              f,
-                                             n_epochs=100000,
-                                             screening=True)
+                                             n_epochs=n_epochs,
+                                             screening=screening)
 
     # KKT conditions
     kkt = np.abs(np.dot(X.T, y - np.dot(X, beta_hat_cyclic_cd_true)))
     # Sklearn's Lasso
     lasso = sklearn_Lasso(alpha=lmbda / len(X), fit_intercept=False,
-                          normalize=False, tol=1e-10).fit(X, y)
+                          normalize=False,
+                          max_iter=n_epochs, tol=1e-15).fit(X, y)
     assert G_lmbda < 1e-11
     assert kkt.all() <= 1
-    assert r_list[-1] <= 1
+    if screening:
+        assert r_list[-1] <= 1
     np.testing.assert_allclose(beta_hat_cyclic_cd_true, lasso.coef_, rtol=1)
