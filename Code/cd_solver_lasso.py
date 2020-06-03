@@ -185,8 +185,7 @@ def test_answer():
                 if np.abs(G_lmbda) <= epsilon:
                     break
 
-    return (beta, A_C_hist, primal_hist, dual_hist, gap_hist, theta_hist,
-            r_list, nb_active_features,
+    return (beta, primal_hist, dual_hist, gap_hist, r_list, nb_active_features,
             all_objs, theta, P_lmbda, D_lmbda, G_lmbda)
 
 
@@ -730,7 +729,7 @@ def test_KKT_conditions():
 def main():
     # Data Simulation
     np.random.seed(0)
-    n_samples, n_features = 1000, 3000
+    n_samples, n_features = 100, 300
     beta = np.random.randn(n_features)
     lmbda = 0.1
 
@@ -741,11 +740,9 @@ def main():
     f = 10
 
     (beta_hat_cyclic_cd_false,
-        A_C_hist_false,
         primal_hist,
         dual_hist,
         gap_hist,
-        theta_hist_false,
         r_list,
         n_active_features_true,
         objs_cyclic_cd,
@@ -763,11 +760,9 @@ def main():
     # print("Beta without screening : ", beta_hat_cyclic_cd_false)
 
     (beta_hat_cyclic_cd_true,
-        A_C_hist_true,
         primal_hist,
         dual_hist,
         gap_hist,
-        theta_hist_true,
         r_list,
         n_active_features_true,
         objs_cyclic_cd,
@@ -779,14 +774,12 @@ def main():
                                              lmbda,
                                              epsilon,
                                              f,
-                                             n_epochs=100000,
+                                             n_epochs=10000,
                                              screening=True)
-
-    print("gap hist true :", gap_hist)
     # Test Functions
-    # test_lasso()
-    # test_dual_gap_convergence()
-    # test_radius_convergence()
+    pytest test_lasso()
+    pytest test_dual_gap_convergence()
+    pytest test_radius_convergence()
 
     obj = objs_cyclic_cd
 
