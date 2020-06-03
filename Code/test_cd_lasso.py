@@ -31,7 +31,7 @@ def test_cd_lasso_gap():
                                              lmbda,
                                              epsilon,
                                              f,
-                                             n_epochs=1000000,
+                                             n_epochs=100000,
                                              screening=False)
 
     assert G_lmbda < 1e-11
@@ -58,7 +58,7 @@ def test_KKT_conditions():
     X, y = simu(beta, n_samples=n_samples, corr=0.5, for_logreg=False)
 
     (beta_hat_cyclic_cd_true, _, _, _, _, _, _, _, _, _, _) = \
-        cyclic_coordinate_descent(X, y, lmbda, epsilon, f, n_epochs=1000000,
+        cyclic_coordinate_descent(X, y, lmbda, epsilon, f, n_epochs=100000,
                                   screening=True)
 
     kkt = np.abs(np.dot(X.T, y - np.dot(X, beta_hat_cyclic_cd_true)))
@@ -87,7 +87,7 @@ def test_radius_convergence():
     X, y = simu(beta, n_samples=n_samples, corr=0.5, for_logreg=False)
 
     (_, _, _, _, r_list, _, _, _, _, _, G_lmbda) = \
-        cyclic_coordinate_descent(X, y, lmbda, epsilon, f, n_epochs=1000000,
+        cyclic_coordinate_descent(X, y, lmbda, epsilon, f, n_epochs=100000,
                                   screening=True)
 
     assert r_list[-1] <= 1
