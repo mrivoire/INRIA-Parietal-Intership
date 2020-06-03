@@ -3,7 +3,7 @@ import numpy as np
 from cd_solver_lasso import simu, cyclic_coordinate_descent
 
 
-def test_cd_lasso_kkt():
+def test_cd_lasso_gap():
     # Data Simulation
     rng = np.random.RandomState(0)
     n_samples, n_features = 10, 30
