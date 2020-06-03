@@ -729,7 +729,7 @@ def test_KKT_conditions():
 def main():
     # Data Simulation
     np.random.seed(0)
-    n_samples, n_features = 100, 300
+    n_samples, n_features = 10, 30
     beta = np.random.randn(n_features)
     lmbda = 0.1
 
@@ -754,7 +754,7 @@ def main():
                                              lmbda,
                                              epsilon,
                                              f,
-                                             n_epochs=100000,
+                                             n_epochs=10000,
                                              screening=False)
 
     # print("Beta without screening : ", beta_hat_cyclic_cd_false)
@@ -777,9 +777,9 @@ def main():
                                              n_epochs=10000,
                                              screening=True)
     # Test Functions
-    pytest test_lasso()
-    pytest test_dual_gap_convergence()
-    pytest test_radius_convergence()
+    test_lasso()
+    test_dual_gap_convergence()
+    test_radius_convergence()
 
     obj = objs_cyclic_cd
 
