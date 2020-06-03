@@ -48,7 +48,6 @@ def test_KKT_conditions():
     -------
     None
     """
-
     rng = np.random.RandomState(0)
     n_samples, n_features = 10, 30
     beta = rng.randn(n_features)
@@ -62,9 +61,9 @@ def test_KKT_conditions():
         cyclic_coordinate_descent(X, y, lmbda, epsilon, f, n_epochs=100000,
                                   screening=True)
 
-    kkt = abs(np.dot(X.T, y - np.dot(X, beta_hat_cyclic_cd_true)))
+    kkt = np.abs(np.dot(X.T, y - np.dot(X, beta_hat_cyclic_cd_true)))
 
-    np.testing.assert_allclose(kkt, lmbda, rtol=1)
+    assert kkt.all() <= 1
 
 
 def test_radius_convergence():
