@@ -61,50 +61,41 @@ def cyclic_coordinate_descent(X, y, lmbda, epsilon, f, n_epochs=5000,
     ----------
 
     X: numpy.ndarray, shape (n_samples, n_features)
-       features matrix
+        features matrix
 
-    y: numpy.array, shape (n_samples, )
-       target labels vector
+    y: ndarray, shape (n_samples, )
+        target labels vector
 
     lmbda: float
-           regularization parameter
+        regularization parameter
 
     epsilon: float
-             stopping criterion
+        stopping criterion
 
     f: int
        frequency
 
-    n_epochs: int, defa
-def inc(x):
-    return x + 1
-
-
-def test_answer():
-    assert inc(3) == 5ult = 5000
-              number of iterations
+    n_epochs: int,
 
     screening: bool, default = True
-               defines whether or not one adds screening to the solver
+        defines whether or not one adds screening to the solver
 
     Returns
     -------
+    beta: ndarray, shape(n_features,)
+        primal parameters vector
 
-    beta: numpy.array, shape(n_features,)
-          primal parameters vector
-
-    theta: numpy.array, shape(n_samples, )
-           dual parameters vector
+    theta: ndarray, shape(n_samples, )
+        dual parameters vector
 
     P_lmbda: float
-             primal value
+        primal value
 
     D_lmbda: float
-             dual value
+        dual value
 
-    all_objs: numpy.array, shape(n_features)
-              residuals vector
-
+    all_objs: ndarray, shape(n_features)
+        residuals vector
     """
 
     # Initialisation of the parameters
@@ -116,7 +107,7 @@ def test_answer():
     theta = np.zeros(n_samples)
     A_C = np.zeros(n_features)
 
-    nb_active_features = []
+    n_active_features = []
     r_list = []
     primal_hist = []
     dual_hist = []
@@ -152,7 +143,7 @@ def test_answer():
             if old_beta_i != beta[i]:
                 residuals += np.dot(X[:, i], old_beta_i - beta[i])
 
-        if (k % f == 1) or (k == 0):
+        if k % f == 0:
             # Computation of theta
             theta = compute_theta_k(X, y, beta, lmbda)
             theta_hist.append(theta)
@@ -179,13 +170,13 @@ def test_answer():
 
                 # Computation of the active set
                 A_C, _ = active_set_vs_zero_set(X, theta, r)
-                nb_active_features.append(len(A_C))
+                n_active_features.append(len(A_C))
                 A_C_hist.append(A_C)
 
                 if np.abs(G_lmbda) <= epsilon:
                     break
 
-    return (beta, primal_hist, dual_hist, gap_hist, r_list, nb_active_features,
+    return (beta, primal_hist, dual_hist, gap_hist, r_list, n_active_features,
             all_objs, theta, P_lmbda, D_lmbda, G_lmbda)
 
 
@@ -202,10 +193,10 @@ def R_primal(X, y, beta, lmbda):
     X: numpy.ndarray, shape=(n_samples, n_features)
        features matrix
 
-    y: numpy.array, shape=(n_samples, )
+    y: ndarray, shape=(n_samples, )
        target labels vector
 
-    beta: numpy.array, shape=(n_features, )
+    beta: ndarray, shape=(n_features, )
           primal optimal parameters vector
 
     lmbda: float
@@ -234,10 +225,10 @@ def R_dual(y, theta, lmbda):
     """
     Parameters
     ----------
-    y: numpy.array, shape=(n_samples, )
+    y: ndarray, shape=(n_samples, )
         target labels vector
 
-    theta: numpy.array, shape=(n_features, )
+    theta: ndarray, shape=(n_features, )
         dual optimal parameters vector
 
     lmbda: float
@@ -256,29 +247,6 @@ def R_dual(y, theta, lmbda):
 ##################################################################
 #    Radius of the safe sphere in closed form : Theorem 2
 ##################################################################
-
-def radius_thm2(R_hat_lmbda, R_inv_hat_lmbda):
-    """Compute the radius of the safe sphere region
-
-    Parameters
-    ----------
-
-    R_hat_lmbda: float
-        primal radius of the safe dome region
-
-    R_inv_hat_lmbda: float
-        dual radius of the safe dome region
-
-    Returns
-    -------
-    r_lmbda: float
-        radius of the safe sphere region
-    """
-
-    r_lmbda = np.sqrt(R_inv_hat_lmbda**2 - R_hat_lmbda**2)
-
-    return r_lmbda
-
 
 def radius(G_lmbda, lmbda):
     """
@@ -311,18 +279,17 @@ def mu_B(x_j, c, r):
 
     Parameters
     ----------
-    x_j: numpy.array, shape=(n_samples, )
-         jth feature X[:,j]
+    x_j: ndarray, shape=(n_samples, )
+        jth feature X[:,j]
 
     c: float
-       center of the sphere
+        center of the sphere
 
     r: float
-       radius of the sphere
+        radius of the sphere
 
     Returns
     -------
-
     mu: float
         maximum value between the scalar products of theta and x_j
         and theta and -x_j
@@ -348,28 +315,26 @@ def compute_theta_k(X, y, beta_hat, lmbda):
     X: numpy.ndarray, shape = (n_samples, n_features)
        features matrix
 
-    y: numpy.array, shape = (n_samples, )
+    y: ndarray, shape = (n_samples, )
        target labels vector
 
-    beta_hat: numpy.array shape = (n_features, )
-              current primal optimal parameters vector
+    beta_hat: ndarray shape = (n_features, )
+        current primal optimal parameters vector
 
     lmbda: float
-           regularization parameter
+        regularization parameter
 
     Returns
     -------
 
-    theta_hat: numpy.array, shape = (n_samples, )
-               dual optimal parameters vector
-
+    theta_hat: ndarray, shape = (n_samples, )
+        dual optimal parameters vector
     """
-
     # Link equation : Equation 3
-    residus = (y - np.dot(X, beta_hat))/lmbda
+    residuals = (y - np.dot(X, beta_hat))/lmbda
 
     # Orthogonal projection of theta_hat onto the feasible set
-    theta_hat = residus / max(np.max(np.abs(residus)), 1)
+    theta_hat = residuals / max(np.max(np.abs(residuals)), 1)
 
     return theta_hat
 
@@ -386,7 +351,7 @@ def active_set_vs_zero_set(X, c, r):
     X: numpy.ndarray, shape = (n_samples, n_features)
        features matrix
 
-    c: numpy.array, shape = (n_samples, )
+    c: ndarray, shape = (n_samples, )
        center of the safe sphere
 
     r: float
@@ -394,10 +359,10 @@ def active_set_vs_zero_set(X, c, r):
 
     Returns
     -------
-    A_C: numpy.array, shape = (n_idx_active_features, )
+    A_C: ndarray, shape = (n_idx_active_features, )
          active set : contains the indices of the relevant features
 
-    Z_C: numpy.array, shape = (n_idx_zero_features, )
+    Z_C: ndarray, shape = (n_idx_zero_features, )
          zero set : contains the indices of the irrelevant features
     """
     A_C = []
@@ -479,10 +444,10 @@ def primal_pb(X, y, beta, lmbda):
     X: numpy.ndarray, shape = (n_samples, n_features)
        features matrix
 
-    y: numpy.array, shape = (n_samples, )
+    y: ndarray, shape = (n_samples, )
        target labels vector
 
-    beta: numpy.array, shape = (n_features, )
+    beta: ndarray, shape = (n_features, )
           initial vector of primal parameters
 
     lmbda: float
@@ -510,9 +475,9 @@ def dual_pb(y, theta, lmbda):
     """
     Parameters
     ----------
-    y: numpy.array, shape = (n_features, )
+    y: ndarray, shape = (n_features, )
 
-    theta: numpy.array, shape = (n_samples, )
+    theta: ndarray, shape = (n_samples, )
            initial vector of dual parameters
 
     lmbda: float
@@ -575,7 +540,7 @@ def gap_safe_sphere(X, c, r):
     X: numpy.ndarray, shape = (n_samples, n_features)
        features matrix
 
-    c: numpy.array, shape = (n_samples,)
+    c: ndarray, shape = (n_samples,)
        center of the sphere
 
     r: float
