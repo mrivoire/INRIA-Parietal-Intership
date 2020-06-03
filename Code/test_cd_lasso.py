@@ -1,6 +1,6 @@
 import numpy as np
 
-from coordinate_descent_with_gap_safe_screening_rules_v1 import simu, cyclic_coordinate_descent
+from cd_solver_lasso import simu, cyclic_coordinate_descent
 
 
 def test_cd_lasso_kkt():
