@@ -2,15 +2,13 @@ import numpy as np
 import numba
 import scipy.linalg
 
-from numba import njit, types
-from numba.extending import overload, register_jitable
-from numba.core.errors import TypingError
-from numba import cuda
+from numba import njit
 
 from numpy.random import randn
 from numpy.random import multivariate_normal
 from scipy.linalg import toeplitz
 from sklearn.linear_model import Lasso as sklearn_Lasso
+
 
 ##########################################################
 #                    Sign Function
@@ -85,106 +83,6 @@ def simu(beta, n_samples=1000, corr=0.5, for_logreg=False):
 
     return X, y
 
-
-################################################
-#    Active set and zero set : Equation 7
-################################################
-
-
-def active_set_vs_zero_set(X, c, r):
-    """
-    Parameters
-    ----------
-    X: numpy.ndarray, shape = (n_samples, n_features)
-       features matrix
-
-    c: ndarray, shape = (n_samples, )
-       center of the safe sphere
-
-    r: float
-       radius of the safe sphere
-
-    Returns
-    -------
-    A_C: ndarray, shape = (n_idx_active_features, )
-         active set : contains the indices of the relevant features
-
-    Z_C: ndarray, shape = (n_idx_zero_features, )
-         zero set : contains the indices of the irrelevant features
-    """
-    A_C = []
-    Z_C = []
-    n_features = X.shape[1]
-    for j in range(n_features):
-        x_j = X[:, j]
-        mu = np.abs(np.dot(x_j.T, c)) + r * np.linalg.norm(x_j)
-        if mu >= 1:
-            A_C.append(j)
-        else:
-            Z_C.append(j)
-
-    return A_C, Z_C
-
-
-##############################################################################
-#                       Overload functions numba
-##############################################################################
-
-# norm
-@register_jitable
-def _oneD_norm_2(a):
-    # re-usable implementation of the 2-norm
-    val = np.abs(a)
-    return np.sqrt(np.sum(val * val))
-
-
-@overload(scipy.linalg.norm)
-def jit_norm(a, ord=None):
-    if isinstance(ord, types.Optional):
-        ord = ord.type
-    # Reject non integer, floating-point or None types for ord
-    if not isinstance(ord, (types.Integer, types.Float, types.NoneType)):
-        raise TypingError("'ord' must be either integer or floating-point")
-    # Reject non-ndarray types
-    if not isinstance(a, types.Array):
-        raise TypingError("Only accepts NumPy ndarray")
-    # Reject ndarrays with non integer or floating-point dtype
-    if not isinstance(a.dtype, (types.Integer, types.Float)):
-        raise TypingError("Only integer and floating point types accepted")
-    # Reject ndarrays with unsupported dimensionality
-    if not (0 <= a.ndim <= 2):
-        raise TypingError('3D and beyond are not allowed')
-    # Implementation for scalars/0d-arrays
-    elif a.ndim == 0:
-        return a.item()
-    # Implementation for vectors
-    elif a.ndim == 1:
-        def _oneD_norm_x(a, ord=None):
-            if ord == 2 or ord is None:
-                return _oneD_norm_2(a)
-            elif ord == np.inf:
-                return np.max(np.abs(a))
-            elif ord == -np.inf:
-                return np.min(np.abs(a))
-            elif ord == 0:
-                return np.sum(a != 0)
-            elif ord == 1:
-                return np.sum(np.abs(a))
-            else:
-                return np.sum(np.abs(a)**ord)**(1. / ord)
-        return _oneD_norm_x
-    # Implementation for matrices
-    elif a.ndim == 2:
-        def _two_D_norm_2(a, ord=None):
-            return _oneD_norm_2(a.ravel())
-        return _two_D_norm_2
-
-@njit
-def use_norm(a, ord=None):
-    # simple test function to check that the overload works
-    return scipy.linalg.norm(a, ord)
-
-
 ##############################################################################
 #   Minimization of the Primal Problem with Coordinate Descent Algorithm
 ##############################################################################
@@ -231,6 +129,7 @@ def cyclic_coordinate_descent(X, y, lmbda, epsilon, f, n_epochs=5000,
     """
 
     # Initialisation of the parameters
+    X = np.asfortranarray(X)
 
     n_samples, n_features = X.shape
     all_objs = []
@@ -240,8 +139,12 @@ def cyclic_coordinate_descent(X, y, lmbda, epsilon, f, n_epochs=5000,
     residuals = y - X.dot(beta)
 
     # Computation of the lipschitz constants vector
+    # lips_const = 0
+    # for i in range(X.shape[0]):
+    #     lips_const += X[i, :].dot(X[i, :])
+    L = (X ** 2).sum(0)
 
-    lips_const = use_norm(X, ord=1)**2
+    # lips_const = np.linalg.norm(X, axis=0)**2
 
     A_c = list(range(n_features))
 
@@ -251,9 +154,11 @@ def cyclic_coordinate_descent(X, y, lmbda, epsilon, f, n_epochs=5000,
             # One cyclicly updates the i^{th} coordinate corresponding to the
             # rest in the Euclidean division by the number of features
             # This allows to always selecting an index between 1 and n_features
-            old_beta_i = cuda.to_device(beta[i])
-            old_beta_i = old_beta_i.copy_to_host()
-            step = 1 / lips_const[i]
+            # old_beta_i = np.copy(beta[i])
+            if L[i] == 0:
+                continue
+            old_beta_i = beta[i]
+            step = 1 / L[i]
             grad = np.dot(X[:, i], residuals)
 
             # Update of the parameters
@@ -269,14 +174,14 @@ def cyclic_coordinate_descent(X, y, lmbda, epsilon, f, n_epochs=5000,
 
             # Update of the residuals
             if old_beta_i != beta[i]:
-                residuals += np.dot(X[:, i], old_beta_i - beta[i])
+                residuals += (old_beta_i - beta[i])*X[:, i]
 
         if k % f == 0:
             # Computation of theta
             theta = residuals / max(np.max(np.abs(residuals)), 1)
 
             # Computation of the primal problem
-            P_lmbda = 0.5 * np.linalg.norm(residuals, 2)**2
+            P_lmbda = 0.5 * residuals.dot(residuals)
             P_lmbda += lmbda * np.linalg.norm(beta, 1)
             # Objective function related to the primal
             all_objs.append(P_lmbda)
@@ -295,8 +200,7 @@ def cyclic_coordinate_descent(X, y, lmbda, epsilon, f, n_epochs=5000,
 
                 # Computation of the active set
                 for j in A_c:
-                    x_j = X[:, j]
-                    mu = np.abs(np.dot(x_j.T, theta)) + r * np.linalg.norm(x_j)
+                    mu = np.abs(np.dot(X[:, j].T, theta)) + r * X[:, j].sum(0)
                     if mu < 1:
                         A_c.remove(j)
 
