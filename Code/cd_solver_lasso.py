@@ -1,12 +1,13 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import pytest
+import numba 
 
 from numpy.random import randn
 from numpy.random import multivariate_normal
 from scipy.linalg import toeplitz
 from sklearn.linear_model import Lasso as sklearn_Lasso
-
+from numba import njit 
 
 ######################################################################
 #     Iterative Solver With Gap Safe Rules
@@ -39,6 +40,7 @@ def simu(beta, n_samples=1000, corr=0.5, for_logreg=False):
 
     # Features Matrix
     X = multivariate_normal(np.zeros(n_features), cov, size=n_samples)
+    X = np.asfortranarray(X)
 
     # Target labels vector with noise
     y = np.dot(X, beta) + randn(n_samples)
@@ -53,7 +55,7 @@ def simu(beta, n_samples=1000, corr=0.5, for_logreg=False):
 #   Minimization of the Primal Problem with Coordinate Descent Algorithm
 ##############################################################################
 
-
+@njit 
 def cyclic_coordinate_descent(X, y, lmbda, epsilon, f, n_epochs=5000,
                               screening=True):
     """Solver : cyclic coordinate descent
@@ -120,7 +122,7 @@ def cyclic_coordinate_descent(X, y, lmbda, epsilon, f, n_epochs=5000,
 
     # Computation of the lipschitz constants vector
 
-    lips_const = np.linalg.norm(X, axis=0)**2
+    L = (X**2).sum(0)
 
     A_c = range(n_features)
 
@@ -130,19 +132,19 @@ def cyclic_coordinate_descent(X, y, lmbda, epsilon, f, n_epochs=5000,
             # One cyclicly updates the i^{th} coordinate corresponding to the
             # rest in the Euclidean division by the number of features
             # This allows to always selecting an index between 1 and n_features
-            old_beta_i = beta[i].copy()
-            step = 1 / lips_const[i]
+            old_beta_i = beta[i]
+            step = 1 / L[i]
             grad = np.dot(X[:, i], residuals)
 
             # Update of the parameters
             beta[i] += step * grad
 
             # Apply proximal operator
-            beta[i] = soft_tbeta[i] = soft_thresholding(step * lmbda, beta[i])hresholding(step * lmbda, beta[i])
+            beta[i] = soft_thresholding(step * lmbda, beta[i])
 
             # Update of the residuals
             if old_beta_i != beta[i]:
-                residuals += np.dot(X[:, i], old_beta_i - beta[i])
+                residuals += (old_beta_i - beta[i]) * X[:, i]
 
         if k % f == 0:
             # Computation of theta
@@ -249,6 +251,7 @@ def R_dual(y, theta, lmbda):
 #    Radius of the safe sphere in closed form : Theorem 2
 ##################################################################
 
+@njit
 def radius(G_lmbda, lmbda):
     """
     Parameters
@@ -273,7 +276,7 @@ def radius(G_lmbda, lmbda):
 #   Mu Function applied to the safe sphere in closed form : Equation 9
 ############################################################################
 
-
+@njit
 def mu_B(x_j, c, r):
     """Function mu applied to the sphere of center c and radius r
        for the jth feature X[:,j]
@@ -305,7 +308,7 @@ def mu_B(x_j, c, r):
 #    compute dual point
 ###############################################################
 
-
+@njit 
 def compute_theta_k(X, y, beta_hat, lmbda):
     """Maximization of the dual problem
        Orthogonal projection of the center of the safe sphere
@@ -344,7 +347,7 @@ def compute_theta_k(X, y, beta_hat, lmbda):
 #    Active set and zero set : Equation 7
 ################################################
 
-
+@njit
 def active_set_vs_zero_set(X, c, r):
     """
     Parameters
@@ -370,8 +373,7 @@ def active_set_vs_zero_set(X, c, r):
     Z_C = []
     n_features = X.shape[1]
     for j in range(n_features):
-        x_j = X[:, j]
-        mu = mu_B(x_j, c, r)
+        mu = mu_B(X[:, j], c, r)
         if mu >= 1:
             A_C.append(j)
         else:
@@ -411,7 +413,7 @@ def sign(x):
 #    Soft-Thresholding Function
 ######################################
 
-
+@njit 
 def soft_thresholding(u, x):
     """
     Parameters
@@ -437,7 +439,7 @@ def soft_thresholding(u, x):
 #                  Primal Problem : Equation 1
 ##########################################################
 
-
+@njit 
 def primal_pb(X, y, beta, lmbda):
     """
     Parameters
@@ -471,7 +473,7 @@ def primal_pb(X, y, beta, lmbda):
 #                  Dual Problem : Equation 2
 ##########################################################
 
-
+@njit
 def dual_pb(y, theta, lmbda):
     """
     Parameters
@@ -499,7 +501,7 @@ def dual_pb(y, theta, lmbda):
 #                  Duality Gap : Equation 2
 ##########################################################
 
-
+@njit 
 def duality_gap(P_lmbda, D_lmbda):
     """
     Parameters
