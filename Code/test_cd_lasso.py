@@ -1,7 +1,7 @@
 import pytest
 import numpy as np
 
-from cd_solver_lasso import simu, cyclic_coordinate_descent
+from cd_solver_lasso_numba import simu, cyclic_coordinate_descent
 from sklearn.linear_model import Lasso as sklearn_Lasso
 
 
