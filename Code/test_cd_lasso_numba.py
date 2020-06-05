@@ -17,9 +17,9 @@ def test_cd_lasso(screening):
 
     epsilon = 1e-14
     f = 10
-    n_epochs = 100000
+    n_epochs = 1000000
 
-    beta_hat, theta_hat = \
+    beta_hat, theta_hat, all_objs = \
         cyclic_coordinate_descent(X,
                                   y,
                                   lmbda,
@@ -35,7 +35,7 @@ def test_cd_lasso(screening):
     lasso = sklearn_Lasso(alpha=lmbda / len(X), fit_intercept=False,
                           normalize=False,
                           max_iter=n_epochs, tol=1e-15).fit(X, y)
-                          
+
     P_lmbda = 0.5*residuals.dot(residuals)
     P_lmbda += lmbda * np.linalg.norm(beta_hat, 1)
     D_lmbda = 0.5*np.linalg.norm(y, ord=2)**2

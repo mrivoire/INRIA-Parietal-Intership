@@ -90,7 +90,7 @@ def simu(beta, n_samples=1000, corr=0.5, for_logreg=False):
 ##############################################################################
 
 
-# @njit
+@njit
 def cyclic_coordinate_descent(X, y, lmbda, epsilon, f, n_epochs=5000,
                               screening=True):
     """Solver : cyclic coordinate descent

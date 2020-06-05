@@ -1,9 +1,10 @@
 import numpy as np
+import matplotlib.pyplot as plt
+import pytest
+
 from numpy.random import randn
 from numpy.random import multivariate_normal
-import matplotlib.pyplot as plt
-from scipy.linalg.special_matrices import toeplitz
-import pytest
+from scipy.linalg import toeplitz
 from sklearn.linear_model import Lasso as sklearn_Lasso
 
 
@@ -137,7 +138,7 @@ def cyclic_coordinate_descent(X, y, lmbda, epsilon, f, n_epochs=5000,
             beta[i] += step * grad
 
             # Apply proximal operator
-            beta[i] = soft_thresholding(step * lmbda, beta[i])
+            beta[i] = soft_tbeta[i] = soft_thresholding(step * lmbda, beta[i])hresholding(step * lmbda, beta[i])
 
             # Update of the residuals
             if old_beta_i != beta[i]:
