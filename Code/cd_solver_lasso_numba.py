@@ -1,6 +1,7 @@
 import numpy as np
 import numba
 import scipy.linalg
+import matplotlib.pyplot as plt
 
 from numba import njit
 
@@ -74,6 +75,7 @@ def simu(beta, n_samples=1000, corr=0.5, for_logreg=False):
 
     # Features Matrix
     X = multivariate_normal(np.zeros(n_features), cov, size=n_samples)
+    X = np.asfortranarray(X)
 
     # Target labels vector with noise
     y = np.dot(X, beta) + randn(n_samples)
@@ -88,7 +90,7 @@ def simu(beta, n_samples=1000, corr=0.5, for_logreg=False):
 ##############################################################################
 
 
-@njit
+# @njit
 def cyclic_coordinate_descent(X, y, lmbda, epsilon, f, n_epochs=5000,
                               screening=True):
     """Solver : cyclic coordinate descent
@@ -129,7 +131,6 @@ def cyclic_coordinate_descent(X, y, lmbda, epsilon, f, n_epochs=5000,
     """
 
     # Initialisation of the parameters
-    X = np.asfortranarray(X)
 
     n_samples, n_features = X.shape
     all_objs = []
@@ -207,7 +208,7 @@ def cyclic_coordinate_descent(X, y, lmbda, epsilon, f, n_epochs=5000,
                 if np.abs(G_lmbda) <= epsilon:
                     break
 
-    return (beta, theta, all_objs)
+    return beta, theta, all_objs
 
 
 def main():
@@ -231,6 +232,19 @@ def main():
                                   f,
                                   n_epochs,
                                   screening=True)
+
+    print("objective function : ", all_objs)
+    obj = all_objs
+
+    x = np.arange(1, len(obj)+1)
+
+    plt.plot(x, obj, label='cyclic_cd', color='blue')
+    plt.yscale('log')
+    plt.title("Cyclic CD Objective")
+    plt.xlabel('n_iter')
+    plt.ylabel('f obj')
+    plt.legend(loc='best')
+    plt.show()
 
 
 if __name__ == "__main__":
