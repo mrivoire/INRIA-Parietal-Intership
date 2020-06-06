@@ -6,7 +6,8 @@ from sklearn.linear_model import Lasso as sklearn_Lasso
 
 
 @pytest.mark.parametrize('screening', [True, False])
-def test_cd_lasso(screening):
+# @pytest.mark.parametrize('store_history', [True, False])
+def test_cd_lasso(screening, store_history=True):
     # Data Simulation
     rng = np.random.RandomState(0)
     n_samples, n_features = 10, 30
@@ -25,7 +26,6 @@ def test_cd_lasso(screening):
         gap_hist,
         r_list,
         n_active_features_true,
-        objs_cyclic_cd,
         theta_hat_cyclic_cd,
         P_lmbda,
         D_lmbda,
@@ -35,7 +35,8 @@ def test_cd_lasso(screening):
                                              epsilon,
                                              f,
                                              n_epochs=n_epochs,
-                                             screening=screening)
+                                             screening=screening,
+                                             store_history=True)
 
     # KKT conditions
     kkt = np.abs(np.dot(X.T, y - np.dot(X, beta_hat_cyclic_cd_true)))
@@ -43,6 +44,7 @@ def test_cd_lasso(screening):
     lasso = sklearn_Lasso(alpha=lmbda / len(X), fit_intercept=False,
                           normalize=False,
                           max_iter=n_epochs, tol=1e-15).fit(X, y)
+    # Tests 
     assert G_lmbda < 1e-11
     assert kkt.all() <= 1
     if screening:

@@ -57,7 +57,7 @@ def simu(beta, n_samples=1000, corr=0.5, for_logreg=False):
 
 @njit
 def cyclic_coordinate_descent(X, y, lmbda, epsilon, f, n_epochs=5000,
-                              screening=True):
+                              screening=True, store_history=True):
     """Solver : cyclic coordinate descent
 
     Parameters
@@ -66,7 +66,7 @@ def cyclic_coordinate_descent(X, y, lmbda, epsilon, f, n_epochs=5000,
     X: numpy.ndarray, shape (n_samples, n_features)
         features matrix
 
-    y: ndarray, shape (n_samples, )
+    y: numpy.array, shape (n_samples, )
         target labels vector
 
     lmbda: float
@@ -83,12 +83,16 @@ def cyclic_coordinate_descent(X, y, lmbda, epsilon, f, n_epochs=5000,
     screening: bool, default = True
         defines whether or not one adds screening to the solver
 
+    store_history: bool, default = True
+        defines whether or not one stores the values of the parameters
+        while the solver is running
+
     Returns
     -------
-    beta: ndarray, shape(n_features,)
+    beta: numpy.array, shape(n_features,)
         primal parameters vector
 
-    theta: ndarray, shape(n_samples, )
+    theta: numpy.array, shape(n_samples, )
         dual parameters vector
 
     P_lmbda: float
@@ -97,14 +101,28 @@ def cyclic_coordinate_descent(X, y, lmbda, epsilon, f, n_epochs=5000,
     D_lmbda: float
         dual value
 
-    all_objs: ndarray, shape(n_features)
-        residuals vector
+    primal_hist: numpy.array, shape(n_epochs / f, )
+        store the primal values during the whole solving process
+
+    dual_hist: numpy.array, shape(n_epochs / f, )
+        store the dual values during the whole solving process
+
+    gap_hist: numpy.array, shape(n_epochs / f, )
+        store the duality gap values during the whole solving process
+
+    r_list: numpy.array, shape(n_epochs / f, )
+        store the values of the radius of the safe sphere during
+        the screening process
+
+    n_active_features: numpy.array, shape(n_epochs / f, )
+        store the number of active features in the active set
+        during the screening process
+
     """
 
     # Initialisation of the parameters
 
     n_samples, n_features = X.shape
-    all_objs = []
 
     beta = np.zeros(n_features)
     theta = np.zeros(n_samples)
@@ -148,30 +166,30 @@ def cyclic_coordinate_descent(X, y, lmbda, epsilon, f, n_epochs=5000,
             # Computation of theta
             theta = (residuals
                      / (lmbda * max(np.max(np.abs(residuals/lmbda)), 1)))
-            theta_hist.append(theta)
 
             # Computation of the primal problem
             P_lmbda = 0.5 * residuals.dot(residuals)
             P_lmbda += lmbda * np.linalg.norm(beta, 1)
-            primal_hist.append(P_lmbda)
 
             # Computation of the dual problem
             D_lmbda = 0.5*np.linalg.norm(y, ord=2)**2
             D_lmbda -= (((lmbda**2) / 2)
                         * np.linalg.norm(theta - y / lmbda, ord=2)**2)
-            dual_hist.append(D_lmbda)
 
             # Computation of the dual gap
             G_lmbda = P_lmbda - D_lmbda
-            gap_hist.append(G_lmbda)
 
             # Objective function related to the primal
-            all_objs.append(P_lmbda)
+            if store_history:
+                theta_hist.append(theta)
+                primal_hist.append(P_lmbda)
+                dual_hist.append(D_lmbda)
+                gap_hist.append(G_lmbda)
 
             if screening:
                 # Computation of the radius of the gap safe sphere
                 r = np.sqrt(2*np.abs(G_lmbda))/lmbda
-                r_list.append(r)
+                # r_list.append(r)
 
                 # Computation of the active set
                 for j in A_c:
@@ -180,219 +198,22 @@ def cyclic_coordinate_descent(X, y, lmbda, epsilon, f, n_epochs=5000,
                           + r * np.linalg.norm(X[:, j]))
                     if mu < 1:
                         A_c.remove(j)
-                n_active_features.append(len(A_c))
+                if store_history:
+                    n_active_features.append(len(A_c))
+                    r_list.append(r)
 
                 if np.abs(G_lmbda) <= epsilon:
                     break
 
     return (beta, primal_hist, dual_hist, gap_hist, r_list, n_active_features,
-            all_objs, theta, P_lmbda, D_lmbda, G_lmbda)
-
-
-###########################################################################
-#                     Computation of R hat : Theorem 2
-###########################################################################
-
-
-def R_primal(X, y, beta, lmbda):
-    """
-    Parameters
-    ----------
-
-    X: numpy.ndarray, shape=(n_samples, n_features)
-       features matrix
-
-    y: ndarray, shape=(n_samples, )
-       target labels vector
-
-    beta: ndarray, shape=(n_features, )
-          primal optimal parameters vector
-
-    lmbda: float
-           regularization parameter
-
-    Returns
-    -------
-
-    R_hat_lmbda: float
-                 primal radius of the dome
-    """
-
-    R_hat_lmbda = ((1 / lmbda)*np.max(np.linalg.norm(y)**2
-                   - np.linalg.norm(np.dot(X, beta) - y)**2
-                   - 2*lmbda*np.linalg.norm(beta, 1), 0)**(1/2))
-
-    return R_hat_lmbda
-
-
-###########################################################################
-#                     Computation of R chech : Theorem 2
-###########################################################################
-
-
-def R_dual(y, theta, lmbda):
-    """
-    Parameters
-    ----------
-    y: ndarray, shape=(n_samples, )
-        target labels vector
-
-    theta: ndarray, shape=(n_features, )
-        dual optimal parameters vector
-
-    lmbda: float
-        regularization parameter
-
-    Returns
-    -------
-    R_inv_hat_lmbda: float
-       dual radius of the dome
-    """
-    R_inv_hat_lmbda = np.linalg.norm(theta - y / lmbda)
-
-    return R_inv_hat_lmbda
-
-
-##################################################################
-#    Radius of the safe sphere in closed form : Theorem 2
-##################################################################
-
-@njit
-def radius(G_lmbda, lmbda):
-    """
-    Parameters
-    ----------
-    G_lmbda: float
-             duality gap
-
-    lmbda: float
-           regularization parameter
-
-    Returns
-    -------
-    r: float
-       radius of the safe sphere
-    """
-
-    r = np.sqrt(2*np.abs(G_lmbda))/lmbda
-    return r
-
-
-############################################################################
-#   Mu Function applied to the safe sphere in closed form : Equation 9
-############################################################################
-
-@njit
-def mu_B(x_j, c, r):
-    """Function mu applied to the sphere of center c and radius r
-       for the jth feature X[:,j]
-
-    Parameters
-    ----------
-    x_j: ndarray, shape=(n_samples, )
-        jth feature X[:,j]
-
-    c: float
-        center of the sphere
-
-    r: float
-        radius of the sphere
-
-    Returns
-    -------
-    mu: float
-        maximum value between the scalar products of theta and x_j
-        and theta and -x_j
-    """
-
-    mu = np.abs(np.dot(x_j.T, c)) + r * np.linalg.norm(x_j)
-
-    return mu
-
-
-###############################################################
-#    compute dual point
-###############################################################
-
-@njit
-def compute_theta_k(X, y, beta_hat, lmbda):
-    """Maximization of the dual problem
-       Orthogonal projection of the center of the safe sphere
-       onto the feasible set
-
-    Parameters
-    ----------
-    X: numpy.ndarray, shape = (n_samples, n_features)
-       features matrix
-
-    y: ndarray, shape = (n_samples, )
-       target labels vector
-
-    beta_hat: ndarray shape = (n_features, )
-        current primal optimal parameters vector
-
-    lmbda: float
-        regularization parameter
-
-    Returns
-    -------
-
-    theta_hat: ndarray, shape = (n_samples, )
-        dual optimal parameters vector
-    """
-    # Link equation : Equation 3
-    residuals = (y - np.dot(X, beta_hat))/lmbda
-
-    # Orthogonal projection of theta_hat onto the feasible set
-    theta_hat = residuals / max(np.max(np.abs(residuals)), 1)
-
-    return theta_hat
-
-
-################################################
-#    Active set and zero set : Equation 7
-################################################
-
-@njit
-def active_set_vs_zero_set(X, c, r):
-    """
-    Parameters
-    ----------
-    X: numpy.ndarray, shape = (n_samples, n_features)
-       features matrix
-
-    c: ndarray, shape = (n_samples, )
-       center of the safe sphere
-
-    r: float
-       radius of the safe sphere
-
-    Returns
-    -------
-    A_C: ndarray, shape = (n_idx_active_features, )
-         active set : contains the indices of the relevant features
-
-    Z_C: ndarray, shape = (n_idx_zero_features, )
-         zero set : contains the indices of the irrelevant features
-    """
-    A_C = []
-    Z_C = []
-    n_features = X.shape[1]
-    for j in range(n_features):
-        mu = mu_B(X[:, j], c, r)
-        if mu >= 1:
-            A_C.append(j)
-        else:
-            Z_C.append(j)
-
-    return A_C, Z_C
+            theta, P_lmbda, D_lmbda, G_lmbda)
 
 
 ##########################################################
 #                    Sign Function
 ##########################################################
 
-
+@njit
 def sign(x):
     """
     Parameters
@@ -436,141 +257,9 @@ def soft_thresholding(u, x):
 
     """
 
-    ST = np.sign(x) * max(abs(x) - u, 0)
+    ST = sign(x) * max(abs(x) - u, 0)
 
     return ST
-
-
-##########################################################
-#                  Primal Problem : Equation 1
-##########################################################
-
-@njit
-def primal_pb(X, y, beta, lmbda):
-    """
-    Parameters
-    ----------
-    X: numpy.ndarray, shape = (n_samples, n_features)
-       features matrix
-
-    y: ndarray, shape = (n_samples, )
-       target labels vector
-
-    beta: ndarray, shape = (n_features, )
-          initial vector of primal parameters
-
-    lmbda: float
-           regularization parameter
-
-    Returns
-    -------
-
-    P_lmbda: float
-             value of the primal problem for a given beta vector
-    """
-
-    P_lmbda = 0.5 * np.linalg.norm(np.dot(X, beta) - y, 2)**2
-    P_lmbda += lmbda * np.linalg.norm(beta, 1)
-
-    return P_lmbda
-
-
-##########################################################
-#                  Dual Problem : Equation 2
-##########################################################
-
-@njit
-def dual_pb(y, theta, lmbda):
-    """
-    Parameters
-    ----------
-    y: ndarray, shape = (n_features, )
-
-    theta: ndarray, shape = (n_samples, )
-           initial vector of dual parameters
-
-    lmbda: float
-           regularization parameter
-
-    Returns
-    -------
-    D_lmbda: float
-             value of the dual problem for a given theta vector
-    """
-    D_lmbda = 0.5*np.linalg.norm(y, ord=2)**2
-    D_lmbda -= ((lmbda**2) / 2) * np.linalg.norm(theta - y / lmbda, ord=2)**2
-
-    return D_lmbda
-
-
-##########################################################
-#                  Duality Gap : Equation 2
-##########################################################
-
-@njit
-def duality_gap(P_lmbda, D_lmbda):
-    """
-    Parameters
-    ----------
-
-    P_lmbda: float
-             value of the primal problem at the optimum beta_hat
-
-    D_lmbda: float
-             value of the dual problem at the optimum theta_hat
-
-    Returns
-    -------
-    G_lmbda: float
-             duality gap between the primal optimal and the dual optimal
-
-    """
-
-    # Duality gap
-    # If it is equal to 0 then the primal optimal is equal to the dual optimal
-    # and the strong duality holds
-    # If there exists a gap between the primal optimal and the dual optimal
-    # then one only has the weak duality with P_lmbda >= D_lmbda
-    G_lmbda = P_lmbda - D_lmbda
-
-    return G_lmbda
-
-
-##########################################################
-#              Gap Safe Sphere : Equation 18
-##########################################################
-
-
-def gap_safe_sphere(X, c, r):
-    """
-    Parameters
-    ----------
-
-    X: numpy.ndarray, shape = (n_samples, n_features)
-       features matrix
-
-    c: ndarray, shape = (n_samples,)
-       center of the sphere
-
-    r: float
-       radius of the sphere
-
-    Returns
-    -------
-
-    C_k: interval
-         sphere of center c and of radius r
-    """
-
-    _, p = X.shape
-
-    C_k = []
-
-    for j in range(p):
-        if np.linalg.norm(X[:, j] - c) <= r:
-            C_k.append(j)
-
-    return C_k
 
 
 def main():
@@ -592,7 +281,6 @@ def main():
         gap_hist,
         r_list,
         n_active_features_true,
-        objs_cyclic_cd,
         theta_hat_cyclic_cd,
         P_lmbda,
         D_lmbda,
@@ -602,9 +290,8 @@ def main():
                                              epsilon,
                                              f,
                                              n_epochs=10000,
-                                             screening=False)
-
-    # print("Beta without screening : ", beta_hat_cyclic_cd_false)
+                                             screening=False,
+                                             store_history=True)
 
     (beta_hat_cyclic_cd_true,
         primal_hist,
@@ -612,7 +299,6 @@ def main():
         gap_hist,
         r_list,
         n_active_features_true,
-        objs_cyclic_cd,
         theta_hat_cyclic_cd,
         P_lmbda,
         D_lmbda,
@@ -622,9 +308,11 @@ def main():
                                              epsilon,
                                              f,
                                              n_epochs=10000,
-                                             screening=True)
+                                             screening=True,
+                                             store_history=True)
 
-    obj = objs_cyclic_cd
+    # Plot primal objective function (=primal_hist)
+    obj = primal_hist
 
     x = np.arange(1, len(obj)+1)
 
@@ -636,7 +324,7 @@ def main():
     plt.legend(loc='best')
     plt.show()
 
-    # Plots
+    # List of abscissa to plot the evolution of the parameters
     list_epochs = []
     for i in range(len(dual_hist)):
         list_epochs.append(10*i)
