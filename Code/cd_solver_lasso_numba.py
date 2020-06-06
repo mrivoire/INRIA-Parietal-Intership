@@ -1,12 +1,10 @@
 import numpy as np
 import matplotlib.pyplot as plt
-import pytest
-import numba
 
 from numpy.random import randn
 from numpy.random import multivariate_normal
 from scipy.linalg import toeplitz
-from sklearn.linear_model import Lasso as sklearn_Lasso
+
 from numba import njit
 
 ######################################################################
@@ -205,8 +203,8 @@ def cyclic_coordinate_descent(X, y, lmbda, epsilon, f, n_epochs=5000,
                 if np.abs(G_lmbda) <= epsilon:
                     break
 
-    return (beta, primal_hist, dual_hist, gap_hist, r_list, n_active_features,
-            theta, P_lmbda, D_lmbda, G_lmbda)
+    return (beta, primal_hist, dual_hist, gap_hist, r_list,
+            n_active_features, theta, P_lmbda, D_lmbda, G_lmbda)
 
 
 ##########################################################
