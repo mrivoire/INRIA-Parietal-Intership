@@ -1,11 +1,16 @@
 import numpy as np
 import matplotlib.pyplot as plt
+import pandas as pd
 
 from numpy.random import randn
 from numpy.random import multivariate_normal
 from scipy.linalg import toeplitz
 
 from numba import njit
+from sklearn.linear_model import LinearRegression
+from sklearn.preprocessing import KBinsDiscretizer
+from sklearn.tree import DecisionTreeRegressor
+from sklearn.decomposition import PCA
 
 ######################################################################
 #     Iterative Solver With Gap Safe Rules
@@ -47,6 +52,48 @@ def simu(beta, n_samples=1000, corr=0.5, for_logreg=False):
         y = sign(y)
 
     return X, y
+
+
+#############################################################################
+#                       KBins-Discretizer
+#############################################################################
+
+def kbinsDiscretizer(X, n_bins, encode='onehot', strategy='quantile'):
+    """Transform the dataset with KBinsDiscretizer
+
+    Parameters
+    ----------
+    X: numpy.ndarray, shape = (n_samples, n_features)
+        features matrix, dataset
+
+    n_bins: int, default value = 5
+        number of bins taken into account in the discretization process
+
+    encode: string, default value = 'onehot'
+        encoding method
+        onehot = encode the transformed result with one-hot encoding and return
+        a sparse matrix. Ignored features are always stacked to the right.
+        onehot-dense = encode the transformed result with one-hot encoding
+        and return a dense array. Ignored features are always stacked to the
+        right.
+        ordinal = return the bin identifier encoded as an integer value
+
+    strategy: string, default value = 'quantile'
+        strategy used to define the widths of the bins
+        quantile = all bins in each feature have the same number of points
+        uniform = all bins in each feature have identical widths
+        kmeans = values in each bin have the same nearest center of a 1D
+        kmeans cluster
+
+    Returns
+    -------
+    X_binned: numpy.ndarray, shape = (n_samples, n_features)
+        discretized features matrix
+    """
+    enc = KBinsDiscretizer(n_bins=n_bins, encode=encode, strategy=strategy)
+    X_binned = enc.fit_transform(X)
+
+    return X_binned, enc
 
 
 ##############################################################################
@@ -260,6 +307,16 @@ def soft_thresholding(u, x):
     return ST
 
 
+#######################################
+#              Read CSV
+#######################################
+
+
+def read_csv(filePath):
+    data = pd.read_csv(filePath + ".csv")
+    return data
+
+
 def main():
     # Data Simulation
     np.random.seed(0)
@@ -268,6 +325,8 @@ def main():
     lmbda = 0.1
 
     X, y = simu(beta, n_samples=n_samples, corr=0.5, for_logreg=False)
+    print("number of samples :", X.shape[0])
+    print("number of features :", X.shape[1])
 
     # Minimization of the Primal Problem with Coordinate Descent Algorithm
     epsilon = 10**(-20)
@@ -365,6 +424,133 @@ def main():
     plt.legend(loc='best')
     plt.show()
 
+    # Comparison between the linear regression on the original dataset (before
+    # discretization, taking continuous values) and the discretized dataset
+    # (taking only a certain number of discrete values defined by the bins)
+
+    # 1. Prediction on the original dataset
+
+    # Defines the setting of the subplots
+    fig, (ax1, ax2) = plt.subplots(ncols=2, sharey=True, figsize=(10, 4))
+    # Linear regression on the original daaset
+    reg = LinearRegression().fit(X, y)
+    ax1.plot(X[:, 0], reg.predict(X), linewidth=2, color='blue',
+             label='linear regression')
+
+    # Decision Tree on the original dataset
+    reg = DecisionTreeRegressor(min_samples_split=3,
+                                random_state=0).fit(X, y)
+    ax1.plot(X[:, 0], reg.predict(X), linewidth=2, color='red',
+             label='decision tree')
+
+    ax1.plot(X[:, 0], y, 'o', c='k')
+    ax1.legend(loc="best")
+    ax1.set_ylabel("Regression output")
+    ax1.set_xlabel("Input feature")
+    ax1.set_title("Result before discretization")
+
+    # 2. Prediction on the discretized dataset
+    n_bins = 10
+    encode = 'onehot'
+    strategy = 'quantile'
+    X_binned, enc = kbinsDiscretizer(X, n_bins=n_bins, encode=encode,
+                                     strategy=strategy)
+    # Linear Regression on the discretized dataset
+    reg = LinearRegression().fit(X_binned, y)
+    ax2.plot(X[:, 0], reg.predict(X_binned), linewidth=2, color='blue',
+             linestyle='-', label='linear regression')
+    # Decision Tree on the discretized dataset
+    reg = DecisionTreeRegressor(min_samples_split=3,
+                                random_state=0).fit(X_binned, y)
+    ax2.plot(X[:, 0], reg.predict(X_binned), linewidth=2, color='red',
+             linestyle=':', label='decision tree')
+
+    ax2.plot(X[:, 0], y, 'o', c='k')
+    ax2.vlines(enc.bin_edges_[0], *plt.gca().get_ylim(), linewidth=1,
+               alpha=0.2)
+    ax2.legend(loc="best")
+    ax2.set_xlabel("Input features")
+    ax2.set_title("Result after discretization")
+    plt.tight_layout()
+    plt.show()
+
+    # PCA : Principal Component Analysis on the original dataset
+    pca = PCA(n_components=2, svd_solver='full')
+    pca.fit(X)
+    svd = pca.singular_values_
+    var_ratio = pca.explained_variance_ratio_
+    PCs = pca.transform(X)
+    print("Variances of the principal components : ", svd)
+    print("Explained variance ratio : ", var_ratio)
+    print("Principal Components : ", PCs)
+
+    # 3. Prediction on the original dataset after having carried out a PCA
+
+    # Defines the setting of the subplots
+    fig, (ax1, ax2) = plt.subplots(ncols=2, sharey=True, figsize=(10, 4))
+    # Linear regression on the original daaset
+    reg = LinearRegression().fit(X, y)
+    ax1.plot(PCs[:, 0], reg.predict(X), linewidth=2, color='blue',
+             label='linear regression')
+
+    # Decision Tree on the original dataset
+    reg = DecisionTreeRegressor(min_samples_split=3,
+                                random_state=0).fit(X, y)
+    ax1.plot(PCs[:, 0], reg.predict(X), linewidth=2, color='red',
+             label='decision tree')
+
+    ax1.plot(PCs[:, 0], y, 'o', c='k')
+    ax1.legend(loc="best")
+    ax1.set_ylabel("Regression output")
+    ax1.set_xlabel("Input feature")
+    ax1.set_title("Result before discretization")
+
+    # 4. Prediction on the discretized dataset after having carried out a PCA
+    n_bins = 10
+    encode = 'onehot'
+    strategy = 'quantile'
+    X_binned, enc = kbinsDiscretizer(X, n_bins=n_bins, encode=encode,
+                                     strategy=strategy)
+    # Linear Regression on the discretized dataset
+    reg = LinearRegression().fit(X_binned, y)
+    ax2.plot(PCs[:, 0], reg.predict(X_binned), linewidth=2, color='blue',
+             linestyle='-', label='linear regression')
+    # Decision Tree on the discretized dataset
+    reg = DecisionTreeRegressor(min_samples_split=3,
+                                random_state=0).fit(X_binned, y)
+    ax2.plot(PCs[:, 0], reg.predict(X_binned), linewidth=2, color='red',
+             linestyle=':', label='decision tree')
+
+    ax2.plot(PCs[:, 0], y, 'o', c='k')
+    ax2.vlines(enc.bin_edges_[0], *plt.gca().get_ylim(), linewidth=1,
+               alpha=0.2)
+    ax2.legend(loc="best")
+    ax2.set_xlabel("Input features")
+    ax2.set_title("Result after discretization")
+    plt.tight_layout()
+    plt.show()
+
+
+
+    # Results
+    # Before discretization, the predictions are different whether we use
+    # linear regression or decision tree : decision tree is able to build
+    # models which are much more complex than linear regression
+    # After discretization, the predictions are exactly the same whatever we
+    # use linear regression or decision tree.
+
+    # Read CSV : Housing Prices Dataset
+    fileDir = "/home/mrivoire/Documents/M2DS_Polytechnique/Stage_INRIA/Code/Datasets"
+    fileNameTrain = "/housing_prices_train"
+    fileNameTest = "/housing_prices_test"
+    filePathTrain = fileDir + fileNameTrain
+    train_set = read_csv(filePathTrain)
+    head_train = train_set.head()
+    filePathTest = fileDir + fileNameTest
+    test_set = read_csv(filePathTest)
+    head_test = test_set.head()
+    print("Housing Prices Training Set Header : ", head_train)
+    print("Housing Prices Testing Set Header : ", head_test)
 
 if __name__ == "__main__":
     main()
