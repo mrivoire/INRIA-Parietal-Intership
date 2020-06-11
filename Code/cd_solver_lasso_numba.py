@@ -11,6 +11,9 @@ from sklearn.linear_model import LinearRegression
 from sklearn.preprocessing import KBinsDiscretizer
 from sklearn.tree import DecisionTreeRegressor
 from sklearn.decomposition import PCA
+from sklearn.model_selection import cross_val_score
+from sklearn.linear_model import Lasso as sklearn_Lasso
+from sklearn.metrics import mean_absolute_error
 
 ######################################################################
 #     Iterative Solver With Gap Safe Rules
@@ -52,48 +55,6 @@ def simu(beta, n_samples=1000, corr=0.5, for_logreg=False):
         y = sign(y)
 
     return X, y
-
-
-#############################################################################
-#                       KBins-Discretizer
-#############################################################################
-
-def kbinsDiscretizer(X, n_bins, encode='onehot', strategy='quantile'):
-    """Transform the dataset with KBinsDiscretizer
-
-    Parameters
-    ----------
-    X: numpy.ndarray, shape = (n_samples, n_features)
-        features matrix, dataset
-
-    n_bins: int, default value = 5
-        number of bins taken into account in the discretization process
-
-    encode: string, default value = 'onehot'
-        encoding method
-        onehot = encode the transformed result with one-hot encoding and return
-        a sparse matrix. Ignored features are always stacked to the right.
-        onehot-dense = encode the transformed result with one-hot encoding
-        and return a dense array. Ignored features are always stacked to the
-        right.
-        ordinal = return the bin identifier encoded as an integer value
-
-    strategy: string, default value = 'quantile'
-        strategy used to define the widths of the bins
-        quantile = all bins in each feature have the same number of points
-        uniform = all bins in each feature have identical widths
-        kmeans = values in each bin have the same nearest center of a 1D
-        kmeans cluster
-
-    Returns
-    -------
-    X_binned: numpy.ndarray, shape = (n_samples, n_features)
-        discretized features matrix
-    """
-    enc = KBinsDiscretizer(n_bins=n_bins, encode=encode, strategy=strategy)
-    X_binned = enc.fit_transform(X)
-
-    return X_binned, enc
 
 
 ##############################################################################
@@ -307,6 +268,16 @@ def soft_thresholding(u, x):
     return ST
 
 
+#########################################
+#               RMSE
+#########################################
+
+def rmse_cv(model, X, y, scoring="neg_mean_squared_error", cv=5):
+    """RMSE : Cross-val score 
+    """
+    rmse = np.sqrt(-cross_val_score(model, X, y, scoring, cv).mean())
+    return(rmse)
+
 #######################################
 #              Read CSV
 #######################################
@@ -431,16 +402,26 @@ def main():
     # 1. Prediction on the original dataset
 
     # Defines the setting of the subplots
+    n_epochs = 500
     fig, (ax1, ax2) = plt.subplots(ncols=2, sharey=True, figsize=(10, 4))
-    # Linear regression on the original daaset
+    # Linear regression on the original dataset
     reg = LinearRegression().fit(X, y)
+    # Lasso regression on the original dataset
+    lasso = sklearn_Lasso(alpha=lmbda / len(X), fit_intercept=False,
+                          normalize=False, max_iter=n_epochs,
+                          tol=1e-15).fit(X, y)
+
+    # cd = cyclic_coordinate_descent(X, y, lmbda, epsilon, f, n_epochs=10000,
+    #                                screening=False,
+    #                                store_history=True)[0].fit(X, y)
+
     ax1.plot(X[:, 0], reg.predict(X), linewidth=2, color='blue',
              label='linear regression')
 
     # Decision Tree on the original dataset
-    reg = DecisionTreeRegressor(min_samples_split=3,
-                                random_state=0).fit(X, y)
-    ax1.plot(X[:, 0], reg.predict(X), linewidth=2, color='red',
+    tree_reg = DecisionTreeRegressor(min_samples_split=3,
+                                     random_state=0).fit(X, y)
+    ax1.plot(X[:, 0], tree_reg.predict(X), linewidth=2, color='red',
              label='decision tree')
 
     ax1.plot(X[:, 0], y, 'o', c='k')
@@ -453,17 +434,28 @@ def main():
     n_bins = 10
     encode = 'onehot'
     strategy = 'quantile'
-    X_binned, enc = kbinsDiscretizer(X, n_bins=n_bins, encode=encode,
-                                     strategy=strategy)
+    enc = KBinsDiscretizer(n_bins=n_bins, encode=encode, strategy=strategy)
+    X_binned = enc.fit_transform(X)
     # Linear Regression on the discretized dataset
-    reg = LinearRegression().fit(X_binned, y)
-    ax2.plot(X[:, 0], reg.predict(X_binned), linewidth=2, color='blue',
+    binning_reg = LinearRegression().fit(X_binned, y)
+    # Lasso onthe discretized dataset
+    # binning_lasso = sklearn_Lasso(alpha=lmbda / len(X_binned),
+    #                               fit_intercept=False, normalize=False,
+    #                               max_iter=n_epochs,
+    #                               tol=1e-15).fit(X_binned.getnnz(axis=0), y)
+
+    # binning_cd = cyclic_coordinate_descent(X_binned, y, lmbda, epsilon, f,
+    #                                        n_epochs=10000, screening=False,
+    #                                        store_history=True)[0].fit(X_binned,
+    #                                                                   y)
+
+    ax2.plot(X[:, 0], binning_reg.predict(X_binned), linewidth=2, color='blue',
              linestyle='-', label='linear regression')
     # Decision Tree on the discretized dataset
-    reg = DecisionTreeRegressor(min_samples_split=3,
-                                random_state=0).fit(X_binned, y)
-    ax2.plot(X[:, 0], reg.predict(X_binned), linewidth=2, color='red',
-             linestyle=':', label='decision tree')
+    binning_tree_reg = DecisionTreeRegressor(min_samples_split=3,
+                                             random_state=0).fit(X_binned, y)
+    ax2.plot(X[:, 0], binning_tree_reg.predict(X_binned), linewidth=2,
+             color='red', linestyle=':', label='decision tree')
 
     ax2.plot(X[:, 0], y, 'o', c='k')
     ax2.vlines(enc.bin_edges_[0], *plt.gca().get_ylim(), linewidth=1,
@@ -473,6 +465,26 @@ def main():
     ax2.set_title("Result after discretization")
     plt.tight_layout()
     plt.show()
+
+    # Assessment of the model by computing the crossval score
+    original_crossval_score = cross_val_score(reg, X, y, cv=5).mean()
+    std_original_crossval = cross_val_score(reg, X, y, cv=5).std()
+    print("Original crossval score : ", original_crossval_score)
+    print("Std original crossval score : ", std_original_crossval)
+    original_rmse = rmse_cv(reg, X, y, scoring="neg_mean_squared_error", cv=5)
+    print("RMSE on original dataset : ", original_rmse)
+    # mae_original_score = mean_absolute_error(y, reg)
+    # print("MAE original dataset : ", mae_original_score)
+    binning_crossval_score = cross_val_score(reg, X_binned, y, cv=5).mean()
+    std_binning_crossval = cross_val_score(reg, X_binned, y, cv=5).std()
+    print("Binning crossval score : ", binning_crossval_score)
+    print("Std binning crossval score : ", std_binning_crossval)
+    # mae_binning_score = mean_absolute_error(y, binning_reg)
+    # print("MAE binning score : ", mae_binning_score)
+    # cd_crossval_score = cross_val_score(cd, X, y, cv=5)
+    # print("CD crossval score : ", cd_crossval_score)
+    # binning_cd_crossval_score = cross_val_score(binning_cd, X_binned, y, cv=5)
+    # print("Binning CD crossval score : ", binning_cd_crossval_score)
 
     # PCA : Principal Component Analysis on the original dataset
     pca = PCA(n_components=2, svd_solver='full')
@@ -494,9 +506,9 @@ def main():
              label='linear regression')
 
     # Decision Tree on the original dataset
-    reg = DecisionTreeRegressor(min_samples_split=3,
-                                random_state=0).fit(X, y)
-    ax1.plot(PCs[:, 0], reg.predict(X), linewidth=2, color='red',
+    tree_reg = DecisionTreeRegressor(min_samples_split=3,
+                                     random_state=0).fit(X, y)
+    ax1.plot(PCs[:, 0], tree_reg.predict(X), linewidth=2, color='red',
              label='decision tree')
 
     ax1.plot(PCs[:, 0], y, 'o', c='k')
@@ -509,17 +521,17 @@ def main():
     n_bins = 10
     encode = 'onehot'
     strategy = 'quantile'
-    X_binned, enc = kbinsDiscretizer(X, n_bins=n_bins, encode=encode,
-                                     strategy=strategy)
+    enc = KBinsDiscretizer(n_bins=n_bins, encode=encode, strategy=strategy)
+    X_binned = enc.fit_transform(X)
     # Linear Regression on the discretized dataset
-    reg = LinearRegression().fit(X_binned, y)
-    ax2.plot(PCs[:, 0], reg.predict(X_binned), linewidth=2, color='blue',
-             linestyle='-', label='linear regression')
+    binning_reg = LinearRegression().fit(X_binned, y)
+    ax2.plot(PCs[:, 0], binning_reg.predict(X_binned), linewidth=2,
+             color='blue', linestyle='-', label='linear regression')
     # Decision Tree on the discretized dataset
-    reg = DecisionTreeRegressor(min_samples_split=3,
-                                random_state=0).fit(X_binned, y)
-    ax2.plot(PCs[:, 0], reg.predict(X_binned), linewidth=2, color='red',
-             linestyle=':', label='decision tree')
+    binning_tree_reg = DecisionTreeRegressor(min_samples_split=3,
+                                             random_state=0).fit(X_binned, y)
+    ax2.plot(PCs[:, 0], binning_tree_reg.predict(X_binned), linewidth=2,
+             color='red', linestyle=':', label='decision tree')
 
     ax2.plot(PCs[:, 0], y, 'o', c='k')
     ax2.vlines(enc.bin_edges_[0], *plt.gca().get_ylim(), linewidth=1,
@@ -529,8 +541,6 @@ def main():
     ax2.set_title("Result after discretization")
     plt.tight_layout()
     plt.show()
-
-
 
     # Results
     # Before discretization, the predictions are different whether we use
@@ -551,6 +561,7 @@ def main():
     head_test = test_set.head()
     print("Housing Prices Training Set Header : ", head_train)
     print("Housing Prices Testing Set Header : ", head_test)
+
 
 if __name__ == "__main__":
     main()
