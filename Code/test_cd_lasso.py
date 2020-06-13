@@ -1,7 +1,7 @@
 import pytest
 import numpy as np
 
-from cd_solver_lasso_numba import simu, cyclic_coordinate_descent
+from cd_solver_lasso_numba import simu, Lasso
 from sklearn.linear_model import Lasso as sklearn_Lasso
 
 
@@ -20,14 +20,10 @@ def test_cd_lasso(screening, store_history):
     f = 10
     n_epochs = 100000
 
-    out = cyclic_coordinate_descent(X,
-                                    y,
-                                    lmbda,
-                                    epsilon,
-                                    f,
-                                    n_epochs=n_epochs,
-                                    screening=screening,
-                                    store_history=store_history)
+    lasso = Lasso(lmbda=lmbda, epsilon=epsilon, f=f, n_epochs=n_epochs,
+                  screening=True, store_history=True)
+
+    out = lasso.cyclic_coordinate_descent(X, y)
 
     (beta_hat, primal_hist, dual_hist, gap_hist, r_list,
      n_active_features_true, theta_hat_cyclic_cd, P_lmbda, D_lmbda,

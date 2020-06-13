@@ -61,31 +61,26 @@ def simu(beta, n_samples=1000, corr=0.5, for_logreg=False):
 #                           Class Lasso
 ###########################################################################
 
-@njit 
+# @njit
 class Lasso:
     """Defines the functions required for the Lasso optimization problem
 
     Parameters
     ----------
     """
-    @njit 
-    def __init__(self, lmbda, penalty, epsilon, f, n_epochs, solver, screening, 
-                 store_history):
+    # @njit
+    def __init__(self, lmbda, epsilon, f, n_epochs, screening, store_history):
 
         self.lmbda = lmbda
-        self.penalty = penalty
         self.epsilon = epsilon
         self.f = f
         self.n_epochs = n_epochs
-        self.solver = solver
         self.screening = screening
         self.store_history = store_history
 
         assert epsilon > 0
-        assert self.penalty in ['l1']
-        assert self.solver in ['cyclic_coordinate_descent']
 
-    @njit
+    # @njit
     def cyclic_coordinate_descent(self, X, y):
         """Solver : cyclic coordinate descent
 
@@ -195,9 +190,9 @@ class Lasso:
 
             if k % self.f == 0:
                 # Computation of theta
-                theta = (residuals
-                         / (self.lmbda * max(np.max(np.abs(residuals
-                                                    / self.lmbda)), 1)))
+                theta = (residuals / (self.lmbda
+                                      * max(np.max(np.abs(residuals
+                                                          / self.lmbda)), 1)))
 
                 # Computation of the primal problem
                 P_lmbda = 0.5 * residuals.dot(residuals)
@@ -206,7 +201,8 @@ class Lasso:
                 # Computation of the dual problem
                 D_lmbda = 0.5*np.linalg.norm(y, ord=2)**2
                 D_lmbda -= (((self.lmbda**2) / 2)
-                            * np.linalg.norm(theta - y / self.lmbda, ord=2)**2)
+                            * np.linalg.norm(theta - y
+                                             / self.lmbda, ord=2)**2)
 
                 # Computation of the dual gap
                 G_lmbda = P_lmbda - D_lmbda
@@ -220,7 +216,7 @@ class Lasso:
 
                 if self.screening:
                     # Computation of the radius of the gap safe sphere
-                    r = np.sqrt(2*np.abs(G_lmbda))/self.lmbda
+                    r = np.sqrt(2*np.abs(G_lmbda)) / self.lmbda
                     # r_list.append(r)
 
                     # Computation of the active set
@@ -240,7 +236,7 @@ class Lasso:
         return (beta, primal_hist, dual_hist, gap_hist, r_list,
                 n_active_features, theta, P_lmbda, D_lmbda, G_lmbda)
 
-    @njit
+    # @njit
     def fit(self, X, y):
         """Fit the data (X,y) based on the solver of the Lasso class
 
@@ -270,12 +266,12 @@ class Lasso:
          G_lmbda) = self.cyclic_coordinate_descent(X, y)
 
         self.params = beta_hat_cyclic_cd_true
-        self.slopes = beta_hat_cyclic_cd_true[:1]
-        self.intercept = beta_hat_cyclic_cd_true[0]
+        self.slopes = beta_hat_cyclic_cd_true
+        # self.intercept = beta_hat_cyclic_cd_true[0]
 
         return self
 
-    @njit
+    # @njit
     def predict(self, X):
         """Predict the target from the observations matrix
 
@@ -290,11 +286,11 @@ class Lasso:
             predicted target vector
         """
 
-        y_hat = np.dot(X, self.slopes) + self.intercept
+        y_hat = np.dot(X, self.slopes)
 
         return y_hat
 
-    @njit
+    # @njit
     def score(self, X, y):
         """Compute the cross-validation score to assess the performance of the
            model (use negative mean absolute error)
@@ -313,7 +309,6 @@ class Lasso:
             negative mean absolute error (MAE)
             negative to keep the semantic that higher is better
         """
-
         score = -np.mean(np.abs(y - self.predict(X)))
 
         return score
@@ -323,7 +318,7 @@ class Lasso:
 #                    Sign Function
 ##########################################################
 
-@njit
+# @njit
 def sign(x):
     """
     Parameters
@@ -350,7 +345,7 @@ def sign(x):
 #    Soft-Thresholding Function
 ######################################
 
-@njit
+# @njit
 def soft_thresholding(u, x):
     """
     Parameters
@@ -387,29 +382,28 @@ def main():
     np.random.seed(0)
     n_samples, n_features = 10, 30
     beta = np.random.randn(n_features)
+    lmbda = 1.
+    f = 10
+    n_epochs = 100000
 
     X, y = simu(beta, n_samples=n_samples, corr=0.5, for_logreg=False)
     print("number of samples :", X.shape[0])
     print("number of features :", X.shape[1])
 
-    lasso = Lasso(lmbda=1., penalty='l1', epsilon=1., f=10, n_epochs=5000,
-                  solver='cyclic_coordinate_descent', screening=True,
-                  store_history=True)
+    lasso = Lasso(lmbda=lmbda, epsilon=lmbda, f=f, n_epochs=n_epochs,
+                  screening=True, store_history=True)
 
     (beta_hat_cyclic_cd_true,
-     primal_hist,
-     dual_hist,
-     gap_hist,
-     r_list,
-     n_active_features_true,
-     theta_hat_cyclic_cd,
-     P_lmbda,
-     D_lmbda,
-     G_lmbda) = lasso.cyclic_coordinate_descent(X, y)
+        primal_hist,
+        dual_hist,
+        gap_hist,
+        r_list,
+        n_active_features_true,
+        theta_hat_cyclic_cd,
+        P_lmbda,
+        D_lmbda,
+        G_lmbda) = lasso.cyclic_coordinate_descent(X, y)
 
-    print("beta hat : ", beta_hat_cyclic_cd_true)
-
-    """
     # Plot primal objective function (=primal_hist)
     obj = primal_hist
 
@@ -632,7 +626,7 @@ def main():
     head_test = test_set.head()
     print("Housing Prices Training Set Header : ", head_train)
     print("Housing Prices Testing Set Header : ", head_test)
-    """
+
 
 if __name__ == "__main__":
     main()
