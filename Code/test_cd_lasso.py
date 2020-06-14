@@ -23,22 +23,22 @@ def test_cd_lasso(screening, store_history):
     lasso = Lasso(lmbda=lmbda, epsilon=epsilon, f=f, n_epochs=n_epochs,
                   screening=True, store_history=True)
 
-    out = lasso.cyclic_coordinate_descent(X, y)
+    lasso.fit(X, y)
 
-    (beta_hat, primal_hist, dual_hist, gap_hist, r_list,
-     n_active_features_true, theta_hat_cyclic_cd, P_lmbda, D_lmbda,
-     G_lmbda) = out
+    # (beta_hat, primal_hist, dual_hist, gap_hist, r_list,
+    #  n_active_features_true, theta_hat_cyclic_cd, P_lmbda, D_lmbda,
+    #  G_lmbda) = out
 
     # KKT conditions
-    kkt = np.abs(np.dot(X.T, y - np.dot(X, beta_hat)))
+    kkt = np.abs(np.dot(X.T, y - np.dot(X, lasso.slopes)))
     # Sklearn's Lasso
-    lasso = sklearn_Lasso(alpha=lmbda / len(X), fit_intercept=False,
-                          normalize=False,
-                          max_iter=n_epochs, tol=1e-15).fit(X, y)
+    sklasso = sklearn_Lasso(alpha=lmbda / len(X), fit_intercept=False,
+                            normalize=False,
+                            max_iter=n_epochs, tol=1e-15).fit(X, y)
     # Tests
-    assert G_lmbda < 1e-11
+    assert lasso.G_lmbda < 1e-11
     assert kkt.all() <= 1
     if screening and store_history:
-        assert r_list[-1] < 1e-5
+        assert lasso.r_list[-1] < 1e-5
 
-    np.testing.assert_allclose(beta_hat, lasso.coef_, rtol=1)
+    np.testing.assert_allclose(lasso.slopes, sklasso.coef_, rtol=1)
