@@ -334,16 +334,22 @@ def sparse_cd(X_data, X_indices, X_indptr, y, lmbda, epsilon, f, n_epochs,
                 continue
 
             old_beta_i = beta[i]
-            scal = 0.
 
             # Matrix product between the features matrix X and the residuals
             start, end = X_indptr[i:i+2]
+            grad = 0.
             for ind in range(start, end):
-                scal += X_data[ind] * residuals[X_indices[ind]]
+                grad += X_data[ind] * residuals[X_indices[ind]]
 
-            beta[i] = soft_thresholding(beta[i] + scal / L[i], lmbda / L[i])
+            # Update of the parameters
+            step = 1 / L[i]
+            beta[i] += step * grad
+
+            # Apply proximal operator
+            beta[i] = soft_thresholding(step * lmbda, beta[i])
             diff = old_beta_i - beta[i]
 
+            # import ipdb; ipdb.set_trace()
             if diff != 0:
                 for ind in range(start, end):
                     residuals[X_indices[ind]] += diff * X_data[ind]
@@ -524,7 +530,7 @@ class SparseLasso:
 
         assert epsilon > 0
 
-    def fit(self, X_data, X_indices, X_indptr, y):
+    def fit(self, X, y):
         """Fit the data (X,y) based on the solver of the Lasso class
 
         Parameters
@@ -540,6 +546,8 @@ class SparseLasso:
         -------
         self: Lasso object
         """
+
+        X_data, X_indices, X_indptr = X.data, X.indices, X.indptr
 
         (beta_hat_cyclic_cd_true,
          primal_hist,
@@ -560,7 +568,7 @@ class SparseLasso:
 
         return self
 
-    def predict(self, X_data, X_indices, X_indptr):
+    def predict(self, X):
         """Predict the target from the observations matrix
 
         Parameters
@@ -585,16 +593,7 @@ class SparseLasso:
         y_hat: numpy.array, shape = (n_samples, )
         predicted target vector
         """
-        n_features = len(X_indptr) - 1
-        n_samples = max(X_indices) + 1
-
-        y_hat = np.zeros(n_features)
-
-        for i in range(n_samples):
-            for j in range(n_features):
-                y_hat[i] += X_data[X_indices[j]] * self.slopes[X_indptr[j]]
-
-        return y_hat
+        return X.dot(self.slopes)
 
     def score(self, X_data, X_indices, X_indptr, y):
         """Compute the cross-validation score to assess the performance of the
@@ -745,11 +744,9 @@ def main():
         D_lmbda,
         G_lmbda) = cyclic_coordinate_descent(
             X, y, lmbda=lmbda, epsilon=lmbda, f=f, n_epochs=n_epochs,
-            screening=True, store_history=True)
+            screening=False, store_history=True)
 
     print("beta hat", beta_hat_cyclic_cd_true)
-
-    1/0
 
     """        
     # Plot primal objective function (=primal_hist)
