@@ -12,6 +12,9 @@ from sklearn.preprocessing import KBinsDiscretizer
 from sklearn.linear_model import LinearRegression
 from sklearn.decomposition import PCA
 from sklearn.model_selection import cross_val_score
+from scipy.sparse import issparse
+
+from cd_solver_lasso_numba import DenseLasso, cyclic_coordinate_descent
 
 
 #######################################
@@ -85,13 +88,13 @@ def onehot_encoding(dataset):
 
 
 ###########################################################
-#                       Nan Values 
+#                       Nan Values
 ###########################################################
 
 
 def proportion_NaN(dataset):
     prop = dataset.isna().mean()
-    
+
     return prop
 
 
@@ -101,8 +104,20 @@ def fill_NaN(dataset):
     return filled_data
 
 
-def main():
+###############################################################
+#                       Split Train Test
+###############################################################
 
+
+def split_train_test(dataset, train):
+    X_train = dataset[:train.shape[0]]
+    X_test = dataset[train.shape[0]:]
+    y = train.SalePrice
+
+    return X_train, X_test, y
+
+
+def main():
     data_dir = "/home/mrivoire/Documents/M2DS_Polytechnique/Stage_INRIA/Code/Datasets"
     fname_train = data_dir + "/housing_prices_train"
     fname_test = data_dir + "/housing_prices_test"
@@ -134,6 +149,34 @@ def main():
 
     all_data = fill_NaN(all_data)
     print(all_data.head())
+
+    X_train, X_test, y_train = split_train_test(all_data, train_set)
+
+    print("X_train :", X_train.head())
+    print("X_test : ", X_test.head())
+    print("y_train : ", y_train.head())
+
+    # Tests with dense features matrices
+
+    X = X_train.to_numpy()
+    y = y_train.to_numpy()
+
+    lmbda = 1.
+    f = 10
+    epsilon = 1e-14
+    n_epochs = 100000
+    screening = True
+    store_history = True
+
+    dense_lasso = DenseLasso(lmbda=lmbda, epsilon=epsilon, f=f,
+                             n_epochs=n_epochs, screening=screening,
+                             store_history=store_history).fit(X, y)
+
+    dense_cv_score = dense_lasso.score(X, y)
+
+    print("dense crossval score : ", dense_cv_score)
+
+    # print("X type : ", type(X))
 
     # Plots
     # matplotlib.rcParams['figure.figsize'] = (12.0, 6.0)
