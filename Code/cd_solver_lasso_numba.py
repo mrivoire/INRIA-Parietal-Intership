@@ -64,7 +64,7 @@ def simu(beta, n_samples=1000, corr=0.5, for_logreg=False):
 ############################################################################
 
 
-# @njit
+@njit
 def cyclic_coordinate_descent(X, y, lmbda, epsilon, f, n_epochs, screening,
                               store_history):
     """Solver : dense cyclic coordinate descent
@@ -213,7 +213,7 @@ def cyclic_coordinate_descent(X, y, lmbda, epsilon, f, n_epochs, screening,
                     mu = (np.abs(X[:, j].T.dot(theta))
                           + r * np.linalg.norm(X[:, j]))
 
-                    print('dot dense :', np.abs(X[:, j].T.dot(theta)))
+                    # print('dot dense :', np.abs(X[:, j].T.dot(theta)))
                     # print('norm dense', np.linalg.norm(X[:, j]))
 
                     # print("mu dense : ", mu)
@@ -235,6 +235,7 @@ def cyclic_coordinate_descent(X, y, lmbda, epsilon, f, n_epochs, screening,
 #########################################################################
 
 
+@njit
 def sparse_cd(X_data, X_indices, X_indptr, y, lmbda, epsilon, f, n_epochs,
               screening, store_history):
     """Solver : sparse cyclic coordinate descent
@@ -409,7 +410,7 @@ def sparse_cd(X_data, X_indices, X_indptr, y, lmbda, epsilon, f, n_epochs,
                     dot = np.abs(dot)
 
                     mu = np.abs(dot) + r * norm
-                    print("dot sparse :", dot)
+                    # print("dot sparse :", dot)
                     # print('norm :', norm)
                     # print('mu sparse : ', mu)
 
@@ -432,10 +433,8 @@ def sparse_cd(X_data, X_indices, X_indptr, y, lmbda, epsilon, f, n_epochs,
 #                           Class Dense Lasso
 ###########################################################################
 
-# @njit
 class Lasso:
 
-    # @njit
     def __init__(self, lmbda, epsilon, f, n_epochs, screening, store_history):
 
         self.lmbda = lmbda
@@ -447,7 +446,6 @@ class Lasso:
 
         assert epsilon > 0
 
-    # @njit
     def fit(self, X, y):
         """Fit the data (X,y) based on the solver of the Lasso class
 
@@ -486,20 +484,20 @@ class Lasso:
             self.slopes = beta_hat_cyclic_cd_true
             self.G_lmbda = G_lmbda
             self.r_list = r_list
-
-        (beta_hat_cyclic_cd_true,
-         primal_hist,
-         dual_hist,
-         gap_hist,
-         r_list,
-         n_active_features_true,
-         theta_hat_cyclic_cd,
-         P_lmbda,
-         D_lmbda,
-         G_lmbda) = cyclic_coordinate_descent(X, y, self.lmbda, self.epsilon, 
-                                              self.f, self.n_epochs, 
-                                              self.screening, 
-                                              self.store_history)
+        else:
+            (beta_hat_cyclic_cd_true,
+             primal_hist,
+             dual_hist,
+             gap_hist,
+             r_list,
+             n_active_features_true,
+             theta_hat_cyclic_cd,
+             P_lmbda,
+             D_lmbda,
+             G_lmbda) = cyclic_coordinate_descent(X, y, self.lmbda, self.epsilon,
+                                                  self.f, self.n_epochs,
+                                                  self.screening,
+                                                  self.store_history)
 
         self.slopes = beta_hat_cyclic_cd_true
         self.G_lmbda = G_lmbda
@@ -614,13 +612,14 @@ def read_csv(filePath):
 def main():
     # Data Simulation
     np.random.seed(0)
-    n_samples, n_features = 2, 3
+    n_samples, n_features = 10, 30
     beta = np.random.randn(n_features)
     lmbda = 1.
     f = 10
     epsilon = 1e-14
     n_epochs = 100000
     screening = True
+    # screening = False
     store_history = True
 
     X, y = simu(beta, n_samples=n_samples, corr=0.5, for_logreg=False)
@@ -643,8 +642,8 @@ def main():
         theta_hat_cyclic_cd_sparse,
         P_lmbda_sparse,
         D_lmbda_sparse,
-        G_lmbda_sparse) = sparse_cd(X_data=X_data, X_indices=X_indices, 
-                                    X_indptr=X_indptr, y=y, lmbda=lmbda, 
+        G_lmbda_sparse) = sparse_cd(X_data=X_data, X_indices=X_indices,
+                                    X_indptr=X_indptr, y=y, lmbda=lmbda,
                                     epsilon=epsilon, f=f,
                                     n_epochs=n_epochs, screening=screening,
                                     store_history=store_history)
@@ -662,14 +661,14 @@ def main():
         theta_hat_cyclic_cd,
         P_lmbda,
         D_lmbda,
-        G_lmbda) = cyclic_coordinate_descent(X, y, lmbda=lmbda, epsilon=lmbda, 
-                                             f=f, n_epochs=n_epochs, 
-                                             screening=True, 
+        G_lmbda) = cyclic_coordinate_descent(X, y, lmbda=lmbda, epsilon=lmbda,
+                                             f=f, n_epochs=n_epochs,
+                                             screening=screening,
                                              store_history=True)
 
     print("beta hat dense solver : ", beta_hat_cyclic_cd_true)
 
-    """        
+    """
     # Plot primal objective function (=primal_hist)
     obj = primal_hist
 

@@ -3,14 +3,16 @@ import numpy as np
 
 from cd_solver_lasso_numba import simu, Lasso
 from sklearn.linear_model import Lasso as sklearn_Lasso
+from scipy.sparse import csc_matrix
 
 
 @pytest.mark.parametrize('screening', [True, False])
 @pytest.mark.parametrize('store_history', [True, False])
-def test_cd_lasso(screening, store_history):
+@pytest.mark.parametrize('sparse', [True, False])
+def test_cd_lasso(screening, store_history, sparse):
     # Data Simulation
     rng = np.random.RandomState(0)
-    n_samples, n_features = 10, 30
+    n_samples, n_features = 20, 30
     beta = rng.randn(n_features)
     lmbda = 1.
 
@@ -19,6 +21,9 @@ def test_cd_lasso(screening, store_history):
     epsilon = 1e-14
     f = 10
     n_epochs = 100000
+
+    if sparse:
+        X = csc_matrix(X)
 
     lasso = Lasso(lmbda=lmbda, epsilon=epsilon, f=f, n_epochs=n_epochs,
                   screening=True, store_history=True)
@@ -30,9 +35,9 @@ def test_cd_lasso(screening, store_history):
     #  G_lmbda) = out
 
     # KKT conditions
-    kkt = np.abs(np.dot(X.T, y - np.dot(X, lasso.slopes)))
+    kkt = np.abs(X.T.dot(y - X.dot(lasso.slopes)))
     # Sklearn's Lasso
-    sklasso = sklearn_Lasso(alpha=lmbda / len(X), fit_intercept=False,
+    sklasso = sklearn_Lasso(alpha=lmbda / X.shape[0], fit_intercept=False,
                             normalize=False,
                             max_iter=n_epochs, tol=1e-15).fit(X, y)
     # Tests
