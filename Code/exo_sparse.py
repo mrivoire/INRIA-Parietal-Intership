@@ -155,12 +155,14 @@ def main():
     col = column_sparse_matrix(A_data, A_indices, A_indptr, 2)
     print("col = ", col)
 
-    row = row_sparse_matrix(A_data, A_indices, A_indptr, 1)
-    print("row = ", row)
+    # row = row_sparse_matrix(A_data, A_indices, A_indptr, 1)
+    # print("row = ", row)
 
     vect = np.array([1, 2, 3])
 
     prod = sparse_matrix_product(A_data, A_indices, A_indptr, vect)
+
+    print("result = ", vect.dot(A))
 
     print("prod = ", prod)
 

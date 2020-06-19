@@ -14,6 +14,7 @@ from sklearn.decomposition import PCA
 from sklearn.model_selection import cross_val_score
 from sklearn.linear_model import Lasso as sklearn_Lasso
 from scipy.sparse import csc_matrix
+from scipy.sparse import issparse
 
 ######################################################################
 #     Iterative Solver With Gap Safe Rules
@@ -318,7 +319,6 @@ def sparse_cd(X_data, X_indices, X_indptr, y, lmbda, epsilon, f, n_epochs,
     D_lmbda = 0
     G_lmbda = 0
 
-
     A_c = list(range(n_features))
 
     L = np.zeros(n_features)
@@ -354,60 +354,62 @@ def sparse_cd(X_data, X_indices, X_indptr, y, lmbda, epsilon, f, n_epochs,
                 for ind in range(start, end):
                     residuals[X_indices[ind]] += diff * X_data[ind]
 
-        # if k % f == 0:
-        #     # Computation of theta
-        #     theta = (residuals / (lmbda
-        #                           * max(np.max(np.abs(residuals
-        #                                               / lmbda)), 1)))
+        if k % f == 0:
+            # Computation of theta
+            theta = (residuals / (lmbda
+                                  * max(np.max(np.abs(residuals
+                                                      / lmbda)), 1)))
 
-        #     # Computation of the primal problem
-        #     P_lmbda = 0.5 * residuals.dot(residuals)
-        #     P_lmbda += lmbda * np.linalg.norm(beta, 1)
+            # Computation of the primal problem
+            P_lmbda = 0.5 * residuals.dot(residuals)
+            P_lmbda += lmbda * np.linalg.norm(beta, 1)
 
-        #     # Computation of the dual problem
-        #     D_lmbda = 0.5 * np.linalg.norm(y, ord=2)**2
-        #     D_lmbda -= (((lmbda**2) / 2)
-        #                 * np.linalg.norm(theta - y
-        #                                  / lmbda, ord=2)**2)
+            # Computation of the dual problem
+            D_lmbda = 0.5 * np.linalg.norm(y, ord=2)**2
+            D_lmbda -= (((lmbda**2) / 2)
+                        * np.linalg.norm(theta - y
+                                         / lmbda, ord=2)**2)
 
-        #     # Computation of the dual gap
-        #     G_lmbda = P_lmbda - D_lmbda
+            # Computation of the dual gap
+            G_lmbda = P_lmbda - D_lmbda
 
-        #     # Objective function related to the primal
-        #     if store_history:
-        #         theta_hist.append(theta)
-        #         primal_hist.append(P_lmbda)
-        #         dual_hist.append(D_lmbda)
-        #         gap_hist.append(G_lmbda)
+            # Objective function related to the primal
+            if store_history:
+                theta_hist.append(theta)
+                primal_hist.append(P_lmbda)
+                dual_hist.append(D_lmbda)
+                gap_hist.append(G_lmbda)
 
-        #     if screening:
-        #         # Computation of the radius of the gap safe sphere
-        #         r = np.sqrt(2 * np.abs(G_lmbda)) / lmbda
-        #         if store_history:
-        #             r_list.append(r)
+            if screening:
+                # Computation of the radius of the gap safe sphere
+                r = np.sqrt(2 * np.abs(G_lmbda)) / lmbda
+                if store_history:
+                    r_list.append(r)
 
-        #         # Computation of the active set
-        #         for j in A_c:
-        #             start, end = X_indptr[j:j+2]
-        #             dot = 0.
-        #             norm = 0.
+                # Computation of the active set
+                for j in A_c:
+                    start, end = X_indptr[j:j+2]
+                    dot = 0.
+                    norm = 0.
 
-        #             for ind in range(start, end):
-        #                 dot += X_data[ind] * theta[X_indices[ind]]
-        #                 norm += X_data[ind]**2
+                    for ind in range(start, end):
+                        dot += X_data[ind] * theta[X_indices[ind]]
+                        norm += X_data[ind]**2
 
-        #             mu = np.abs(dot) + r * np.linalg.norm(X_data[ind])
+                    norm = np.sqrt(norm)
 
-        #             # mu = (np.abs(np.dot(X_data[X_indptr[j]].T, theta))
-        #             #       + r * np.linalg.norm(X_data[X_indptr[j]]))
-        #             if mu < 1:
-        #                 A_c.remove(j)
-        #         if store_history:
-        #             n_active_features.append(len(A_c))
-        #             r_list.append(r)
+                    mu = np.abs(dot) + r * norm
 
-        #         if np.abs(G_lmbda) <= epsilon:
-        #             break
+                    # mu = (np.abs(np.dot(X_data[X_indptr[j]].T, theta))
+                    #       + r * np.linalg.norm(X_data[X_indptr[j]]))
+                    if mu < 1:
+                        A_c.remove(j)
+                if store_history:
+                    n_active_features.append(len(A_c))
+                    r_list.append(r)
+
+                if np.abs(G_lmbda) <= epsilon:
+                    break
 
     return (beta, primal_hist, dual_hist, gap_hist, r_list,
             n_active_features, theta, P_lmbda, D_lmbda, G_lmbda)
@@ -420,7 +422,7 @@ def sparse_cd(X_data, X_indices, X_indptr, y, lmbda, epsilon, f, n_epochs,
 ###########################################################################
 
 # @njit
-class DenseLasso:
+class Lasso:
 
     # @njit
     def __init__(self, lmbda, epsilon, f, n_epochs, screening, store_history):
@@ -452,6 +454,28 @@ class DenseLasso:
         self: Lasso object
         """
 
+        if issparse(X):
+            X_data = X.data
+            X_indices = X.indices
+            X_indptr = X.indptr
+
+            (beta_hat_cyclic_cd_true,
+             primal_hist,
+             dual_hist,
+             gap_hist,
+             r_list,
+             n_active_features_true,
+             theta_hat_cyclic_cd,
+             P_lmbda,
+             D_lmbda,
+             G_lmbda) = sparse_cd(X_data, X_indices, X_indptr, y, self.lmbda,
+                                  self.epsilon, self.f, self.n_epochs,
+                                  self.screening, self.store_history)
+
+            self.slopes = beta_hat_cyclic_cd_true
+            self.G_lmbda = G_lmbda
+            self.r_list = r_list
+
         (beta_hat_cyclic_cd_true,
          primal_hist,
          dual_hist,
@@ -461,9 +485,10 @@ class DenseLasso:
          theta_hat_cyclic_cd,
          P_lmbda,
          D_lmbda,
-         G_lmbda) = cyclic_coordinate_descent(
-            X, y, self.lmbda, self.epsilon, self.f, self.n_epochs,
-            self.screening, self.store_history)
+         G_lmbda) = cyclic_coordinate_descent(X, y, self.lmbda, self.epsilon, 
+                                              self.f, self.n_epochs, 
+                                              self.screening, 
+                                              self.store_history)
 
         self.slopes = beta_hat_cyclic_cd_true
         self.G_lmbda = G_lmbda
@@ -508,124 +533,6 @@ class DenseLasso:
             negative to keep the semantic that higher is better
         """
         score = -np.mean(np.abs(y - self.predict(X)))
-
-        return score
-
-
-############################################################################
-#                         Class Sparse Lasso
-############################################################################
-
-
-class SparseLasso:
-
-    def __init__(self, lmbda, epsilon, f, n_epochs, screening, store_history):
-
-        self.lmbda = lmbda
-        self.epsilon = epsilon
-        self.f = f
-        self.n_epochs = n_epochs
-        self.screening = screening
-        self.store_history = store_history
-
-        assert epsilon > 0
-
-    def fit(self, X, y):
-        """Fit the data (X,y) based on the solver of the Lasso class
-
-        Parameters
-        ----------
-
-        X: numpy.ndarray, shape = (n_samples, n_features)
-            features matrix
-
-        y: numpy.array, shape = (n_samples, )
-            target vector
-
-        Returns
-        -------
-        self: Lasso object
-        """
-
-        X_data, X_indices, X_indptr = X.data, X.indices, X.indptr
-
-        (beta_hat_cyclic_cd_true,
-         primal_hist,
-         dual_hist,
-         gap_hist,
-         r_list,
-         n_active_features_true,
-         theta_hat_cyclic_cd,
-         P_lmbda,
-         D_lmbda,
-         G_lmbda) = sparse_cd(X_data, X_indices, X_indptr, y, self.lmbda,
-                              self.epsilon, self.f, self.n_epochs,
-                              self.screening, self.store_history)
-
-        self.slopes = beta_hat_cyclic_cd_true
-        self.G_lmbda = G_lmbda
-        self.r_list = r_list
-
-        return self
-
-    def predict(self, X):
-        """Predict the target from the observations matrix
-
-        Parameters
-        ----------
-        X: numpy.ndarray, shape = (n_samples, n_features)
-        features matrix
-
-        X_data: csr format, data array of the features matrix
-        data is an array containing all the non-zero elements of the sparse
-        matrix
-
-        X_indices: csr format, index array of the features matrix
-        indices is an array mapping each element in data to its column in the
-        sparse matrix
-
-        X_indptr: csr format, index array pointer of the features matrix
-        indptr is an array mapping the elements of data and indices to the rows
-        of the sparse matrix
-
-        Returns
-        -------
-        y_hat: numpy.array, shape = (n_samples, )
-        predicted target vector
-        """
-        return X.dot(self.slopes)
-
-    def score(self, X_data, X_indices, X_indptr, y):
-        """Compute the cross-validation score to assess the performance of the
-           model (use negative mean absolute error)
-
-        Parameters
-        ----------
-        X: numpy.ndarray, shape = (n_samples, n_features)
-            features matrix
-
-        X_data: csr format, data array of the features matrix
-        data is an array containing all the non-zero elements of the sparse
-        matrix
-
-        X_indices: csr format, index array of the features matrix
-        indices is an array mapping each element in data to its column in the
-        sparse matrix
-
-        X_indptr: csr format, index array pointer of the features matrix
-        indptr is an array mapping the elements of data and indices to the rows
-        of the sparse matrix
-
-        y: numpy.array, shape = (n_samples, )
-            target vector
-
-        Returns
-        -------
-        score: float
-            negative mean absolute error (MAE)
-            negative to keep the semantic that higher is better
-        """
-        score = -np.mean(np.abs(y - self.predict(X_data, X_indices, X_indptr)))
 
         return score
 
@@ -716,20 +623,22 @@ def main():
     print("X_indices : ", X_indices)
     print("X_indptr : ", X_indptr)
 
-    beta_hat = sparse_cd(X_data=X_data, X_indices=X_indices, X_indptr=X_indptr,
-                         y=y, lmbda=lmbda, epsilon=epsilon, f=f,
-                         n_epochs=n_epochs, screening=screening,
-                         store_history=store_history)
+    (beta_hat_cyclic_cd_true_sparse,
+        primal_hist_sparse,
+        dual_hist_sparse,
+        gap_hist_sparse,
+        r_list_sparse,
+        n_active_features_true_sparse,
+        theta_hat_cyclic_cd_sparse,
+        P_lmbda_sparse,
+        D_lmbda_sparse,
+        G_lmbda_sparse) = sparse_cd(X_data=X_data, X_indices=X_indices, 
+                                    X_indptr=X_indptr, y=y, lmbda=lmbda, 
+                                    epsilon=epsilon, f=f,
+                                    n_epochs=n_epochs, screening=screening,
+                                    store_history=store_history)
 
-    print("beta hat : ", beta_hat)
-
-    # sparse_lasso = SparseLasso(lmbda=lmbda, epsilon=epsilon, f=f,
-    #                            n_epochs=n_epochs, screening=screening,
-    #                            store_history=store_history).fit(X_data,
-    #                                                             X_indices,
-    #                                                             X_indptr, y)
-
-    # print("sparse lasso : ", sparse_lasso)
+    print("beta hat sparse solver: ", beta_hat_cyclic_cd_true_sparse)
 
     X = X.toarray()
 
@@ -742,11 +651,12 @@ def main():
         theta_hat_cyclic_cd,
         P_lmbda,
         D_lmbda,
-        G_lmbda) = cyclic_coordinate_descent(
-            X, y, lmbda=lmbda, epsilon=lmbda, f=f, n_epochs=n_epochs,
-            screening=False, store_history=True)
+        G_lmbda) = cyclic_coordinate_descent(X, y, lmbda=lmbda, epsilon=lmbda, 
+                                             f=f, n_epochs=n_epochs, 
+                                             screening=True, 
+                                             store_history=True)
 
-    print("beta hat", beta_hat_cyclic_cd_true)
+    print("beta hat dense solver : ", beta_hat_cyclic_cd_true)
 
     """        
     # Plot primal objective function (=primal_hist)
@@ -949,6 +859,7 @@ def main():
     # print("Housing Prices Training Set Header : ", head_train)
     # print("Housing Prices Testing Set Header : ", head_test)
     """
+
 
 if __name__ == "__main__":
     main()
