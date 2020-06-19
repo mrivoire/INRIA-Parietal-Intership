@@ -50,56 +50,6 @@ def column_sparse_matrix(data, indices, indptr, j):
 
 
 ############################################################################
-#                     Print a row of a sparse matrix
-############################################################################
-
-
-def row_sparse_matrix(data, indices, indptr, i):
-    """Return the wished row of a sparse matrix
-
-    Parameters
-    ----------
-    data: numpy.array, shape = (number of non-zero elements, )
-        contains the non-zero elements of the sparse matrix
-
-    indices: csc format index array, shape = (number of non-zero elements, )
-        contains the indices of the rows to which belong the non-zero elements
-        of the sparse matrix
-
-    indptr: csc format index pointer array, shape = (number of columns + 1, )
-        contains the indices of the columns which have at least a non-zero
-        element
-
-    i: int
-        number of the row to print
-
-    Returns
-    -------
-    row: numpy.array, shape = (, n_cols)
-    """
-    n_rows = max(indices) + 1
-    n_cols = len(indptr) - 1
-
-    row = np.zeros(n_cols)
-
-    # tmp_list = list()
-    # for k in range(len(data)):
-    #     if k % n_cols == i:
-    #         tmp_list.append(data[k])
-
-    start = 0.
-
-    for ind in range(n_rows):
-        if ind == i:
-            start = ind
-
-    for j in range(n_cols):
-        row[j] = data[start + j * (n_cols - 1)]
-
-    return row 
-
-
-############################################################################
 #               Product vector - matrix with a sparse matrix
 ############################################################################
 
@@ -133,11 +83,18 @@ def sparse_matrix_product(data, indices, indptr, vect):
 
     prod = np.zeros(n_cols)
 
+    col = np.zeros(n_rows)
+
     for j in range(n_cols):
-        col = column_sparse_matrix(data, indices, indptr, j)
+        col = np.zeros(n_rows)
+        start, end = indptr[j:j+2]
+        for ind in range(start, end):
+            col[indices[ind]] = data[ind] 
+
         tmp_prod = 0.
-        for ind in range(n_rows):
-            tmp_prod += col[ind] * vect[ind]
+
+        for i in range(n_rows):
+            tmp_prod += col[i] * vect[i]
         prod[j] = tmp_prod
 
     return prod
@@ -161,10 +118,13 @@ def main():
     vect = np.array([1, 2, 3])
 
     prod = sparse_matrix_product(A_data, A_indices, A_indptr, vect)
+    print("prod = ", prod)
+
+    A.toarray()
 
     print("result = ", vect.dot(A))
 
-    print("prod = ", prod)
+    
 
 if __name__ == "__main__":
     main()

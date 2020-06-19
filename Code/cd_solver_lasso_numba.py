@@ -1,6 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
+import ipdb
 
 from numpy.random import randn
 from numpy.random import multivariate_normal
@@ -63,7 +64,7 @@ def simu(beta, n_samples=1000, corr=0.5, for_logreg=False):
 ############################################################################
 
 
-@njit
+# @njit
 def cyclic_coordinate_descent(X, y, lmbda, epsilon, f, n_epochs, screening,
                               store_history):
     """Solver : dense cyclic coordinate descent
@@ -141,6 +142,9 @@ def cyclic_coordinate_descent(X, y, lmbda, epsilon, f, n_epochs, screening,
     dual_hist = []
     gap_hist = []
     theta_hist = []
+    P_lmbda = 0
+    D_lmbda = 0
+    G_lmbda = 0
 
     residuals = y - X.dot(beta)
 
@@ -206,8 +210,13 @@ def cyclic_coordinate_descent(X, y, lmbda, epsilon, f, n_epochs, screening,
 
                 # Computation of the active set
                 for j in A_c:
-                    mu = (np.abs(np.dot(X[:, j].T, theta))
+                    mu = (np.abs(X[:, j].T.dot(theta))
                           + r * np.linalg.norm(X[:, j]))
+
+                    print('dot dense :', np.abs(X[:, j].T.dot(theta)))
+                    # print('norm dense', np.linalg.norm(X[:, j]))
+
+                    # print("mu dense : ", mu)
                     if mu < 1:
                         A_c.remove(j)
                 if store_history:
@@ -397,11 +406,13 @@ def sparse_cd(X_data, X_indices, X_indptr, y, lmbda, epsilon, f, n_epochs,
                         norm += X_data[ind]**2
 
                     norm = np.sqrt(norm)
+                    dot = np.abs(dot)
 
                     mu = np.abs(dot) + r * norm
+                    print("dot sparse :", dot)
+                    # print('norm :', norm)
+                    # print('mu sparse : ', mu)
 
-                    # mu = (np.abs(np.dot(X_data[X_indptr[j]].T, theta))
-                    #       + r * np.linalg.norm(X_data[X_indptr[j]]))
                     if mu < 1:
                         A_c.remove(j)
                 if store_history:
