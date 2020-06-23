@@ -54,7 +54,7 @@ def simu(beta, n_samples=1000, corr=0.5, for_logreg=False,
     X = np.asfortranarray(X)
 
     # Target labels vector with noise
-    y = np.dot(X, beta) + randn(n_samples)
+    y = np.dot(X, beta) + rng.randn(n_samples)
 
     if for_logreg:
         y = sign(y)
