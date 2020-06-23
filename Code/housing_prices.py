@@ -14,7 +14,7 @@ from sklearn.decomposition import PCA
 from sklearn.model_selection import cross_val_score
 from scipy.sparse import issparse
 
-from cd_solver_lasso_numba import DenseLasso, cyclic_coordinate_descent
+# from cd_solver_lasso_numba import DenseLasso, cyclic_coordinate_descent
 
 
 #######################################
@@ -156,7 +156,7 @@ def main():
     print("X_test : ", X_test.head())
     print("y_train : ", y_train.head())
 
-    # Tests with dense features matrices
+    Tests with dense features matrices
 
     X = X_train.to_numpy()
     y = y_train.to_numpy()
@@ -168,13 +168,13 @@ def main():
     screening = True
     store_history = True
 
-    dense_lasso = DenseLasso(lmbda=lmbda, epsilon=epsilon, f=f,
-                             n_epochs=n_epochs, screening=screening,
-                             store_history=store_history).fit(X, y)
+    # dense_lasso = DenseLasso(lmbda=lmbda, epsilon=epsilon, f=f,
+    #                          n_epochs=n_epochs, screening=screening,
+    #                          store_history=store_history).fit(X, y)
 
-    dense_cv_score = dense_lasso.score(X, y)
+    # dense_cv_score = dense_lasso.score(X, y)
 
-    print("dense crossval score : ", dense_cv_score)
+    # print("dense crossval score : ", dense_cv_score)
 
     # print("X type : ", type(X))
 

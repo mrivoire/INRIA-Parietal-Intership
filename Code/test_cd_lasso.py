@@ -43,4 +43,9 @@ def test_cd_lasso(screening, store_history, sparse):
     if screening and store_history:
         assert lasso.r_list[-1] < 1e-5
 
+    assert len(lasso.A_c) == np.count_nonzero(lasso.slopes)
+
     np.testing.assert_allclose(lasso.slopes, sklasso.coef_, rtol=1)
+
+    print("beta hat : ", lasso.slopes)
+    print("coef sklearn : ", sklasso.coef_)

@@ -54,7 +54,7 @@ def simu(beta, n_samples=1000, corr=0.5, for_logreg=False,
     X = np.asfortranarray(X)
 
     # Target labels vector with noise
-    y = np.dot(X, beta) + randn(n_samples)
+    y = np.dot(X, beta) + rng.randn(n_samples)
 
     if for_logreg:
         y = sign(y)
@@ -216,12 +216,9 @@ def cyclic_coordinate_descent(X, y, lmbda, epsilon, f, n_epochs, screening,
                     mu = (np.abs(X[:, j].T.dot(theta))
                           + r * np.linalg.norm(X[:, j]))
 
-                    # print('dot dense :', np.abs(X[:, j].T.dot(theta)))
-                    # print('norm dense', np.linalg.norm(X[:, j]))
-
-                    # print("mu dense : ", mu)
                     if mu < 1:
                         A_c.remove(j)
+
                 if store_history:
                     n_active_features.append(len(A_c))
                     r_list.append(r)
@@ -230,7 +227,7 @@ def cyclic_coordinate_descent(X, y, lmbda, epsilon, f, n_epochs, screening,
                     break
 
     return (beta, primal_hist, dual_hist, gap_hist, r_list,
-            n_active_features, theta, P_lmbda, D_lmbda, G_lmbda)
+            n_active_features, theta, P_lmbda, D_lmbda, G_lmbda, A_c)
 
 
 #########################################################################
@@ -420,12 +417,9 @@ def sparse_cd(X_data, X_indices, X_indptr, y, lmbda, epsilon, f, n_epochs,
                     dot = np.abs(dot)
 
                     mu = np.abs(dot) + r * norm
-                    # print("dot sparse :", dot)
-                    # print('norm :', norm)
-                    # print('mu sparse : ', mu)
-
                     if mu < 1:
                         A_c.remove(j)
+
                 if store_history:
                     n_active_features.append(len(A_c))
                     r_list.append(r)
@@ -434,7 +428,7 @@ def sparse_cd(X_data, X_indices, X_indptr, y, lmbda, epsilon, f, n_epochs,
                     break
 
     return (beta, primal_hist, dual_hist, gap_hist, r_list,
-            n_active_features, theta, P_lmbda, D_lmbda, G_lmbda)
+            n_active_features, theta, P_lmbda, D_lmbda, G_lmbda, A_c)
 
 # https://stackoverflow.com/questions/52299420/scipy-csr-matrix-understand-indptr
 
@@ -487,9 +481,10 @@ class Lasso:
              theta_hat_cyclic_cd,
              P_lmbda,
              D_lmbda,
-             G_lmbda) = sparse_cd(X_data, X_indices, X_indptr, y, self.lmbda,
-                                  self.epsilon, self.f, self.n_epochs,
-                                  self.screening, self.store_history)
+             G_lmbda, 
+             A_c) = sparse_cd(X_data, X_indices, X_indptr, y, self.lmbda,
+                              self.epsilon, self.f, self.n_epochs,
+                              self.screening, self.store_history)
         else:
             (beta_hat_cyclic_cd_true,
              primal_hist,
@@ -500,15 +495,16 @@ class Lasso:
              theta_hat_cyclic_cd,
              P_lmbda,
              D_lmbda,
-             G_lmbda) = cyclic_coordinate_descent(X, y, self.lmbda,
-                                                  self.epsilon,
-                                                  self.f, self.n_epochs,
-                                                  self.screening,
-                                                  self.store_history)
+             G_lmbda,
+             A_c) = cyclic_coordinate_descent(X, y, self.lmbda, self.epsilon,
+                                              self.f, self.n_epochs,
+                                              self.screening,
+                                              self.store_history)
 
         self.slopes = beta_hat_cyclic_cd_true
         self.G_lmbda = G_lmbda
         self.r_list = r_list
+        self.A_c = A_c
 
         return self
 
@@ -626,7 +622,6 @@ def main():
     epsilon = 1e-14
     n_epochs = 100000
     screening = True
-    # screening = False
     store_history = True
 
     X, y = simu(beta, n_samples=n_samples, corr=0.5, for_logreg=False,
@@ -650,13 +645,18 @@ def main():
         theta_hat_cyclic_cd_sparse,
         P_lmbda_sparse,
         D_lmbda_sparse,
-        G_lmbda_sparse) = sparse_cd(X_data=X_data, X_indices=X_indices,
-                                    X_indptr=X_indptr, y=y, lmbda=lmbda,
-                                    epsilon=epsilon, f=f,
-                                    n_epochs=n_epochs, screening=screening,
-                                    store_history=store_history)
+        G_lmbda_sparse,
+        A_c_sparse) = sparse_cd(X_data=X_data, X_indices=X_indices,
+                                X_indptr=X_indptr, y=y, lmbda=lmbda,
+                                epsilon=epsilon, f=f,
+                                n_epochs=n_epochs, screening=screening,
+                                store_history=store_history)
+
+    print("A_c sparse : ", A_c_sparse)
 
     print("beta hat sparse solver: ", beta_hat_cyclic_cd_true_sparse)
+    nb_nonzero_sparse = np.count_nonzero(beta_hat_cyclic_cd_true_sparse)
+    print("number of non zero elements in sparse : ", nb_nonzero_sparse)
 
     X = X.toarray()
 
@@ -669,12 +669,18 @@ def main():
         theta_hat_cyclic_cd,
         P_lmbda,
         D_lmbda,
-        G_lmbda) = cyclic_coordinate_descent(X, y, lmbda=lmbda, epsilon=lmbda,
-                                             f=f, n_epochs=n_epochs,
-                                             screening=screening,
-                                             store_history=True)
+        G_lmbda,
+        A_c_dense) = cyclic_coordinate_descent(X, y, lmbda=lmbda, 
+                                               epsilon=epsilon,
+                                               f=f, n_epochs=n_epochs,
+                                               screening=screening,
+                                               store_history=True)
+
+    print("A_c dense : ", A_c_dense)
 
     print("beta hat dense solver : ", beta_hat_cyclic_cd_true)
+    nb_nonzero_dense = np.count_nonzero(beta_hat_cyclic_cd_true)
+    print("number of non zero elements in dense : ", nb_nonzero_dense)
 
     """
     # Plot primal objective function (=primal_hist)
