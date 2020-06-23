@@ -4,7 +4,6 @@ import pandas as pd
 import ipdb
 
 from numpy.random import randn
-from numpy.random import multivariate_normal
 from scipy.linalg import toeplitz
 
 from numba import njit
@@ -14,6 +13,7 @@ from sklearn.tree import DecisionTreeRegressor
 from sklearn.decomposition import PCA
 from sklearn.model_selection import cross_val_score
 from sklearn.linear_model import Lasso as sklearn_Lasso
+from sklearn.utils import check_random_state
 from scipy.sparse import csc_matrix
 from scipy.sparse import issparse
 
@@ -42,12 +42,15 @@ the cost of each iteration while keeping the same convergence behaviour.
 #############################################################################
 
 
-def simu(beta, n_samples=1000, corr=0.5, for_logreg=False):
+def simu(beta, n_samples=1000, corr=0.5, for_logreg=False,
+         random_state=None):
     n_features = len(beta)
     cov = toeplitz(corr ** np.arange(0, n_features))
 
+    rng = check_random_state(random_state)
+
     # Features Matrix
-    X = multivariate_normal(np.zeros(n_features), cov, size=n_samples)
+    X = rng.multivariate_normal(np.zeros(n_features), cov, size=n_samples)
     X = np.asfortranarray(X)
 
     # Target labels vector with noise
@@ -179,7 +182,7 @@ def cyclic_coordinate_descent(X, y, lmbda, epsilon, f, n_epochs, screening,
         if k % f == 0:
             # Computation of theta
             theta = (residuals / (lmbda
-                                  * max(np.max(np.abs(residuals
+                                  * max(np.max(np.abs(X.T @ residuals
                                                       / lmbda)), 1)))
 
             # Computation of the primal problem
@@ -334,7 +337,7 @@ def sparse_cd(X_data, X_indices, X_indptr, y, lmbda, epsilon, f, n_epochs,
     L = np.zeros(n_features)
 
     for i in A_c:
-        start, end = X_indptr[i:i+2]
+        start, end = X_indptr[i:i + 2]
         for ind in range(start, end):
             L[i] += X_data[ind] ** 2
 
@@ -346,7 +349,7 @@ def sparse_cd(X_data, X_indices, X_indptr, y, lmbda, epsilon, f, n_epochs,
             old_beta_i = beta[i]
 
             # Matrix product between the features matrix X and the residuals
-            start, end = X_indptr[i:i+2]
+            start, end = X_indptr[i:i + 2]
             grad = 0.
             for ind in range(start, end):
                 grad += X_data[ind] * residuals[X_indices[ind]]
@@ -366,9 +369,16 @@ def sparse_cd(X_data, X_indices, X_indptr, y, lmbda, epsilon, f, n_epochs,
 
         if k % f == 0:
             # Computation of theta
-            theta = (residuals / (lmbda
-                                  * max(np.max(np.abs(residuals
-                                                      / lmbda)), 1)))
+            XTR_absmax = 0
+            # Matrix product between the features matrix X and the residuals
+            for i in A_c:
+                start, end = X_indptr[i:i + 2]
+                dot = 0.
+                for ind in range(start, end):
+                    dot += X_data[ind] * residuals[X_indices[ind]]
+                XTR_absmax = max(abs(dot), XTR_absmax)
+
+            theta = residuals / max(XTR_absmax, lmbda)
 
             # Computation of the primal problem
             P_lmbda = 0.5 * residuals.dot(residuals)
@@ -398,7 +408,7 @@ def sparse_cd(X_data, X_indices, X_indptr, y, lmbda, epsilon, f, n_epochs,
 
                 # Computation of the active set
                 for j in A_c:
-                    start, end = X_indptr[j:j+2]
+                    start, end = X_indptr[j:j + 2]
                     dot = 0.
                     norm = 0.
 
@@ -480,10 +490,6 @@ class Lasso:
              G_lmbda) = sparse_cd(X_data, X_indices, X_indptr, y, self.lmbda,
                                   self.epsilon, self.f, self.n_epochs,
                                   self.screening, self.store_history)
-
-            self.slopes = beta_hat_cyclic_cd_true
-            self.G_lmbda = G_lmbda
-            self.r_list = r_list
         else:
             (beta_hat_cyclic_cd_true,
              primal_hist,
@@ -494,7 +500,8 @@ class Lasso:
              theta_hat_cyclic_cd,
              P_lmbda,
              D_lmbda,
-             G_lmbda) = cyclic_coordinate_descent(X, y, self.lmbda, self.epsilon,
+             G_lmbda) = cyclic_coordinate_descent(X, y, self.lmbda,
+                                                  self.epsilon,
                                                   self.f, self.n_epochs,
                                                   self.screening,
                                                   self.store_history)
@@ -611,9 +618,9 @@ def read_csv(filePath):
 
 def main():
     # Data Simulation
-    np.random.seed(0)
+    rng = check_random_state(0)
     n_samples, n_features = 10, 30
-    beta = np.random.randn(n_features)
+    beta = rng.randn(n_features)
     lmbda = 1.
     f = 10
     epsilon = 1e-14
@@ -622,7 +629,8 @@ def main():
     # screening = False
     store_history = True
 
-    X, y = simu(beta, n_samples=n_samples, corr=0.5, for_logreg=False)
+    X, y = simu(beta, n_samples=n_samples, corr=0.5, for_logreg=False,
+                random_state=rng)
 
     X = csc_matrix(X)
     X_data = X.data

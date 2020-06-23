@@ -12,11 +12,12 @@ from scipy.sparse import csc_matrix
 def test_cd_lasso(screening, store_history, sparse):
     # Data Simulation
     rng = np.random.RandomState(0)
-    n_samples, n_features = 20, 30
+    n_samples, n_features = 10, 30
     beta = rng.randn(n_features)
     lmbda = 1.
 
-    X, y = simu(beta, n_samples=n_samples, corr=0.5, for_logreg=False)
+    X, y = simu(beta, n_samples=n_samples, corr=0.5,
+                for_logreg=False, random_state=42)
 
     epsilon = 1e-14
     f = 10
@@ -29,10 +30,6 @@ def test_cd_lasso(screening, store_history, sparse):
                   screening=True, store_history=True)
 
     lasso.fit(X, y)
-
-    # (beta_hat, primal_hist, dual_hist, gap_hist, r_list,
-    #  n_active_features_true, theta_hat_cyclic_cd, P_lmbda, D_lmbda,
-    #  G_lmbda) = out
 
     # KKT conditions
     kkt = np.abs(X.T.dot(y - X.dot(lasso.slopes)))
