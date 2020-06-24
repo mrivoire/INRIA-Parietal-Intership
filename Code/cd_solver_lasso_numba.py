@@ -221,7 +221,6 @@ def cyclic_coordinate_descent(X, y, lmbda, epsilon, f, n_epochs, screening,
 
                 if store_history:
                     n_active_features.append(len(A_c))
-                    r_list.append(r)
 
                 if np.abs(G_lmbda) <= epsilon:
                     break
@@ -422,7 +421,6 @@ def sparse_cd(X_data, X_indices, X_indptr, y, lmbda, epsilon, f, n_epochs,
 
                 if store_history:
                     n_active_features.append(len(A_c))
-                    r_list.append(r)
 
                 if np.abs(G_lmbda) <= epsilon:
                     break
@@ -632,9 +630,8 @@ def main():
     X_indices = X.indices
     X_indptr = X.indptr
 
-    print("X_data : ", X_data)
-    print("X_indices : ", X_indices)
-    print("X_indptr : ", X_indptr)
+    print("shape sparse X : ", X.shape)
+    print("shape y : ", y.shape)
 
     (beta_hat_cyclic_cd_true_sparse,
         primal_hist_sparse,
@@ -651,12 +648,6 @@ def main():
                                 epsilon=epsilon, f=f,
                                 n_epochs=n_epochs, screening=screening,
                                 store_history=store_history)
-
-    print("A_c sparse : ", A_c_sparse)
-
-    print("beta hat sparse solver: ", beta_hat_cyclic_cd_true_sparse)
-    nb_nonzero_sparse = np.count_nonzero(beta_hat_cyclic_cd_true_sparse)
-    print("number of non zero elements in sparse : ", nb_nonzero_sparse)
 
     X = X.toarray()
 
@@ -676,13 +667,9 @@ def main():
                                                screening=screening,
                                                store_history=True)
 
-    print("A_c dense : ", A_c_dense)
+    print("shape X dense : ", X.shape)
+    print("shape y : ", y.shape)
 
-    print("beta hat dense solver : ", beta_hat_cyclic_cd_true)
-    nb_nonzero_dense = np.count_nonzero(beta_hat_cyclic_cd_true)
-    print("number of non zero elements in dense : ", nb_nonzero_dense)
-
-    """
     # Plot primal objective function (=primal_hist)
     obj = primal_hist
 
@@ -700,6 +687,9 @@ def main():
     list_epochs = []
     for i in range(len(dual_hist)):
         list_epochs.append(10 * i)
+
+    print("length list epochs : ", len(list_epochs))
+    print("length r list : ", len(r_list))
 
     # Plot history of the radius
     plt.plot(list_epochs, r_list, label='radius', color='red')
@@ -776,6 +766,8 @@ def main():
     strategy = 'quantile'
     enc = KBinsDiscretizer(n_bins=n_bins, encode=encode, strategy=strategy)
     X_binned = enc.fit_transform(X)
+    X_binned = X_binned.tocsc()
+    print("type X_binned : ", type(X_binned))
     # Linear Regression on the discretized dataset
     binning_reg = LinearRegression().fit(X_binned, y)
     # Lasso onthe discretized dataset
@@ -802,12 +794,29 @@ def main():
     plt.show()
 
     # Assessment of the model by computing the crossval score
-    dense_lasso = DenseLasso(lmbda=lmbda, epsilon=epsilon, f=f,
-                             n_epochs=n_epochs, screening=screening,
-                             store_history=store_history).fit(X, y)
+    dense_lasso = Lasso(lmbda=lmbda, epsilon=epsilon, f=f,
+                        n_epochs=n_epochs, screening=screening,
+                        store_history=store_history).fit(X, y)
 
     original_dense_lasso_cv_score = dense_lasso.score(X, y)
-    print("original dense lasso crossval score", original_dense_lasso_cv_score)
+    print("original dense lasso crossval score : ", 
+          original_dense_lasso_cv_score)
+
+    sparse_lasso = Lasso(lmbda=lmbda, epsilon=epsilon, f=f, n_epochs=n_epochs, 
+                         screening=screening, 
+                         store_history=store_history).fit(X_binned, y)
+
+    sparse_pred = sparse_lasso.predict(X_binned)
+    print("shape sparse pred : ", sparse_pred.shape)
+    
+    binning_lasso_cv_score = sparse_lasso.score(X_binned, y)
+    print("binning lasso crossval score : ", binning_lasso_cv_score)
+
+    sklearn_dense_cv_score = lasso.score(X, y)
+    print("sklearn dense lasso crossval score : ", sklearn_dense_cv_score)
+
+    sklearn_binning_cv_score = binning_lasso.score(X_binned, y)
+    print("sklearn binning lasso crossval score : ", sklearn_binning_cv_score)
 
     # PCA : Principal Component Analysis on the original dataset
     pca = PCA(n_components=2, svd_solver='full')
@@ -882,7 +891,6 @@ def main():
     # head_test = test_set.head()
     # print("Housing Prices Training Set Header : ", head_train)
     # print("Housing Prices Testing Set Header : ", head_test)
-    """
 
 
 if __name__ == "__main__":
