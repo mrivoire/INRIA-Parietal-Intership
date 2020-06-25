@@ -520,7 +520,7 @@ class Lasso:
             predicted target vector
         """
 
-        y_hat = np.dot(X, self.slopes)
+        y_hat = X.dot(self.slopes)
 
         return y_hat
 
