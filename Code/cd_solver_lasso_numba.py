@@ -183,10 +183,7 @@ def cyclic_coordinate_descent(X, y, lmbda, epsilon, f, n_epochs, screening,
             # Computation of theta
             XTR_absmax = 0
             for i in A_c:
-                dot = 0.
-                for k in range(n_samples):
-                    dot += X[k, i] * residuals[k]
-                XTR_absmax = max(abs(dot), XTR_absmax)
+                XTR_absmax = max(abs(np.dot(X[:, i], residuals)), XTR_absmax)
 
             theta = residuals / max(XTR_absmax, lmbda)                
 
