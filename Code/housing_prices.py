@@ -10,6 +10,7 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import KBinsDiscretizer
 from sklearn.linear_model import LinearRegression
+from sklearn.linear_model import Lasso
 from sklearn.decomposition import PCA
 from sklearn.model_selection import cross_val_score
 from scipy.sparse import issparse
@@ -118,7 +119,7 @@ def split_train_test(dataset, train):
 
 
 def main():
-    data_dir = "/home/mrivoire/Documents/M2DS_Polytechnique/Stage_INRIA/Code/Datasets"
+    data_dir = "../Datasets"
     fname_train = data_dir + "/housing_prices_train"
     fname_test = data_dir + "/housing_prices_test"
     train_set = read_csv(fname_train)
@@ -156,7 +157,7 @@ def main():
     print("X_test : ", X_test.head())
     print("y_train : ", y_train.head())
 
-    Tests with dense features matrices
+    # Tests with dense features matrices
 
     X = X_train.to_numpy()
     y = y_train.to_numpy()
@@ -167,6 +168,10 @@ def main():
     n_epochs = 100000
     screening = True
     store_history = True
+
+    lasso = Lasso()
+    scores = cross_val_score(lasso, X, y, cv=5)
+    print(scores)
 
     # dense_lasso = DenseLasso(lmbda=lmbda, epsilon=epsilon, f=f,
     #                          n_epochs=n_epochs, screening=screening,
