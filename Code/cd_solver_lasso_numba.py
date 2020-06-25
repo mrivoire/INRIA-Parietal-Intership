@@ -181,9 +181,14 @@ def cyclic_coordinate_descent(X, y, lmbda, epsilon, f, n_epochs, screening,
 
         if k % f == 0:
             # Computation of theta
-            theta = (residuals / (lmbda
-                                  * max(np.max(np.abs(X.T @ residuals
-                                                      / lmbda)), 1)))
+            XTR_absmax = 0
+            for i in A_c:
+                dot = 0.
+                for k in range(n_samples):
+                    dot += X[k, i] * residuals[k]
+                XTR_absmax = max(abs(dot), XTR_absmax)
+
+            theta = residuals / max(XTR_absmax, lmbda)                
 
             # Computation of the primal problem
             P_lmbda = 0.5 * residuals.dot(residuals)
@@ -805,9 +810,6 @@ def main():
     sparse_lasso = Lasso(lmbda=lmbda, epsilon=epsilon, f=f, n_epochs=n_epochs, 
                          screening=screening, 
                          store_history=store_history).fit(X_binned, y)
-
-    sparse_pred = sparse_lasso.predict(X_binned)
-    print("shape sparse pred : ", sparse_pred.shape)
     
     binning_lasso_cv_score = sparse_lasso.score(X_binned, y)
     print("binning lasso crossval score : ", binning_lasso_cv_score)
