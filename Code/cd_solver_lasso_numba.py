@@ -7,6 +7,7 @@ from numpy.random import randn
 from scipy.linalg import toeplitz
 
 from numba import njit
+from numba import jit
 from sklearn.linear_model import LinearRegression
 from sklearn.preprocessing import KBinsDiscretizer
 from sklearn.tree import DecisionTreeRegressor
@@ -71,7 +72,7 @@ def simu(beta, n_samples=1000, corr=0.5, for_logreg=False,
 ############################################################################
 
 
-@njit
+@jit
 def cyclic_coordinate_descent(X, y, lmbda, epsilon, f, n_epochs, screening,
                               store_history):
     """Solver : dense cyclic coordinate descent
@@ -240,7 +241,7 @@ def cyclic_coordinate_descent(X, y, lmbda, epsilon, f, n_epochs, screening,
 #########################################################################
 
 
-@njit
+@jit
 def sparse_cd(X_data, X_indices, X_indptr, y, lmbda, epsilon, f, n_epochs,
               screening, store_history):
     """Solver : sparse cyclic coordinate descent
@@ -322,7 +323,6 @@ def sparse_cd(X_data, X_indices, X_indptr, y, lmbda, epsilon, f, n_epochs,
     beta = np.zeros(n_features)
     theta = np.zeros(n_samples)
 
-    # print(y)
     residuals = np.copy(y)
     n_active_features = []
     r_list = []
@@ -557,7 +557,7 @@ class Lasso:
 #                    Sign Function
 ##########################################################
 
-@njit
+@jit
 def sign(x):
     """
     Parameters
@@ -584,7 +584,7 @@ def sign(x):
 #    Soft-Thresholding Function
 ######################################
 
-@njit
+@jit
 def soft_thresholding(u, x):
     """
     Parameters
