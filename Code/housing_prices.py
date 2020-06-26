@@ -15,7 +15,10 @@ from sklearn.decomposition import PCA
 from sklearn.model_selection import cross_val_score
 from scipy.sparse import issparse
 
-# from cd_solver_lasso_numba import DenseLasso, cyclic_coordinate_descent
+from cd_solver_lasso_numba import Lasso, cyclic_coordinate_descent, sparse_cd
+# import pickle
+# pickle.load(open("model.pkl", 'rb'))
+# model.embedding_ = model.embedding_.astype(np.float32, order='A')
 
 
 #######################################
@@ -119,7 +122,8 @@ def split_train_test(dataset, train):
 
 
 def main():
-    data_dir = "../Datasets"
+    # data_dir = "../Datasets"
+    data_dir = "/home/mrivoire/Documents/M2DS_Polytechnique/Stage_INRIA/Datasets"
     fname_train = data_dir + "/housing_prices_train"
     fname_test = data_dir + "/housing_prices_test"
     train_set = read_csv(fname_train)
@@ -169,17 +173,17 @@ def main():
     screening = True
     store_history = True
 
-    lasso = Lasso()
-    scores = cross_val_score(lasso, X, y, cv=5)
-    print(scores)
+    # lasso = Lasso()
+    # scores = cross_val_score(lasso, X, y, cv=5)
+    # print(scores)
 
-    # dense_lasso = DenseLasso(lmbda=lmbda, epsilon=epsilon, f=f,
-    #                          n_epochs=n_epochs, screening=screening,
-    #                          store_history=store_history).fit(X, y)
+    dense_lasso = Lasso(lmbda=lmbda, epsilon=epsilon, f=f,
+                        n_epochs=n_epochs, screening=screening,
+                        store_history=store_history).fit(X, y)
 
-    # dense_cv_score = dense_lasso.score(X, y)
+    dense_cv_score = dense_lasso.score(X, y)
 
-    # print("dense crossval score : ", dense_cv_score)
+    print("dense crossval score : ", dense_cv_score)
 
     # print("X type : ", type(X))
 

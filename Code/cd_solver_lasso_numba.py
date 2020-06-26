@@ -17,6 +17,10 @@ from sklearn.utils import check_random_state
 from scipy.sparse import csc_matrix
 from scipy.sparse import issparse
 
+# import pickle
+# pickle.load(open("model.pkl", 'rb'))
+# model.embedding_ = model.embedding_.astype(np.float32, order='A')
+
 ######################################################################
 #     Iterative Solver With Gap Safe Rules
 ######################################################################
@@ -190,7 +194,7 @@ def cyclic_coordinate_descent(X, y, lmbda, epsilon, f, n_epochs, screening,
             # Computation of the primal problem
             P_lmbda = 0.5 * residuals.dot(residuals)
             P_lmbda += lmbda * np.linalg.norm(beta, 1)
-
+            
             # Computation of the dual problem
             D_lmbda = 0.5 * np.linalg.norm(y, ord=2)**2
             D_lmbda -= (((lmbda**2) / 2)
