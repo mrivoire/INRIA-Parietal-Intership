@@ -3,6 +3,8 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import ipdb
 import time
+import matplotlib
+import matplotlib.pyplot as plt
 
 from numpy.random import randn
 from scipy.linalg import toeplitz
@@ -18,10 +20,6 @@ from sklearn.linear_model import Lasso as sklearn_Lasso
 from sklearn.utils import check_random_state
 from scipy.sparse import csc_matrix
 from scipy.sparse import issparse
-
-# import pickle
-# pickle.load(open("model.pkl", 'rb'))
-# model.embedding_ = model.embedding_.astype(np.float32, order='A')
 
 ######################################################################
 #     Iterative Solver With Gap Safe Rules
@@ -163,11 +161,6 @@ def cyclic_coordinate_descent(X, y, lmbda, epsilon, f, n_epochs, screening,
 
     A_c = list(range(n_features))
 
-    # with objmode(start='f8'):
-    #     start = time.perf_counter()
-
-    # start = time.time()
-
     # Iterations of the algorithm
     for k in range(n_epochs):
         for i in A_c:
@@ -237,12 +230,6 @@ def cyclic_coordinate_descent(X, y, lmbda, epsilon, f, n_epochs, screening,
 
                 if np.abs(G_lmbda) <= epsilon:
                     break
-
-    # with objmode(end='f8'):
-    #     end = time.perf_counter()
-    #     delay = 'time: {}'.format(end - start)
-    # end = time.time()
-    # delay = end - start
 
     return (beta, primal_hist, dual_hist, gap_hist, r_list,
             n_active_features, theta, P_lmbda, D_lmbda, G_lmbda, A_c)
@@ -355,10 +342,6 @@ def sparse_cd(X_data, X_indices, X_indptr, y, lmbda, epsilon, f, n_epochs,
         for ind in range(start, end):
             L[i] += X_data[ind] ** 2
 
-    # with objmode(start='f8'):
-    #     start = time.perf_counter()
-    # start = time.time()
-   
     for k in range(n_epochs):
         for i in A_c:
             if L[i] == 0.:
@@ -447,12 +430,6 @@ def sparse_cd(X_data, X_indices, X_indptr, y, lmbda, epsilon, f, n_epochs,
                 if np.abs(G_lmbda) <= epsilon:
                     break
 
-    # with objmode(end='f8'):
-    #     end = time.perf_counter()
-    #     delay = 'time: {}'.format(end - start)
-    # end = time.time()
-    # delay = end - start
-
     return (beta, primal_hist, dual_hist, gap_hist, r_list,
             n_active_features, theta, P_lmbda, D_lmbda, G_lmbda, A_c)
 
@@ -531,7 +508,6 @@ class Lasso:
         self.G_lmbda = G_lmbda
         self.r_list = r_list
         self.A_c = A_c
-        # self.delay = delay
 
         return self
 
@@ -571,7 +547,7 @@ class Lasso:
             negative mean absolute error (MAE)
             negative to keep the semantic that higher is better
         """
-        # score = np.mean(np.abs(y - self.predict(X)))
+
         u = ((y - self.predict(X))**2).sum()
         v = ((y - np.mean(y))**2).sum()
         score = 1 - u / v
@@ -696,9 +672,6 @@ def main():
                                                screening=screening,
                                                store_history=True)
 
-    # print("delay sparse : ", delay_sparse)
-    # print("delay dense : ", delay_dense)
-
     # Plot primal objective function (=primal_hist)
     obj = primal_hist
 
@@ -796,7 +769,6 @@ def main():
     enc = KBinsDiscretizer(n_bins=n_bins, encode=encode, strategy=strategy)
     X_binned = enc.fit_transform(X)
     X_binned = X_binned.tocsc()
-    print("type X_binned : ", type(X_binned))
     # Linear Regression on the discretized dataset
     binning_reg = LinearRegression().fit(X_binned, y)
     # Lasso onthe discretized dataset
@@ -907,16 +879,125 @@ def main():
     # After discretization, the predictions are exactly the same whatever we
     # use linear regression or decision tree.
 
-    # Read CSV : Housing Prices Dataset
-    # data_dir = "./Datasets"
-    # fname_train = data_dir + "/housing_prices_train"
-    # fname_test = data_dir + "/housing_prices_test"
-    # train_set = read_csv(fname_train)
-    # head_train = train_set.head()
-    # test_set = read_csv(fname_test)
-    # head_test = test_set.head()
-    # print("Housing Prices Training Set Header : ", head_train)
-    # print("Housing Prices Testing Set Header : ", head_test)
+    # Bar Plots
+    encode = 'onehot'
+    strategy = 'quantile'
+    time_list = [0 for i in range(9)]
+    time_list_sklearn = [0 for i in range(9)]
+    scores_list = [0 for i in range(9)]
+    sklearn_scores = [0 for i in range(9)]
+    for epoch in range(1000):
+        X, y = simu(beta, n_samples=10, corr=0.5, for_logreg=False, 
+                    random_state=epoch)
+        for n_bins in range(2, 11):
+            enc = KBinsDiscretizer(n_bins=n_bins, encode=encode, 
+                                   strategy=strategy)
+            X_binned = enc.fit_transform(X)
+            X_binned = X_binned.tocsc()
+
+            start1 = time.time()
+
+            sparse_lasso = Lasso(lmbda=lmbda, epsilon=epsilon, f=f,
+                                 n_epochs=n_epochs,
+                                 screening=screening,
+                                 store_history=store_history).fit(X_binned, y)
+
+            end1 = time.time()
+            delay_sparse = end1 - start1
+
+            cv_score = sparse_lasso.score(X_binned, y)
+            scores_list[n_bins - 2] += cv_score
+            start2 = time.time()
+
+            sparse_lasso_sklearn = sklearn_Lasso(alpha=(lmbda 
+                                                        / X_binned.shape[0]),
+                                                 fit_intercept=False,
+                                                 normalize=False,
+                                                 max_iter=n_epochs,
+                                                 tol=1e-15).fit(X_binned, y)
+
+            end2 = time.time()
+            delay_sklearn = end2 - start2
+
+            cv_score_sklearn = sparse_lasso_sklearn.score(X_binned, y)
+            sklearn_scores[n_bins - 2] += cv_score_sklearn
+
+            time_list[n_bins - 2] += delay_sparse
+            time_list_sklearn[n_bins - 2] += delay_sklearn
+
+    sklearn_scores = [i / 1000 for i in sklearn_scores]
+    scores_list = [i / 1000 for i in scores_list]
+    time_list = [i / 1000 for i in time_list]
+    time_list_sklearn = [i / 1000 for i in time_list_sklearn]
+
+    print("list sklearn sparse cv scores : ", sklearn_scores)
+    print("list time sklearn : ", time_list_sklearn)
+    print("list sparse cv scores : ", scores_list)
+    print("list time : ", time_list)
+
+    bins = ['2', '3', '4', '5', '6', '7', '8', '9', '10']
+
+    x = np.arange(len(bins))  # the label locations
+    width = 0.35  # the width of the bars
+    fig = plt.figure()
+    ax = fig.add_subplot(111)
+    rects1 = ax.bar(x - width/2, time_list, width, 
+                    label='our sparse lasso solver')
+    rects2 = ax.bar(x + width/2, time_list_sklearn, width, 
+                    label='sklearn sparse lasso solver')
+
+    # Add some text for labels, title and custom x-axis tick labels, etc.
+    ax.set_ylabel('execution time')
+    ax.set_title('time by bins and solver')
+    ax.set_xticks(x)
+    ax.set_xticklabels(bins)
+    ax.legend()
+
+    def autolabel(rects, scale):
+        """Attach a text label above each bar in *rects*, displaying its
+        height.
+        """
+
+        for rect in rects:
+            height = rect.get_height()
+            ax.annotate('{}'.format(round(height * scale, 0)/scale),
+                        xy=(rect.get_x() + rect.get_width() / 2, height),
+                        xytext=(0, 3),  # 3 points vertical offset
+                        textcoords="offset points",
+                        ha='center', va='bottom')
+
+    autolabel(rects1, 10000)
+    autolabel(rects2, 10000)
+
+    fig.tight_layout()
+    plt.show()
+    bins = ['2', '3', '4', '5', '6', '7', '8', '9', '10']
+    x = np.arange(len(bins))  # the label locations
+    width = 0.35  # the width of the bars
+
+    print("scores list shape : ", len(scores_list))
+    print("sklearn scores list shape : ", len(sklearn_scores))
+    print("first element scores list : ", type(scores_list[0]))
+    print("first element scores list sklearn : ", type(sklearn_scores[0]))
+    fig = plt.figure()
+    ax = fig.add_subplot(111)
+    rects1_score = ax.bar(x - width/2, scores_list, width, 
+                          label='our sparse lasso solver')
+    rects2_score = ax.bar(x + width/2, sklearn_scores, width, 
+                          label='sklearn sparse lasso solver')
+
+    # Add some text for labels, title and custom x-axis tick labels, etc.
+    ax.set_ylabel('crossval score')
+    ax.set_title('crossval score by bins and solver')
+    ax.set_xticks(x)
+    ax.set_xticklabels(bins)
+    ax.legend()
+
+    autolabel(rects1_score, 100)
+    autolabel(rects2_score, 100)
+
+    fig.tight_layout()
+    plt.show()
 
 
 if __name__ == "__main__":
