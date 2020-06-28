@@ -167,6 +167,9 @@ def main():
     X = X_train.to_numpy()
     y = y_train.to_numpy()
 
+    print("shape of X_train : ", X.shape)
+    print("columns of X_train", X_train.columns)
+
     lmbda = 1.
     f = 10
     epsilon = 1e-14
@@ -178,23 +181,23 @@ def main():
     # scores = cross_val_score(lasso, X, y, cv=5)
     # print(scores)
 
-    dense_lasso = Lasso(lmbda=lmbda, epsilon=epsilon, f=f,
-                        n_epochs=n_epochs, screening=screening,
-                        store_history=store_history).fit(X, y)
+    # dense_lasso = Lasso(lmbda=lmbda, epsilon=epsilon, f=f,
+    #                     n_epochs=n_epochs, screening=screening,
+    #                     store_history=store_history).fit(X, y)
 
-    dense_cv_score = dense_lasso.score(X, y)
+    # dense_cv_score = dense_lasso.score(X, y)
 
-    print("dense cv score : ", dense_cv_score)
+    # print("dense cv score : ", dense_cv_score)
 
-    dense_lasso_sklearn = sklearn_Lasso(alpha=lmbda / len(X), 
-                                        fit_intercept=False,
-                                        normalize=False, max_iter=n_epochs,
-                                        tol=1e-15).fit(X, y)
+    # dense_lasso_sklearn = sklearn_Lasso(alpha=lmbda / len(X), 
+    #                                     fit_intercept=False,
+    #                                     normalize=False, max_iter=n_epochs,
+    #                                     tol=1e-15).fit(X, y)
 
-    dense_cv_sklearn = dense_lasso_sklearn.score(X_train, y)
-    print("dense cv score sklearn : ", dense_cv_sklearn)
+    # dense_cv_sklearn = dense_lasso_sklearn.score(X_train, y)
+    # print("dense cv score sklearn : ", dense_cv_sklearn)
 
-    n_bins = 10
+    n_bins = 3
     encode = 'onehot'
     strategy = 'quantile'
     enc = KBinsDiscretizer(n_bins=n_bins, encode=encode, strategy=strategy)
@@ -202,21 +205,22 @@ def main():
     X_binned = X_binned.tocsc()
 
     sparse_lasso_sklearn = sklearn_Lasso(alpha=lmbda / len(X), 
-                                        fit_intercept=False,
-                                        normalize=False, max_iter=n_epochs,
-                                        tol=1e-15).fit(X_binned, y)
+                                         fit_intercept=False,
+                                         normalize=False, max_iter=n_epochs,
+                                         tol=1e-15).fit(X_binned, y)
 
     sparse_cv_sklearn = sparse_lasso_sklearn.score(X_binned, y)
 
     print("sparse cv score sklearn : ", sparse_cv_sklearn)
 
-    sparse_lasso = Lasso(lmbda=lmbda, epsilon=epsilon, f=f, n_epochs=n_epochs, 
+    sparse_lasso = Lasso(lmbda=lmbda, epsilon=epsilon, f=f, 
+                         n_epochs=n_epochs, 
                          screening=screening, 
                          store_history=store_history).fit(X_binned, y)
 
     sparse_cv_score = sparse_lasso.score(X_binned, y)
 
-    # print("sparse crossval score : ", sparse_cv_score)
+    print("sparse crossval score : ", sparse_cv_score)
 
     # print("X type : ", type(X))
 

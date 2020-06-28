@@ -109,6 +109,9 @@ def lambda_max(X, y, tau):
     lmbda_max: float
         highest regularization value in the grid search
     """
+
+    
+
     return lmbda_max
 
 

@@ -2,11 +2,12 @@ import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
 import ipdb
+import time
 
 from numpy.random import randn
 from scipy.linalg import toeplitz
 
-from numba import njit
+from numba import njit, objmode
 from numba import jit
 from sklearn.linear_model import LinearRegression
 from sklearn.preprocessing import KBinsDiscretizer
@@ -72,7 +73,7 @@ def simu(beta, n_samples=1000, corr=0.5, for_logreg=False,
 ############################################################################
 
 
-@jit
+@njit
 def cyclic_coordinate_descent(X, y, lmbda, epsilon, f, n_epochs, screening,
                               store_history):
     """Solver : dense cyclic coordinate descent
@@ -139,7 +140,7 @@ def cyclic_coordinate_descent(X, y, lmbda, epsilon, f, n_epochs, screening,
 
     # Initialisation of the parameters
 
-    n_samples, n_features = np.shape(X)
+    n_samples, n_features = X.shape
 
     beta = np.zeros(n_features)
     theta = np.zeros(n_samples)
@@ -161,6 +162,11 @@ def cyclic_coordinate_descent(X, y, lmbda, epsilon, f, n_epochs, screening,
     L = (X**2).sum(0)
 
     A_c = list(range(n_features))
+
+    # with objmode(start='f8'):
+    #     start = time.perf_counter()
+
+    # start = time.time()
 
     # Iterations of the algorithm
     for k in range(n_epochs):
@@ -190,12 +196,12 @@ def cyclic_coordinate_descent(X, y, lmbda, epsilon, f, n_epochs, screening,
             for i in A_c:
                 XTR_absmax = max(abs(np.dot(X[:, i], residuals)), XTR_absmax)
 
-            theta = residuals / max(XTR_absmax, lmbda)                
+            theta = residuals / max(XTR_absmax, lmbda)
 
             # Computation of the primal problem
             P_lmbda = 0.5 * residuals.dot(residuals)
             P_lmbda += lmbda * np.linalg.norm(beta, 1)
-            
+
             # Computation of the dual problem
             D_lmbda = 0.5 * np.linalg.norm(y, ord=2)**2
             D_lmbda -= (((lmbda**2) / 2)
@@ -232,6 +238,12 @@ def cyclic_coordinate_descent(X, y, lmbda, epsilon, f, n_epochs, screening,
                 if np.abs(G_lmbda) <= epsilon:
                     break
 
+    # with objmode(end='f8'):
+    #     end = time.perf_counter()
+    #     delay = 'time: {}'.format(end - start)
+    # end = time.time()
+    # delay = end - start
+
     return (beta, primal_hist, dual_hist, gap_hist, r_list,
             n_active_features, theta, P_lmbda, D_lmbda, G_lmbda, A_c)
 
@@ -241,7 +253,7 @@ def cyclic_coordinate_descent(X, y, lmbda, epsilon, f, n_epochs, screening,
 #########################################################################
 
 
-@jit
+@njit
 def sparse_cd(X_data, X_indices, X_indptr, y, lmbda, epsilon, f, n_epochs,
               screening, store_history):
     """Solver : sparse cyclic coordinate descent
@@ -343,6 +355,10 @@ def sparse_cd(X_data, X_indices, X_indptr, y, lmbda, epsilon, f, n_epochs,
         for ind in range(start, end):
             L[i] += X_data[ind] ** 2
 
+    # with objmode(start='f8'):
+    #     start = time.perf_counter()
+    # start = time.time()
+   
     for k in range(n_epochs):
         for i in A_c:
             if L[i] == 0.:
@@ -431,6 +447,12 @@ def sparse_cd(X_data, X_indices, X_indptr, y, lmbda, epsilon, f, n_epochs,
                 if np.abs(G_lmbda) <= epsilon:
                     break
 
+    # with objmode(end='f8'):
+    #     end = time.perf_counter()
+    #     delay = 'time: {}'.format(end - start)
+    # end = time.time()
+    # delay = end - start
+
     return (beta, primal_hist, dual_hist, gap_hist, r_list,
             n_active_features, theta, P_lmbda, D_lmbda, G_lmbda, A_c)
 
@@ -485,7 +507,7 @@ class Lasso:
              theta_hat_cyclic_cd,
              P_lmbda,
              D_lmbda,
-             G_lmbda, 
+             G_lmbda,
              A_c) = sparse_cd(X_data, X_indices, X_indptr, y, self.lmbda,
                               self.epsilon, self.f, self.n_epochs,
                               self.screening, self.store_history)
@@ -509,6 +531,7 @@ class Lasso:
         self.G_lmbda = G_lmbda
         self.r_list = r_list
         self.A_c = A_c
+        # self.delay = delay
 
         return self
 
@@ -548,7 +571,10 @@ class Lasso:
             negative mean absolute error (MAE)
             negative to keep the semantic that higher is better
         """
-        score = -np.mean(np.abs(y - self.predict(X)))
+        # score = np.mean(np.abs(y - self.predict(X)))
+        u = ((y - self.predict(X))**2).sum()
+        v = ((y - np.mean(y))**2).sum()
+        score = 1 - u / v
 
         return score
 
@@ -557,7 +583,7 @@ class Lasso:
 #                    Sign Function
 ##########################################################
 
-@jit
+@njit
 def sign(x):
     """
     Parameters
@@ -584,7 +610,7 @@ def sign(x):
 #    Soft-Thresholding Function
 ######################################
 
-@jit
+@njit
 def soft_thresholding(u, x):
     """
     Parameters
@@ -636,9 +662,6 @@ def main():
     X_indices = X.indices
     X_indptr = X.indptr
 
-    print("shape sparse X : ", X.shape)
-    print("shape y : ", y.shape)
-
     (beta_hat_cyclic_cd_true_sparse,
         primal_hist_sparse,
         dual_hist_sparse,
@@ -667,14 +690,14 @@ def main():
         P_lmbda,
         D_lmbda,
         G_lmbda,
-        A_c_dense) = cyclic_coordinate_descent(X, y, lmbda=lmbda, 
+        A_c_dense) = cyclic_coordinate_descent(X, y, lmbda=lmbda,
                                                epsilon=epsilon,
                                                f=f, n_epochs=n_epochs,
                                                screening=screening,
                                                store_history=True)
 
-    print("shape X dense : ", X.shape)
-    print("shape y : ", y.shape)
+    # print("delay sparse : ", delay_sparse)
+    # print("delay dense : ", delay_dense)
 
     # Plot primal objective function (=primal_hist)
     obj = primal_hist
@@ -805,13 +828,13 @@ def main():
                         store_history=store_history).fit(X, y)
 
     original_dense_lasso_cv_score = dense_lasso.score(X, y)
-    print("original dense lasso crossval score : ", 
+    print("original dense lasso crossval score : ",
           original_dense_lasso_cv_score)
 
-    sparse_lasso = Lasso(lmbda=lmbda, epsilon=epsilon, f=f, n_epochs=n_epochs, 
-                         screening=screening, 
+    sparse_lasso = Lasso(lmbda=lmbda, epsilon=epsilon, f=f, n_epochs=n_epochs,
+                         screening=screening,
                          store_history=store_history).fit(X_binned, y)
-    
+
     binning_lasso_cv_score = sparse_lasso.score(X_binned, y)
     print("binning lasso crossval score : ", binning_lasso_cv_score)
 
