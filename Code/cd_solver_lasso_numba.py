@@ -228,8 +228,8 @@ def cyclic_coordinate_descent(X, y, lmbda, epsilon, f, n_epochs, screening,
                 if store_history:
                     n_active_features.append(len(A_c))
 
-                if np.abs(G_lmbda) <= epsilon:
-                    break
+            if np.abs(G_lmbda) <= epsilon:
+                break
 
     return (beta, primal_hist, dual_hist, gap_hist, r_list,
             n_active_features, theta, P_lmbda, D_lmbda, G_lmbda, A_c)
