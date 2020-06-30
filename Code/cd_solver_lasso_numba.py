@@ -153,45 +153,48 @@ def cyclic_coordinate_descent(X, y, lmbda, epsilon, f, n_epochs, screening,
     D_lmbda = 0
     G_lmbda = 0
 
-    residuals = y - X.dot(beta)
+    y_norm2 = np.linalg.norm(y, ord=2)**2
+    residuals = y.copy()
 
     # Computation of the lipschitz constants vector
+    L = (X**2).sum(axis=0)
 
-    L = (X**2).sum(0)
-
-    A_c = list(range(n_features))
-
-    safeset_membership = [True for i in range(n_features)]
-
-    safe_set = list(range(n_features))
+    safeset_membership = np.ones(n_features, dtype=bool)
 
     # Iterations of the algorithm
     for k in range(n_epochs):
-        for i in A_c:
+        for j in range(n_features):
+            if not safeset_membership[j]:
+                continue
+
             # One cyclicly updates the i^{th} coordinate corresponding to
             # the rest in the Euclidean division by the number of features
             # This allows to always selecting an index between 1 and
             # n_features
 
-            old_beta_i = beta[i]
-            step = 1 / L[i]
-            grad = np.dot(X[:, i], residuals)
+            old_beta_j = beta[j]
+            step = 1 / L[j]
+            grad = np.dot(X[:, j], residuals)
 
             # Update of the parameters
             beta[i] += step * grad
 
             # Apply proximal operator
-            beta[i] = soft_thresholding(step * lmbda, beta[i])
+            beta[j] = soft_thresholding(step * lmbda, beta[j])
 
             # Update of the residuals
-            if old_beta_i != beta[i]:
-                residuals += (old_beta_i - beta[i]) * X[:, i]
+            delta_beta_j = old_beta_j - beta[j]
+            if delta_beta_j != 0.:
+                for i in range(n_samples):
+                    residuals[i] += delta_beta_j * X[i, j]
+                # residuals += delta_beta_j * X[:, j]
 
         if k % f == 0:
             # Computation of theta
             XTR_absmax = 0
-            for i in A_c:
-                XTR_absmax = max(abs(np.dot(X[:, i], residuals)), XTR_absmax)
+            for j in range(n_features):
+                if safeset_membership[j]:
+                    XTR_absmax = max(abs(np.dot(X[:, j], residuals)), XTR_absmax)
 
             theta = residuals / max(XTR_absmax, lmbda)
 
@@ -200,7 +203,7 @@ def cyclic_coordinate_descent(X, y, lmbda, epsilon, f, n_epochs, screening,
             P_lmbda += lmbda * np.linalg.norm(beta, 1)
 
             # Computation of the dual problem
-            D_lmbda = 0.5 * np.linalg.norm(y, ord=2)**2
+            D_lmbda = 0.5 * y_norm2
             D_lmbda -= (((lmbda**2) / 2)
                         * np.linalg.norm(theta - y
                                          / lmbda, ord=2)**2)
@@ -222,22 +225,16 @@ def cyclic_coordinate_descent(X, y, lmbda, epsilon, f, n_epochs, screening,
                     r_list.append(r)
 
                 # Computation of the active set
-                for j in A_c:
-                    mu = (np.abs(X[:, j].T.dot(theta))
-                          + r * np.linalg.norm(X[:, j]))
+                for j in range(n_features):
+                    if safeset_membership[j]:
+                        mu = (np.abs(X[:, j].T.dot(theta))
+                              + r * np.sqrt(L[j]))
 
-                    # if mu < 1:
-                    #     A_c.remove(j)
-
-                    if mu < 1:
-                        safeset_membership[j] = False
-                
-                # safe_set = safeset_membership.index(True)
-                safe_set = [j for j, x in enumerate(safeset_membership) if x]
+                        if mu < 1:
+                            safeset_membership[j] = False
 
                 if store_history:
-                    # n_active_features.append(len(A_c))  
-                    n_active_features.append(len(safe_set))          
+                    n_active_features.append(np.sum(safeset_membership))
 
             if np.abs(G_lmbda) <= epsilon:
                 break

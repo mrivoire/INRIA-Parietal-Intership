@@ -8,9 +8,10 @@ from scipy.sparse import csc_matrix
 
 # Data Simulation
 rng = np.random.RandomState(0)
-n_samples, n_features = 100, 300
+n_samples, n_features = 500, 3000
 beta = rng.randn(n_features)
-lmbda = .01
+beta[np.sort(np.abs(beta))[-30] > np.abs(beta)] = 0.
+lmbda = .1
 
 X, y = simu(beta, n_samples=n_samples, corr=0.5,
             for_logreg=False, random_state=42)
@@ -18,15 +19,15 @@ X, y = simu(beta, n_samples=n_samples, corr=0.5,
 y /= np.linalg.norm(y)
 
 f = 10
-n_epochs = 100000
-sparse = False
-tol = 1e-8
+n_epochs = 500
+sparse = True
+tol = 1e-15
 
 if sparse:
     X = csc_matrix(X)
 
 lasso = Lasso(lmbda=lmbda, epsilon=tol, f=f, n_epochs=n_epochs,
-              screening=False, store_history=True)
+              screening=True, store_history=False)
 lasso.fit(X[:, :2], y)  # compile numba code
 
 start1 = time.time()
