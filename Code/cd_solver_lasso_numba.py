@@ -161,6 +161,10 @@ def cyclic_coordinate_descent(X, y, lmbda, epsilon, f, n_epochs, screening,
 
     A_c = list(range(n_features))
 
+    safeset_membership = [True for i in range(n_features)]
+
+    safe_set = list(range(n_features))
+
     # Iterations of the algorithm
     for k in range(n_epochs):
         for i in A_c:
@@ -222,17 +226,24 @@ def cyclic_coordinate_descent(X, y, lmbda, epsilon, f, n_epochs, screening,
                     mu = (np.abs(X[:, j].T.dot(theta))
                           + r * np.linalg.norm(X[:, j]))
 
+                    # if mu < 1:
+                    #     A_c.remove(j)
+
                     if mu < 1:
-                        A_c.remove(j)
+                        safeset_membership[j] = False
+                
+                # safe_set = safeset_membership.index(True)
+                safe_set = [j for j, x in enumerate(safeset_membership) if x]
 
                 if store_history:
-                    n_active_features.append(len(A_c))
+                    # n_active_features.append(len(A_c))  
+                    n_active_features.append(len(safe_set))          
 
             if np.abs(G_lmbda) <= epsilon:
                 break
 
     return (beta, primal_hist, dual_hist, gap_hist, r_list,
-            n_active_features, theta, P_lmbda, D_lmbda, G_lmbda, A_c)
+            n_active_features, theta, P_lmbda, D_lmbda, G_lmbda, safe_set)
 
 
 #########################################################################
@@ -335,6 +346,9 @@ def sparse_cd(X_data, X_indices, X_indptr, y, lmbda, epsilon, f, n_epochs,
 
     A_c = list(range(n_features))
 
+    safeset_membership = [True for i in range(n_features)]
+    safe_set = list(range(n_features))
+
     L = np.zeros(n_features)
 
     for i in A_c:
@@ -422,7 +436,10 @@ def sparse_cd(X_data, X_indices, X_indptr, y, lmbda, epsilon, f, n_epochs,
 
                     mu = np.abs(dot) + r * norm
                     if mu < 1:
-                        A_c.remove(j)
+                        # A_c.remove(j)
+                        safeset_membership[j] = False
+
+                safe_set = [j for j, x in enumerate(safeset_membership) if x]
 
                 if store_history:
                     n_active_features.append(len(A_c))
@@ -431,7 +448,7 @@ def sparse_cd(X_data, X_indices, X_indptr, y, lmbda, epsilon, f, n_epochs,
                     break
 
     return (beta, primal_hist, dual_hist, gap_hist, r_list,
-            n_active_features, theta, P_lmbda, D_lmbda, G_lmbda, A_c)
+            n_active_features, theta, P_lmbda, D_lmbda, G_lmbda, safe_set)
 
 # https://stackoverflow.com/questions/52299420/scipy-csr-matrix-understand-indptr
 
@@ -485,9 +502,9 @@ class Lasso:
              P_lmbda,
              D_lmbda,
              G_lmbda,
-             A_c) = sparse_cd(X_data, X_indices, X_indptr, y, self.lmbda,
-                              self.epsilon, self.f, self.n_epochs,
-                              self.screening, self.store_history)
+             safe_set) = sparse_cd(X_data, X_indices, X_indptr, y, self.lmbda,
+                                   self.epsilon, self.f, self.n_epochs,
+                                   self.screening, self.store_history)
         else:
             (beta_hat_cyclic_cd_true,
              primal_hist,
@@ -499,16 +516,17 @@ class Lasso:
              P_lmbda,
              D_lmbda,
              G_lmbda,
-             A_c) = cyclic_coordinate_descent(X, y, self.lmbda, self.epsilon,
-                                              self.f, self.n_epochs,
-                                              self.screening,
-                                              self.store_history)
+             safe_set) = cyclic_coordinate_descent(X, y, self.lmbda, 
+                                                   self.epsilon,
+                                                   self.f, self.n_epochs,
+                                                   self.screening,
+                                                   self.store_history)
 
         self.slopes = beta_hat_cyclic_cd_true
         self.G_lmbda = G_lmbda
         self.P_lmbda = P_lmbda
         self.r_list = r_list
-        self.A_c = A_c
+        self.safe_set = safe_set
 
         return self
 
@@ -636,16 +654,18 @@ def main():
     X, y = simu(beta, n_samples=n_samples, corr=0.5, for_logreg=False,
                 random_state=rng)
 
-    # X = csc_matrix(X)
-    # X_data = X.data
-    # X_indices = X.indices
-    # X_indptr = X.indptr
-    enc = KBinsDiscretizer(n_bins=2, encode=encode, strategy=strategy)
-    X_binned = enc.fit_transform(X)
-    X_binned = X_binned.tocsc()
-    X_binned_data = X_binned.data
-    X_binned_indices = X_binned.indices
-    X_binned_indptr = X_binned.indptr
+
+
+    X = csc_matrix(X)
+    X_data = X.data
+    X_indices = X.indices
+    X_indptr = X.indptr
+    # enc = KBinsDiscretizer(n_bins=2, encode=encode, strategy=strategy)
+    # X_binned = enc.fit_transform(X)
+    # X_binned = X_binned.tocsc()
+    # X_binned_data = X_binned.data
+    # X_binned_indices = X_binned.indices
+    # X_binned_indptr = X_binned.indptr
 
     (beta_hat_cyclic_cd_true_sparse,
         primal_hist_sparse,
@@ -657,257 +677,263 @@ def main():
         P_lmbda_sparse,
         D_lmbda_sparse,
         G_lmbda_sparse,
-        A_c_sparse) = sparse_cd(X_data=X_binned_data, 
-                                X_indices=X_binned_indices,
-                                X_indptr=X_binned_indptr, y=y, lmbda=lmbda,
-                                epsilon=epsilon, f=f,
-                                n_epochs=n_epochs, screening=screening,
-                                store_history=store_history)
+        safe_set_sparse) = sparse_cd(X_data=X_data,
+                                     X_indices=X_indices,
+                                     X_indptr=X_indptr, y=y, 
+                                     lmbda=lmbda,
+                                     epsilon=epsilon, f=f,
+                                     n_epochs=n_epochs, screening=screening,
+                                     store_history=store_history)
 
-    print("primal function : ", P_lmbda_sparse)   
-    
+
+    print("safe set sparse : ", safe_set_sparse)
+    # print("primal function : ", P_lmbda_sparse)
+
+    # sparse_lasso_sklearn =
+    # print("store mu = ", store_mu) sklearn_Lasso(alpha=(lmbda / X_binned.shape[0]),
+    #                                      fit_intercept=False,
+    #                                      normalize=False,
+    #                                      max_iter=n_epochs,
+    #                                      tol=1e-14).fit(X_binned, y)
+
+    # slopes = sparse_lasso_sklearn.coef_
+    # intercept = sparse_lasso_sklearn.intercept_
+
+    # # (1 / (2 * n_samples)) * ||y - Xw||^2_2 + alpha * ||w||_1
+
+    # primal_function = ((1 / 2)
+    #                    * np.linalg.norm(y - X_binned.dot(slopes.T), 2)**2
+    #                    + lmbda * np.linalg.norm(slopes, 1))
+
+    # print("primal sklearn : ", primal_function)
+    X = X.toarray()
+
+    (beta_hat_cyclic_cd_true,
+        primal_hist,
+        dual_hist,
+        gap_hist,
+        r_list,
+        n_active_features_true,
+        theta_hat_cyclic_cd,
+        P_lmbda,
+        D_lmbda,
+        G_lmbda,
+        safe_set_dense) = cyclic_coordinate_descent(X, y, lmbda=lmbda,
+                                                    epsilon=epsilon,
+                                                    f=f, n_epochs=n_epochs,
+                                                    screening=screening,
+                                                    store_history=True)
+
+    print("safe set dense = ", safe_set_dense)
+
+    # Plot primal objective function (=primal_hist)
+    obj = primal_hist
+
+    x = np.arange(1, len(obj) + 1)
+
+    plt.plot(x, obj, label='cyclic_cd', color='blue')
+    plt.yscale('log')
+    plt.title("Cyclic CD Objective")
+    plt.xlabel('n_iter')
+    plt.ylabel('f obj')
+    plt.legend(loc='best')
+    plt.show()
+
+    # List of abscissa to plot the evolution of the parameters
+    list_epochs = []
+    for i in range(len(dual_hist)):
+        list_epochs.append(10 * i)
+
+    print("length list epochs : ", len(list_epochs))
+    print("length r list : ", len(r_list))
+
+    # Plot history of the radius
+    plt.plot(list_epochs, r_list, label='radius', color='red')
+    plt.yscale('log')
+    plt.title("Convergence of the radius of the safe sphere")
+    plt.xlabel("n_epochs")
+    plt.ylabel("Radius")
+    plt.legend(loc='best')
+    plt.show()
+
+    # Plot Dual history vs Primal history
+    plt.plot(list_epochs, dual_hist, label='dual', color='red')
+    plt.plot(list_epochs, obj, label='primal', color='blue')
+    plt.yscale('log')
+    plt.title("Primal VS Dual Monitoring")
+    plt.xlabel('n_epochs')
+    plt.ylabel('optimization problem')
+    plt.legend(loc='best')
+    plt.show()
+
+    # Plot Dual gap
+    plt.plot(list_epochs, gap_hist, label='dual gap', color='cyan')
+    plt.yscale('log')
+    plt.title("Convergence of the Duality Gap")
+    plt.xlabel('n_epochs')
+    plt.ylabel('Duality gap')
+    plt.legend(loc='best')
+    plt.show()
+
+    # Plot number of features in active set
+    plt.plot(list_epochs, n_active_features_true,
+             label='number of active features', color='magenta')
+    plt.yscale('log')
+    plt.title("Evolution of the number of active features")
+    plt.xlabel('n_epochs')
+    plt.ylabel('Number of active features')
+    plt.legend(loc='best')
+    plt.show()
+
+    # Comparison between the linear regression on the original dataset (before
+    # discretization, taking continuous values) and the discretized dataset
+    # (taking only a certain number of discrete values defined by the bins)
+
+    # 1. Prediction on the original dataset
+
+    # Defines the setting of the subplots
+    n_epochs = 500
+    fig, (ax1, ax2) = plt.subplots(ncols=2, sharey=True, figsize=(10, 4))
+    # Linear regression on the original dataset
+    reg = LinearRegression().fit(X, y)
+    # Lasso regression on the original dataset
+    lasso = sklearn_Lasso(alpha=lmbda / len(X), fit_intercept=False,
+                          normalize=False, max_iter=n_epochs,
+                          tol=1e-15).fit(X, y)
+
+    ax1.plot(X[:, 0], reg.predict(X), linewidth=2, color='blue',
+             label='linear regression')
+
+    # Decision Tree on the original dataset
+    tree_reg = DecisionTreeRegressor(min_samples_split=3,
+                                     random_state=0).fit(X, y)
+    ax1.plot(X[:, 0], tree_reg.predict(X), linewidth=2, color='red',
+             label='decision tree')
+
+    ax1.plot(X[:, 0], y, 'o', c='k')
+    ax1.legend(loc="best")
+    ax1.set_ylabel("Regression output")
+    ax1.set_xlabel("Input feature")
+    ax1.set_title("Result before discretization")
+
+    # 2. Prediction on the discretized dataset
+    n_bins = 10
+    encode = 'onehot'
+    strategy = 'quantile'
+    enc = KBinsDiscretizer(n_bins=n_bins, encode=encode, strategy=strategy)
+    X_binned = enc.fit_transform(X)
+    X_binned = X_binned.tocsc()
+    # Linear Regression on the discretized dataset
+    binning_reg = LinearRegression().fit(X_binned, y)
+    # Lasso onthe discretized dataset
+    binning_lasso = sklearn_Lasso(alpha=lmbda / X_binned.shape[0],
+                                  fit_intercept=False, normalize=False,
+                                  max_iter=n_epochs,
+                                  tol=1e-15).fit(X_binned, y)
+
+    ax2.plot(X[:, 0], binning_reg.predict(X_binned), linewidth=2, color='blue',
+             linestyle='-', label='linear regression')    
+    enc = KBinsDiscretizer(n_bins=n_bins, encode=encode, strategy=strategy)
+    X_binned = enc.fit_transform(X)
+    X_binned = X_binned.tocsc()
 
     sparse_lasso_sklearn = sklearn_Lasso(alpha=(lmbda / X_binned.shape[0]),
                                          fit_intercept=False,
                                          normalize=False,
                                          max_iter=n_epochs,
                                          tol=1e-14).fit(X_binned, y)
+    # Decision Tree on the discretized dataset
+    binning_tree_reg = DecisionTreeRegressor(min_samples_split=3,
+                                             random_state=0).fit(X_binned, y)
+    ax2.plot(X[:, 0], binning_tree_reg.predict(X_binned), linewidth=2,
+             color='red', linestyle=':', label='decision tree')
 
-    slopes = sparse_lasso_sklearn.coef_
-    intercept = sparse_lasso_sklearn.intercept_
+    ax2.plot(X[:, 0], y, 'o', c='k')
+    ax2.vlines(enc.bin_edges_[0], *plt.gca().get_ylim(), linewidth=1,
+               alpha=0.2)
+    ax2.legend(loc="best")
+    ax2.set_xlabel("Input features")
+    ax2.set_title("Result after discretization")
+    plt.tight_layout()
+    plt.show()
 
-    # (1 / (2 * n_samples)) * ||y - Xw||^2_2 + alpha * ||w||_1
+    # Assessment of the model by computing the crossval score
+    dense_lasso = Lasso(lmbda=lmbda, epsilon=epsilon, f=f,
+                        n_epochs=n_epochs, screening=screening,
+                        store_history=store_history).fit(X, y)
 
-    primal_function = ((1 / (2 * n_samples)) 
-                       * np.linalg.norm(y - X_binned.dot(slopes.T), 2)**2 
-                       + lmbda * np.linalg.norm(slopes, 1)) 
+    original_dense_lasso_cv_score = dense_lasso.score(X, y)
+    print("original dense lasso crossval score : ",
+          original_dense_lasso_cv_score)
 
-    print("primal sklearn : ", primal_function)  
-    # X = X.toarray() 
+    sparse_lasso = Lasso(lmbda=lmbda, epsilon=epsilon, f=f, n_epochs=n_epochs,
+                         screening=screening,
+                         store_history=store_history).fit(X_binned, y)
 
-    # (beta_hat_cyclic_cd_true,
-    #     primal_hist,
-    #     dual_hist,
-    #     gap_hist,
-    #     r_list,
-    #     n_active_features_true,
-    #     theta_hat_cyclic_cd,
-    #     P_lmbda,
-    #     D_lmbda,
-    #     G_lmbda,
-    #     A_c_dense) = cyclic_coordinate_descent(X, y, lmbda=lmbda,
-    #                                            epsilon=epsilon,
-    #                                            f=f, n_epochs=n_epochs,
-    #                                            screening=screening,
-    #                                            store_history=True)
+    binning_lasso_cv_score = sparse_lasso.score(X_binned, y)
+    print("binning lasso crossval score : ", binning_lasso_cv_score)
 
-    # Plot primal objective function (=primal_hist)
-    # obj = primal_hist
+    sklearn_dense_cv_score = lasso.score(X, y)
+    print("sklearn dense lasso crossval score : ", sklearn_dense_cv_score)
 
-    # x = np.arange(1, len(obj) + 1)
+    sklearn_binning_cv_score = binning_lasso.score(X_binned, y)
+    print("sklearn binning lasso crossval score : ", sklearn_binning_cv_score)
 
-    # plt.plot(x, obj, label='cyclic_cd', color='blue')
-    # plt.yscale('log')
-    # plt.title("Cyclic CD Objective")
-    # plt.xlabel('n_iter')
-    # plt.ylabel('f obj')
-    # plt.legend(loc='best')
-    # plt.show()
+    # PCA : Principal Component Analysis on the original dataset
+    pca = PCA(n_components=2, svd_solver='full')
+    pca.fit(X)
+    svd = pca.singular_values_
+    var_ratio = pca.explained_variance_ratio_
+    PCs = pca.transform(X)
+    print("Variances of the principal components : ", svd)
+    print("Explained variance ratio : ", var_ratio)
+    print("Principal Components : ", PCs)
 
-    # # List of abscissa to plot the evolution of the parameters
-    # list_epochs = []
-    # for i in range(len(dual_hist)):
-    #     list_epochs.append(10 * i)
+    # 3. Prediction on the original dataset after having carried out a PCA
 
-    # print("length list epochs : ", len(list_epochs))
-    # print("length r list : ", len(r_list))
+    # Defines the setting of the subplots
+    fig, (ax1, ax2) = plt.subplots(ncols=2, sharey=True, figsize=(10, 4))
+    # Linear regression on the original dataset
+    reg = LinearRegression().fit(X, y)
+    ax1.plot(PCs[:, 0], reg.predict(X), linewidth=2, color='blue',
+             label='linear regression')
 
-    # # Plot history of the radius
-    # plt.plot(list_epochs, r_list, label='radius', color='red')
-    # plt.yscale('log')
-    # plt.title("Convergence of the radius of the safe sphere")
-    # plt.xlabel("n_epochs")
-    # plt.ylabel("Radius")
-    # plt.legend(loc='best')
-    # plt.show()
+    # Decision Tree on the original dataset
+    tree_reg = DecisionTreeRegressor(min_samples_split=3,
+                                     random_state=0).fit(X, y)
+    ax1.plot(PCs[:, 0], tree_reg.predict(X), linewidth=2, color='red',
+             label='decision tree')
 
-    # # Plot Dual history vs Primal history
-    # plt.plot(list_epochs, dual_hist, label='dual', color='red')
-    # plt.plot(list_epochs, obj, label='primal', color='blue')
-    # plt.yscale('log')
-    # plt.title("Primal VS Dual Monitoring")
-    # plt.xlabel('n_epochs')
-    # plt.ylabel('optimization problem')
-    # plt.legend(loc='best')
-    # plt.show()
+    ax1.plot(PCs[:, 0], y, 'o', c='k')
+    ax1.legend(loc="best")
+    ax1.set_ylabel("Regression output")
+    ax1.set_xlabel("Input feature")
+    ax1.set_title("Result before discretization")
 
-    # # Plot Dual gap
-    # plt.plot(list_epochs, gap_hist, label='dual gap', color='cyan')
-    # plt.yscale('log')
-    # plt.title("Convergence of the Duality Gap")
-    # plt.xlabel('n_epochs')
-    # plt.ylabel('Duality gap')
-    # plt.legend(loc='best')
-    # plt.show()
+    # 4. Prediction on the discretized dataset after having carried out a PCA
+    n_bins = 10
+    encode = 'onehot'
+    strategy = 'quantile'
+    enc = KBinsDiscretizer(n_bins=n_bins, encode=encode, strategy=strategy)
+    X_binned = enc.fit_transform(X)
+    # Linear Regression on the discretized dataset
+    binning_reg = LinearRegression().fit(X_binned, y)
+    ax2.plot(PCs[:, 0], binning_reg.predict(X_binned), linewidth=2,
+             color='blue', linestyle='-', label='linear regression')
+    # Decision Tree on the discretized dataset
+    binning_tree_reg = DecisionTreeRegressor(min_samples_split=3,
+                                             random_state=0).fit(X_binned, y)
+    ax2.plot(PCs[:, 0], binning_tree_reg.predict(X_binned), linewidth=2,
+             color='red', linestyle=':', label='decision tree')
 
-    # # Plot number of features in active set
-    # plt.plot(list_epochs, n_active_features_true,
-    #          label='number of active features', color='magenta')
-    # plt.yscale('log')
-    # plt.title("Evolution of the number of active features")
-    # plt.xlabel('n_epochs')
-    # plt.ylabel('Number of active features')
-    # plt.legend(loc='best')
-    # plt.show()
-
-    # Comparison between the linear regression on the original dataset (before
-    # discretization, taking continuous values) and the discretized dataset
-    # (taking only a certain number of discrete values defined by the bins)
-
-    # # 1. Prediction on the original dataset
-
-    # # Defines the setting of the subplots
-    # n_epochs = 500
-    # fig, (ax1, ax2) = plt.subplots(ncols=2, sharey=True, figsize=(10, 4))
-    # # Linear regression on the original dataset
-    # reg = LinearRegression().fit(X, y)
-    # # Lasso regression on the original dataset
-    # lasso = sklearn_Lasso(alpha=lmbda / len(X), fit_intercept=False,
-    #                       normalize=False, max_iter=n_epochs,
-    #                       tol=1e-15).fit(X, y)
-
-    # ax1.plot(X[:, 0], reg.predict(X), linewidth=2, color='blue',
-    #          label='linear regression')
-
-    # # Decision Tree on the original dataset
-    # tree_reg = DecisionTreeRegressor(min_samples_split=3,
-    #                                  random_state=0).fit(X, y)
-    # ax1.plot(X[:, 0], tree_reg.predict(X), linewidth=2, color='red',
-    #          label='decision tree')
-
-    # ax1.plot(X[:, 0], y, 'o', c='k')
-    # ax1.legend(loc="best")
-    # ax1.set_ylabel("Regression output")
-    # ax1.set_xlabel("Input feature")
-    # ax1.set_title("Result before discretization")
-
-    # # 2. Prediction on the discretized dataset
-    # n_bins = 10
-    # encode = 'onehot'
-    # strategy = 'quantile'
-    # enc = KBinsDiscretizer(n_bins=n_bins, encode=encode, strategy=strategy)
-    # X_binned = enc.fit_transform(X)
-    # X_binned = X_binned.tocsc()
-    # # Linear Regression on the discretized dataset
-    # binning_reg = LinearRegression().fit(X_binned, y)
-    # # Lasso onthe discretized dataset
-    # binning_lasso = sklearn_Lasso(alpha=lmbda / X_binned.shape[0],
-    #                               fit_intercept=False, normalize=False,
-    #                               max_iter=n_epochs,
-    #                               tol=1e-15).fit(X_binned, y)
-
-    # ax2.plot(X[:, 0], binning_reg.predict(X_binned), linewidth=2, color='blue',
-    #          linestyle='-', label='linear regression')    enc = KBinsDiscretizer(n_bins=1, encode=encode, strategy=strategy)
-    # X_binned = enc.fit_transform(X)
-    # X_binned = X_binned.tocsc()
-
-    # sparse_lasso_sklearn = sklearn_Lasso(alpha=(lmbda / X_binned.shape[0]),
-    #                                             fit_intercept=False,
-    #                                             normalize=False,
-    #                                             max_iter=n_epochs,
-    #                                             tol=1e-14).fit(X_binned, y)
-    # # Decision Tree on the discretized dataset
-    # binning_tree_reg = DecisionTreeRegressor(min_samples_split=3,
-    #                                          random_state=0).fit(X_binned, y)
-    # ax2.plot(X[:, 0], binning_tree_reg.predict(X_binned), linewidth=2,
-    #          color='red', linestyle=':', label='decision tree')
-
-    # ax2.plot(X[:, 0], y, 'o', c='k')
-    # ax2.vlines(enc.bin_edges_[0], *plt.gca().get_ylim(), linewidth=1,
-    #            alpha=0.2)
-    # ax2.legend(loc="best")
-    # ax2.set_xlabel("Input features")
-    # ax2.set_title("Result after discretization")
-    # plt.tight_layout()
-    # plt.show()
-
-    # # Assessment of the model by computing the crossval score
-    # dense_lasso = Lasso(lmbda=lmbda, epsilon=epsilon, f=f,
-    #                     n_epochs=n_epochs, screening=screening,
-    #                     store_history=store_history).fit(X, y)
-
-    # original_dense_lasso_cv_score = dense_lasso.score(X, y)
-    # print("original dense lasso crossval score : ",
-    #       original_dense_lasso_cv_score)
-
-    # sparse_lasso = Lasso(lmbda=lmbda, epsilon=epsilon, f=f, n_epochs=n_epochs,
-    #                      screening=screening,
-    #                      store_history=store_history).fit(X_binned, y)
-
-    # binning_lasso_cv_score = sparse_lasso.score(X_binned, y)
-    # print("binning lasso crossval score : ", binning_lasso_cv_score)
-
-    # sklearn_dense_cv_score = lasso.score(X, y)
-    # print("sklearn dense lasso crossval score : ", sklearn_dense_cv_score)
-
-    # sklearn_binning_cv_score = binning_lasso.score(X_binned, y)
-    # print("sklearn binning lasso crossval score : ", sklearn_binning_cv_score)
-
-    # # PCA : Principal Component Analysis on the original dataset
-    # pca = PCA(n_components=2, svd_solver='full')
-    # pca.fit(X)
-    # svd = pca.singular_values_
-    # var_ratio = pca.explained_variance_ratio_
-    # PCs = pca.transform(X)
-    # print("Variances of the principal components : ", svd)
-    # print("Explained variance ratio : ", var_ratio)
-    # print("Principal Components : ", PCs)
-
-    # # 3. Prediction on the original dataset after having carried out a PCA
-
-    # # Defines the setting of the subplots
-    # fig, (ax1, ax2) = plt.subplots(ncols=2, sharey=True, figsize=(10, 4))
-    # # Linear regression on the original daaset
-    # reg = LinearRegression().fit(X, y)
-    # ax1.plot(PCs[:, 0], reg.predict(X), linewidth=2, color='blue',
-    #          label='linear regression')
-
-    # # Decision Tree on the original dataset
-    # tree_reg = DecisionTreeRegressor(min_samples_split=3,
-    #                                  random_state=0).fit(X, y)
-    # ax1.plot(PCs[:, 0], tree_reg.predict(X), linewidth=2, color='red',
-    #          label='decision tree')
-
-    # ax1.plot(PCs[:, 0], y, 'o', c='k')
-    # ax1.legend(loc="best")
-    # ax1.set_ylabel("Regression output")
-    # ax1.set_xlabel("Input feature")
-    # ax1.set_title("Result before discretization")
-
-    # # 4. Prediction on the discretized dataset after having carried out a PCA
-    # n_bins = 10
-    # encode = 'onehot'
-    # strategy = 'quantile'
-    # enc = KBinsDiscretizer(n_bins=n_bins, encode=encode, strategy=strategy)
-    # X_binned = enc.fit_transform(X)
-    # # Linear Regression on the discretized dataset
-    # binning_reg = LinearRegression().fit(X_binned, y)
-    # ax2.plot(PCs[:, 0], binning_reg.predict(X_binned), linewidth=2,
-    #          color='blue', linestyle='-', label='linear regression')
-    # # Decision Tree on the discretized dataset
-    # binning_tree_reg = DecisionTreeRegressor(min_samples_split=3,
-    #                                          random_state=0).fit(X_binned, y)
-    # ax2.plot(PCs[:, 0], binning_tree_reg.predict(X_binned), linewidth=2,
-    #          color='red', linestyle=':', label='decision tree')
-
-    # ax2.plot(PCs[:, 0], y, 'o', c='k')
-    # ax2.vlines(enc.bin_edges_[0], *plt.gca().get_ylim(), linewidth=1,
-    #            alpha=0.2)
-    # ax2.legend(loc="best")
-    # ax2.set_xlabel("Input features")
-    # ax2.set_title("Result after discretization")
-    # plt.tight_layout()
-    # plt.show()
+    ax2.plot(PCs[:, 0], y, 'o', c='k')
+    ax2.vlines(enc.bin_edges_[0], *plt.gca().get_ylim(), linewidth=1,
+               alpha=0.2)
+    ax2.legend(loc="best")
+    ax2.set_xlabel("Input features")
+    ax2.set_title("Result after discretization")
+    plt.tight_layout()
+    plt.show()
 
     # Results
     # Before discretization, the predictions are different whether we use
@@ -917,125 +943,125 @@ def main():
     # use linear regression or decision tree.
 
     # Bar Plots
-    # encode = 'onehot'
-    # strategy = 'quantile'
-    # time_list = [0 for i in range(3)]
-    # time_list_sklearn = [0 for i in range(3)]
-    # scores_list = [0 for i in range(3)]
-    # sklearn_scores = [0 for i in range(3)]
+    encode = 'onehot'
+    strategy = 'quantile'
+    time_list = [0 for i in range(3)]
+    time_list_sklearn = [0 for i in range(3)]
+    scores_list = [0 for i in range(3)]
+    sklearn_scores = [0 for i in range(3)]
 
-    # for rep in range(1):
-    #     X, y = simu(beta, n_samples=10, corr=0.5, for_logreg=False, 
-    #                 random_state=rep)
-    #     for n_bins in range(2, 5):
-    #         enc = KBinsDiscretizer(n_bins=n_bins, encode=encode, 
-    #                                strategy=strategy)
-    #         X_binned = enc.fit_transform(X)
-    #         X_binned = X_binned.tocsc()
+    for rep in range(1):
+        X, y = simu(beta, n_samples=10, corr=0.5, for_logreg=False,
+                    random_state=rep)
+        for n_bins in range(2, 5):
+            enc = KBinsDiscretizer(n_bins=n_bins, encode=encode,
+                                   strategy=strategy)
+            X_binned = enc.fit_transform(X)
+            X_binned = X_binned.tocsc()
 
-    #         start1 = time.time()
+            start1 = time.time()
 
-    #         sparse_lasso = Lasso(lmbda=lmbda, epsilon=epsilon, f=f,
-    #                              n_epochs=n_epochs,
-    #                              screening=screening,
-    #                              store_history=True).fit(X_binned, y)
+            sparse_lasso = Lasso(lmbda=lmbda, epsilon=epsilon, f=f,
+                                 n_epochs=n_epochs,
+                                 screening=screening,
+                                 store_history=False).fit(X_binned, y)
 
-    #         end1 = time.time()
-    #         delay_sparse = end1 - start1
+            end1 = time.time()
+            delay_sparse = end1 - start1
 
-    #         cv_score = sparse_lasso.score(X_binned, y)
-    #         scores_list[n_bins - 2] += cv_score
-    #         start2 = time.time()
+            cv_score = sparse_lasso.score(X_binned, y)
+            scores_list[n_bins - 2] += cv_score
+            start2 = time.time()
 
-    #         sparse_lasso_sklearn = sklearn_Lasso(alpha=(lmbda 
-    #                                                     / X_binned.shape[0]),
-    #                                              fit_intercept=False,
-    #                                              normalize=False,
-    #                                              max_iter=n_epochs,
-    #                                              tol=1e-14).fit(X_binned, y)
+            sparse_lasso_sklearn = sklearn_Lasso(alpha=(lmbda
+                                                        / X_binned.shape[0]),
+                                                 fit_intercept=False,
+                                                 normalize=False,
+                                                 max_iter=n_epochs,
+                                                 tol=1e-14).fit(X_binned, y)
 
-    #         end2 = time.time()
-    #         delay_sklearn = end2 - start2
+            end2 = time.time()
+            delay_sklearn = end2 - start2
 
-    #         cv_score_sklearn = sparse_lasso_sklearn.score(X_binned, y)
-    #         sklearn_scores[n_bins - 2] += cv_score_sklearn
+            cv_score_sklearn = sparse_lasso_sklearn.score(X_binned, y)
+            sklearn_scores[n_bins - 2] += cv_score_sklearn
 
-    #         time_list[n_bins - 2] += delay_sparse
-    #         time_list_sklearn[n_bins - 2] += delay_sklearn
+            time_list[n_bins - 2] += delay_sparse
+            time_list_sklearn[n_bins - 2] += delay_sklearn
 
-    # sklearn_scores = [i / 1 for i in sklearn_scores]
-    # scores_list = [i / 1 for i in scores_list]
-    # time_list = [i / 1 for i in time_list]
-    # time_list_sklearn = [i / 1 for i in time_list_sklearn]
+    sklearn_scores = [i / 1 for i in sklearn_scores]
+    scores_list = [i / 1 for i in scores_list]
+    time_list = [i / 1 for i in time_list]
+    time_list_sklearn = [i / 1 for i in time_list_sklearn]
 
-    # print("list sklearn sparse cv scores : ", sklearn_scores)
-    # print("list time sklearn : ", time_list_sklearn)
-    # print("list sparse cv scores : ", scores_list)
-    # print("list time : ", time_list)
+    print("list sklearn sparse cv scores : ", sklearn_scores)
+    print("list time sklearn : ", time_list_sklearn)
+    print("list sparse cv scores : ", scores_list)
+    print("list time : ", time_list)
 
-    # bins = ['2', '3', '4']
+    bins = ['2', '3', '4']
 
-    # x = np.arange(len(bins))  # the label locations
-    # width = 0.35  # the width of the bars
-    # fig = plt.figure()
-    # ax = fig.add_subplot(111)
-    # rects1 = ax.bar(x - width/2, time_list, width, 
-    #                 label='our sparse lasso solver')
-    # rects2 = ax.bar(x + width/2, time_list_sklearn, width, 
-    #                 label='sklearn sparse lasso solver')
+    x = np.arange(len(bins))  # the label locations
+    width = 0.35  # the width of the bars
+    fig = plt.figure()
+    ax = fig.add_subplot(111)
+    rects1 = ax.bar(x - width/2, time_list, width,
+                    label='our sparse lasso solver')
+    rects2 = ax.bar(x + width/2, time_list_sklearn, width,
+                    label='sklearn sparse lasso solver')
 
-    # # Add some text for labels, title and custom x-axis tick labels, etc.
-    # ax.set_ylabel('execution time')
-    # ax.set_title('time by bins and solver')
-    # ax.set_xticks(x)
-    # ax.set_xticklabels(bins)
-    # ax.legend()
+    # Add some text for labels, title and custom x-axis tick labels, etc.
+    ax.set_ylabel('execution time')
+    ax.set_title('time by bins and solver')
+    ax.set_xticks(x)
+    ax.set_xticklabels(bins)
+    ax.legend()
 
-    # def autolabel(rects, scale):
-    #     """Attach a text label above each bar in *rects*, displaying its
-    #     height.
-    #     """
+    def autolabel(rects, scale):
+        """Attach a text label above each bar in *rects*, displaying its
+        height.
+        """
 
-    #     for rect in rects:
-    #         height = rect.get_height()
-    #         ax.annotate('{}'.format(round(height * scale, 0)/scale),
-    #                     xy=(rect.get_x() + rect.get_width() / 2, height),
-    #                     xytext=(0, 3),  # 3 points vertical offset
-    #                     textcoords="offset points",
-    #                     ha='center', va='bottom')
+        for rect in rects:
+            height = rect.get_height()
+            ax.annotate('{}'.format(round(height * scale, 0)/scale),
+                        xy=(rect.get_x() + rect.get_width() / 2, height),
+                        xytext=(0, 3),  # 3 points vertical offset
+                        textcoords="offset points",
+                        ha='center', va='bottom')
 
-    # autolabel(rects1, 10000)
-    # autolabel(rects2, 10000)
+    autolabel(rects1, 10000)
+    autolabel(rects2, 10000)
 
-    # fig.tight_layout()
-    # plt.show()
-    # bins = ['2', '3', '4']
-    # x = np.arange(len(bins))  # the label locations
-    # width = 0.35  # the width of the bars
+    fig.tight_layout()
+    plt.show()
+    bins = ['2', '3', '4']
+    x = np.arange(len(bins))  # the label locations
+    width = 0.35  # the width of the bars
 
-    # print("scores list shape : ", len(scores_list))
-    # print("sklearn scores list shape : ", len(sklearn_scores))
-    # print("first element scores list : ", type(scores_list[0]))
-    # print("first element scores list sklearn : ", type(sklearn_scores[0]))
-    # fig = plt.figure()
-    # ax = fig.add_subplot(111)
-    # rects1_score = ax.bar(x - width/2, scores_list, width, 
-    #                       label='our sparse lasso solver')
-    # rects2_score = ax.bar(x + width/2, sklearn_scores, width, 
-    #                       label='sklearn sparse lasso solver')
+    print("scores list shape : ", len(scores_list))
+    print("sklearn scores list shape : ", len(sklearn_scores))
+    print("first element scores list : ", type(scores_list[0]))
+    print("first element scores list sklearn : ", type(sklearn_scores[0]))
+    fig = plt.figure()
+    ax = fig.add_subplot(111)
+    rects1_score = ax.bar(x - width/2, scores_list, width,
+                          label='our sparse lasso solver')
+    rects2_score = ax.bar(x + width/2, sklearn_scores, width,
+                          label='sklearn sparse lasso solver')
 
-    # # Add some text for labels, title and custom x-axis tick labels, etc.
-    # ax.set_ylabel('crossval score')
-    # ax.set_title('crossval score by bins and solver')
-    # ax.set_xticks(x)
-    # ax.set_xticklabels(bins)
-    # ax.legend()
+    # Add some text for labels, title and custom x-axis tick labels, etc.
+    ax.set_ylabel('crossval score')
+    ax.set_title('crossval score by bins and solver')
+    ax.set_xticks(x)
+    ax.set_xticklabels(bins)
+    ax.legend()
 
-    # autolabel(rects1_score, 1000)
-    # autolabel(rects2_score, 1000)
+    autolabel(rects1_score, 1000)
+    autolabel(rects2_score, 1000)
 
-    # fig.tight_layout()
-    # plt.show()
+    fig.tight_layout()
+    plt.show()
 
 
 if __name__ == "__main__":

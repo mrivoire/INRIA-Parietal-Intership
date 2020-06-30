@@ -60,7 +60,7 @@ def test_cd_lasso(screening, store_history, sparse):
     if screening and store_history:
         assert lasso.r_list[-1] < 1e-5
 
-    assert len(lasso.A_c) == np.count_nonzero(lasso.slopes)
+    assert len(lasso.safe_set) == np.count_nonzero(lasso.slopes)
 
     np.testing.assert_allclose(lasso.slopes, sklasso.coef_, rtol=1e-6)
     np.testing.assert_allclose(lasso.P_lmbda, primal_function_sklearn,
