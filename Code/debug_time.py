@@ -19,7 +19,7 @@ X, y = simu(beta, n_samples=n_samples, corr=0.5,
 y /= np.linalg.norm(y)
 
 f = 10
-n_epochs = 500
+n_epochs = 1000
 sparse = True
 tol = 1e-15
 
@@ -52,7 +52,7 @@ primal_function_sklearn = (0.5
                                             2)**2
                            + lmbda * np.linalg.norm(sklasso.coef_, 1))
 primal_function_numba = (0.5
-                           * np.linalg.norm(y - X.dot(lasso.slopes.T),
+                         * np.linalg.norm(y - X.dot(lasso.slopes.T),
                                             2)**2
-                           + lmbda * np.linalg.norm(lasso.slopes, 1))
+                         + lmbda * np.linalg.norm(lasso.slopes, 1))
 print(primal_function_sklearn - primal_function_numba)

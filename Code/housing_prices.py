@@ -4,6 +4,7 @@ import scipy
 import matplotlib
 import matplotlib.pyplot as plt
 
+from numba import njit
 from scipy.stats import skew
 from scipy.stats.stats import pearsonr
 from sklearn.preprocessing import StandardScaler
@@ -17,10 +18,6 @@ from scipy.sparse import issparse
 from sklearn.linear_model import Lasso as sklearn_Lasso
 
 from cd_solver_lasso_numba import Lasso, cyclic_coordinate_descent, sparse_cd
-# import pickle
-# pickle.load(open("model.pkl", 'rb'))
-# model.embedding_ = model.embedding_.astype(np.float32, order='A')
-
 
 #######################################
 #              Read CSV

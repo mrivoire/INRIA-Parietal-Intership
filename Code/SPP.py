@@ -112,7 +112,7 @@ def sign(x):
 #############################################################################
 
 
-def max_val(X_binned, ids_list, residuals, t, t_prime):
+def max_val(X_binned, ids_list, residuals, max_depth):
     """Compute the maximum inner product between X_binned.T and the residuals
        Return the feature and its id which allows to maximize the inner product
 
@@ -123,6 +123,10 @@ def max_val(X_binned, ids_list, residuals, t, t_prime):
 
     ids_list: list of length n_features * n_bins
         contains the ids of the discrete features
+
+    max_depth: int
+        maximal depth of the tree
+        maximal degree of interactions between the original features
 
     Returns
     -------
@@ -141,108 +145,170 @@ def max_val(X_binned, ids_list, residuals, t, t_prime):
     n_features = len(X_binned_indptr) - 1
     n_samples = max(X_binned_indices) + 1
 
-    max_inner_prod = 0
-    id_max_feat = 0
+    max_val = 0
+    depth = 0
 
-    for j in range(n_features):
-        start, end = X_binned_indptr[j:j+2]
-        inner_prod = 0
-        for ind in range(start, end):
-            inner_prod += X_binned_data[ind] * residuals[X_binned_indices[ind]]
+    for i in ids_list:
+        for k in range(i+1, len(ids_list)):
+            max_val, key = max_val_rec(X_binned=X_binned, parent=i,
+                                       current_max_val=max_val, j=k,
+                                       residuals=residuals,
+                                       max_depth=max_depth,
+                                       depth=depth)
 
-        if abs(inner_prod) > max_inner_prod:
-            max_inner_prod = abs(inner_prod)
-            id_max_feat = j
-
-        max_inner_prod = max(abs(inner_prod), max_inner_prod)
-
-    lmbda_max = 0
-
-    start, end = X_binned_indptr[id_max_feat:id_max_feat+2]
-    for ind in range(start, end):
-        lmbda_max += X_binned_data[ind] * residuals[X_binned_indices[ind]]
-
-    lmbda_max = abs(lmbda_max)
-
-    # how to determine t and t' : how to select the subtree of root t
-    lmbda_t_prime = 0 
-    start1, end1 = X_binned_indptr[t_prime:t_prime+2]
-    for ind in range(start1, end1):
-        lmbda_t_prime += (X_binned_data[ind] 
-                          * residuals[X_binned_indices[ind]])
-
-    lmbda_t_prime = abs(lmbda_t_prime)
-
-    lmbda_t_pos = 0
-    lmbda_t_neg = 0
-
-    start2, end2 = X_binned_indptr[t:t+2]
-    for ind in range(start2, end2):
-        if residuals[X_binned_indices[ind]] >= 0:
-            lmbda_t_pos += X_binned_data[ind] * residuals[X_binned_indices[ind]]
-        else:
-            lmbda_t_neg += X_binned_data[ind] * residuals[X_binned_indices[ind]]
-
-    ub = max(lmbda_t_pos, -lmbda_t_neg)
-
-    if lmbda_t_prime <= ub:
-        # If this criterion is satisfied then we can prune the whole subtree 
-        # from the root t
-
-        # how to find the id of all the child nodes of the root t ? 
-
-        ids_list.remove(t)
-        ids_list.remove(t_prime)
 
     # the recursion is used to scan the tree from the root to the leaves ?
-    # stopping criterion = when the pruned tree contains no more node for 
+    # stopping criterion = when the pruned tree contains no more node for
     # which the sppc criterion is satisfied ?
 
     # DFS
-    # 1. Create a recursive function that takes the index of node and a visited 
+    # 1. Create a recursive function that takes the index of node and a visited
     # array
-    # 2. Mark the current node as visited and print the node 
-    # 3. Traverse all the adjacent and unmarked nodes and call the recursive 
+    # 2. Mark the current node as visited and print the node
+    # 3. Traverse all the adjacent and unmarked nodes and call the recursive
     # function with index of adjacent node.
 
-    return lmbda_max, ids_list
+    return max_val, ids_list
 
 
-# def max_val_rec(feature, max_inner_prod, id, residuals):
-#     """Compute the inner product value between the given feature and the vector
-#         of residuals provided thanks to the pre-solve processing
+def max_val_rec(X_binned, parent, current_max_val, j, residuals, max_depth,
+                depth):
+    """Compute the maximal inner product value between the given feature and
+        the vector of residuals provided thanks to the pre-solve processing
 
-#     Parameters
-#     ----------
-#     feature: feature for which we want to compute the inner product value
+    Parameters
+    ----------
+    X_binned: numpy.ndarray(), shape = (n_samples, n_features)
+        binned features matrix
 
-#     id: int
-#         id of the feature given as parameter
+    parent: int
+        index of the parent node
 
-#     residuals: numpy.array, shape = (n_samples, )
-#         vector of residuals
+    current_max_val: float
+        current maximal inner product between the visited features
+        and the residuals
 
-#     Returns
-#     -------
+    j (line 254): int
+        index of the child node
 
-#     inner_prod: float
-#         inner product value
+    residuals: numpy.array(), shape = (n_samples, )
+        vector of residuals
 
-#     id: int
-#         id of the feature for which we compute the inner product
-#     """
-#     # res obtained by pre-solve
-#     # compare current_max_inner_prod to inner_product
-#     # if equation above algo in spp paper is satisfied then prune the subtree
-#     # otherwise visit the subtree
+    max_depth: int
+        maximum degree of interactions between the original features
+        maximum depth in the tree
 
-#     inner_prod = feature.dot(residuals)
+    depth: int
+        current depth
+        goes from 0 to max_depth if we start from the root to the leaves
+        or from max_dpeth to 0 if we start from the leaves to the root
 
-#     if inner_prod > max_inner_prod:
-#         max_inner_prod = inner_prod
+    Returns
+    -------
 
-#     return max_inner_prod, id
+    key: int
+        index of the feature which provides the max_val
 
+    current_max_val: float
+        maximal inner product between the features and the vector of residuals
+
+    """
+    # res obtained by pre-solve
+    # compare current_max_inner_prod to inner_product
+    # if equation above algo in spp paper is satisfied then prune the subtree
+    # otherwise visit the subtree
+
+    # for a given node which is the root of a subtree, returns the max_val
+    # if the max_val of the subtree is greater it returns the maxval of the
+    # subtree otherwise it returns the previous maxval
+    # for a given node t, compute the criterion with the
+    # negative and positive parts
+
+    # Compute the current feature
+    # element wise product between parent and feature j to obtain the
+    # interaction result feature x
+
+    X_binned = X_binned.tocsc()
+    X_binned_data = X_binned.data
+    X_binned_indices = X_binned.indices
+    X_binned_indptr = X_binned.indptr
+
+    n_features = len(X_binned_indptr) - 1
+    n_samples = max(X_binned_indices) + 1
+
+    current_feature = np.zeros(n_samples)
+    parent1_feature = np.zeros(n_samples)
+    parent2_feature = np.zeros(n_samples)
+
+    start1, end1 = X_binned_indptr[parent: parent + 2]
+    start2, end2 = X_binned_indptr[j: j+2]
+
+    for ind in range(start1, end1):
+        parent1_feature = X_binned_data[ind]
+
+    for ind in range(start2, end2):
+        parent2_feature = X_binned_data[ind]
+
+    for i in range(n_samples):
+        current_feature[i] = parent1_feature[i] * parent2_feature[i]
+
+    # Compute the criterion (and the inner product with the residuals)
+    child_inner_prod_pos = 0
+    child_inner_prod_neg = 0
+    parent_inner_prod_pos = 0
+    parent_inner_prod_neg = 0
+    parent_inner_prod = 0
+    child_inner_prod = 0
+    max_val = 0
+
+    for i in range(n_samples):
+        if residuals[i] >= 0:
+            child_inner_prod_pos += current_feature[i] * residuals[i]
+            parent_inner_prod_pos += parent1_feature[i] * residuals[i]
+
+        else:
+            child_inner_prod_neg += current_feature[i] * residuals[i]
+            parent_inner_prod_neg += parent1_feature[i] * residuals[i]
+
+        child_inner_prod = child_inner_prod_neg + child_inner_prod_pos
+        parent_inner_prod = parent_inner_prod_neg + parent_inner_prod_pos
+
+    # If the criterion is verified
+        # return the current maxval
+
+    if abs(child_inner_prod) <= max(parent_inner_prod_pos,
+                                    -parent_inner_prod_neg):
+        current_max_val = parent_inner_prod
+        key = parent
+
+        return current_max_val, key
+
+    else:
+    # If the criterion is not satisfied:
+        # Check the current node :
+        # compute max_val
+        # update max_val if required
+
+        max_val = child_inner_prod
+        if max_val > current_max_val:
+            current_max_val = max_val
+            key = [parent, j]
+
+        # If depth < max_depth:
+            # for loop over the child nodes (number of children = n_features)
+            # for ind = j+1 ... p if the parent node is j
+                # maxval = max_val_rec(depth = depth + 1)
+
+        if depth < max_depth: # start from 0 to max_depth
+            # recursive call of the function on the following stage
+            for ind in range(j+1, n_features):
+                current_max_val = max_val_rec(X_binned, j, current_max_val,
+                                              j+1, residuals, max_depth,
+                                              depth + 1)
+
+        # How to find the key of the feature providing the maxval ?
+
+        return current_max_val, key
 
 # #############################################################################
 # #                           Safe Pattern Pruning
@@ -380,28 +446,48 @@ def main():
                                          max_iter=n_epochs,
                                          tol=1e-14).fit(X_binned, y)
 
-    max_inner_prod = 0
     residuals = y - X_binned.dot(sparse_lasso_sklearn.coef_)
     print("residuals : ", residuals)
-    for j in range(n_features):
-        start, end = X_binned_indptr[j:j + 2]
-        dot = 0.
-        for ind in range(start, end):
-            dot += X_binned_data[ind] * residuals[X_binned_indices[ind]]
-        max_inner_prod = max(abs(dot), max_inner_prod)
 
-    print("max inner product : ", max_inner_prod)
+    parent1_feature = np.zeros(n_samples)
+    parent2_feature = np.zeros(n_samples)
+    child_feature = np.zeros(n_samples)
+
+    interactions_feat_list = list()
+
+    # Building of the interactions features
+    for j in range(n_features):
+        start1, end1 = X_binned_indptr[j:j+2]
+        for ind in range(start1, end1):
+            parent1_feature[X_binned_indices[ind]] = X_binned_data[ind]
+        for k in range(j+1, n_features):
+            start2, end2 = X_binned_indptr[k:k+2]
+            for ind in range(start2, end2):
+                parent2_feature[X_binned_indices[ind]] = X_binned_data[ind]
+
+            child_feature = np.zeros(n_samples)
+            for i in range(n_samples):
+                child_feature[i] += parent1_feature[i] * parent2_feature[i]
+            interactions_feat_list.append(child_feature)
+
+    max_val_test = 0
+    inner_prod = 0
+
+    for ind, feat in enumerate(interactions_feat_list):
+        for i in range(n_samples):
+            inner_prod += feat[i] * residuals[i]
+            if inner_prod > max_val_test:
+                max_val_test = inner_prod
+
+    print("max val = ", max_val_test)
+
 
     # Test max_val function
-
+    max_depth = 2
     ids_list = list(range(n_features))
-    t = 1
-    t_prime = 2
-    lmbda_max, new_ids_list =  max_val(X_binned, ids_list, residuals, t, 
-                                       t_prime)
 
-    print("lmbda max : ", lmbda_max)
-    print("new ids list : ", new_ids_list)
+    max_inner_prod, key = max_val(X_binned=X_binned, ids_list=ids_list,
+                                  residuals=residuals, max_depth=max_depth)
 
 
 if __name__ == "__main__":

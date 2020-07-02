@@ -59,8 +59,12 @@ def test_cd_lasso(screening, store_history, sparse):
     assert kkt.all() <= 1
     if screening and store_history:
         assert lasso.r_list[-1] < 1e-5
+        
+    n_coeffs = 0
+    for i in range(len(lasso.safe_set)):
+        n_coeffs += lasso.safe_set[i]
 
-    assert len(lasso.safe_set) == np.count_nonzero(lasso.slopes)
+    assert n_coeffs == np.count_nonzero(lasso.slopes)
 
     np.testing.assert_allclose(lasso.slopes, sklasso.coef_, rtol=1e-6)
     np.testing.assert_allclose(lasso.P_lmbda, primal_function_sklearn,
