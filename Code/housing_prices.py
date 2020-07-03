@@ -7,7 +7,6 @@ import matplotlib.pyplot as plt
 from numba import njit
 from scipy.stats import skew
 from scipy.stats.stats import pearsonr
-from sklearn.preprocessing import StandardScaler
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import KBinsDiscretizer
 from sklearn.linear_model import LinearRegression
@@ -16,8 +15,14 @@ from sklearn.decomposition import PCA
 from sklearn.model_selection import cross_val_score
 from scipy.sparse import issparse
 from sklearn.linear_model import Lasso as sklearn_Lasso
+from sklearn.compose import ColumnTransformer
+from sklearn.pipeline import Pipeline
+from sklearn.impute import SimpleImputer
+from sklearn.preprocessing import StandardScaler, OneHotEncoder
+from sklearn.model_selection import train_test_split, GridSearchCV
 
 from cd_solver_lasso_numba import Lasso, cyclic_coordinate_descent, sparse_cd
+
 
 #######################################
 #              Read CSV
@@ -62,6 +67,17 @@ def numeric_features(dataset):
     numeric_feats = dataset.dtypes[dataset.dtypes != "object"].index
 
     return numeric_feats
+
+
+##################################################
+#           Categorical Features
+##################################################
+
+
+def categorical_features(dataset):
+    categorical_feats = dataset.dtypes[dataset.dtypes == "object"].index
+
+    return categorical_feats
 
 
 ###################################################
@@ -138,22 +154,34 @@ def main():
     log_sale_price = log_transform(train_set['SalePrice'])
     # print("log target : ", log_sale_price)
 
-    numeric_feats = numeric_features(all_data)
-    # print("numeric features : ", numeric_feats)
-
     skewed_feats = skewness(train_set)
     # print("skewed features : ", skewed_feats)
 
-    all_data = onehot_encoding(all_data)
-    # print("onehot data : ", all_data)
+    numeric_feats = numeric_features(all_data)
+    # print("numeric features : ", numeric_feats)
 
-    prop_NaN = proportion_NaN(all_data)
-    # print("proportion NaN values :", prop_NaN)
+    numeric_transformer = Pipeline(steps=[
+        ('imputer', SimpleImputer(strategy='median')),
+        ('scaler', StandardScaler()),
+        ('binning', KBinsDiscretizer(n_bins=3, encode='onehot',
+                                     strategy='quantile'))])
 
-    all_data = fill_NaN(all_data)
-    # print(all_data.head())
+    print("numeric transformer = ", numeric_transformer)
 
-    X_train, X_test, y_train = split_train_test(all_data, train_set)
+    categorical_feats = categorical_features(all_data)
+    print("categorical features = ", categorical_feats)
+    
+    
+    # all_data = onehot_encoding(all_data)
+    # # print("onehot data : ", all_data)
+
+    # prop_NaN = proportion_NaN(all_data)
+    # # print("proportion NaN values :", prop_NaN)
+
+    # all_data = fill_NaN(all_data)
+    # # print(all_data.head())
+
+    # X_train, X_test, y_train = split_train_test(all_data, train_set)
 
     # print("X_train :", X_train.head())
     # print("X_test : ", X_test.head())
@@ -161,18 +189,18 @@ def main():
 
     # Tests with dense features matrices
 
-    X = X_train.to_numpy()
-    y = y_train.to_numpy()
+    # X = X_train.to_numpy()
+    # y = y_train.to_numpy()
 
-    print("shape of X_train : ", X.shape)
-    print("columns of X_train", X_train.columns)
+    # print("shape of X_train : ", X.shape)
+    # print("columns of X_train", X_train.columns)
 
-    lmbda = 1.
-    f = 10
-    epsilon = 1e-14
-    n_epochs = 100000
-    screening = True
-    store_history = True
+    # lmbda = 1.
+    # f = 10
+    # epsilon = 1e-14
+    # n_epochs = 100000
+    # screening = True
+    # store_history = True
 
     # lasso = Lasso()
     # scores = cross_val_score(lasso, X, y, cv=5)
@@ -186,7 +214,7 @@ def main():
 
     # print("dense cv score : ", dense_cv_score)
 
-    # dense_lasso_sklearn = sklearn_Lasso(alpha=lmbda / len(X), 
+    # dense_lasso_sklearn = sklearn_Lasso(alpha=lmbda / len(X),
     #                                     fit_intercept=False,
     #                                     normalize=False, max_iter=n_epochs,
     #                                     tol=1e-15).fit(X, y)
@@ -194,30 +222,30 @@ def main():
     # dense_cv_sklearn = dense_lasso_sklearn.score(X_train, y)
     # print("dense cv score sklearn : ", dense_cv_sklearn)
 
-    n_bins = 3
-    encode = 'onehot'
-    strategy = 'quantile'
-    enc = KBinsDiscretizer(n_bins=n_bins, encode=encode, strategy=strategy)
-    X_binned = enc.fit_transform(X)
-    X_binned = X_binned.tocsc()
+    # n_bins = 3
+    # encode = 'onehot'
+    # strategy = 'quantile'
+    # enc = KBinsDiscretizer(n_bins=n_bins, encode=encode, strategy=strategy)
+    # X_binned = enc.fit_transform(X)
+    # X_binned = X_binned.tocsc()
 
-    sparse_lasso_sklearn = sklearn_Lasso(alpha=lmbda / len(X), 
-                                         fit_intercept=False,
-                                         normalize=False, max_iter=n_epochs,
-                                         tol=1e-15).fit(X_binned, y)
+    # sparse_lasso_sklearn = sklearn_Lasso(alpha=lmbda / len(X),
+    #                                      fit_intercept=False,
+    #                                      normalize=False, max_iter=n_epochs,
+    #                                      tol=1e-15).fit(X_binned, y)
 
-    sparse_cv_sklearn = sparse_lasso_sklearn.score(X_binned, y)
+    # sparse_cv_sklearn = sparse_lasso_sklearn.score(X_binned, y)
 
-    print("sparse cv score sklearn : ", sparse_cv_sklearn)
+    # print("sparse cv score sklearn : ", sparse_cv_sklearn)
 
-    sparse_lasso = Lasso(lmbda=lmbda, epsilon=epsilon, f=f, 
-                         n_epochs=n_epochs, 
-                         screening=screening, 
-                         store_history=store_history).fit(X_binned, y)
+    # sparse_lasso = Lasso(lmbda=lmbda, epsilon=epsilon, f=f,
+    #                      n_epochs=n_epochs,
+    #                      screening=screening,
+    #                      store_history=store_history).fit(X, y)
 
-    sparse_cv_score = sparse_lasso.score(X_binned, y)
+    # sparse_cv_score = sparse_lasso.score(X_binned, y)
 
-    print("sparse crossval score : ", sparse_cv_score)
+    # print("sparse crossval score : ", sparse_cv_score)
 
     # print("X type : ", type(X))
 

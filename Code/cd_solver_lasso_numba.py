@@ -152,8 +152,12 @@ def cyclic_coordinate_descent(X, y, lmbda, epsilon, f, n_epochs, screening,
     P_lmbda = 0
     D_lmbda = 0
     G_lmbda = 0
+    # y_norm2 = 0
 
     y_norm2 = np.linalg.norm(y, ord=2)**2
+    # for i in range(n_samples):
+    #     y_norm2 += y[i]**2
+
     residuals = y.copy()
 
     # Computation of the lipschitz constants vector
@@ -194,12 +198,16 @@ def cyclic_coordinate_descent(X, y, lmbda, epsilon, f, n_epochs, screening,
             XTR_absmax = 0
             for j in range(n_features):
                 if safeset_membership[j]:
-                    XTR_absmax = max(abs(np.dot(X[:, j], residuals)),
+                    XTR_absmax = max(abs(X[:, j].dot(residuals)),
                                      XTR_absmax)
 
             theta = residuals / max(XTR_absmax, lmbda)
 
             # Computation of the primal problem
+            # beta_norm1 = 0
+            # for i in range(n_features):
+            #     beta_norm1 += abs(beta[i])
+
             P_lmbda = 0.5 * residuals.dot(residuals)
             P_lmbda += lmbda * np.linalg.norm(beta, 1)
 
@@ -343,6 +351,10 @@ def sparse_cd(X_data, X_indices, X_indptr, y, lmbda, epsilon, f, n_epochs,
     P_lmbda = 0
     D_lmbda = 0
     G_lmbda = 0
+    # y_norm2 = 0
+
+    # for i in range(n_samples):
+    #     y_norm2 += y[i]**2
 
     safeset_membership = np.ones(n_features)
 

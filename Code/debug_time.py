@@ -20,7 +20,7 @@ y /= np.linalg.norm(y)
 
 f = 10
 n_epochs = 1000
-sparse = True
+sparse = False
 tol = 1e-15
 
 if sparse:
