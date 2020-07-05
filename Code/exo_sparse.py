@@ -32,7 +32,7 @@ def column_sparse_matrix(data, indices, indptr, j):
     """
 
     # To select the indices of the non-zero elements of the wished column
-    start, end = indptr[j:j+2]
+    start, end = indptr[j : j + 2]
     n_rows = max(indices) + 1
 
     col = np.zeros(n_rows)
@@ -87,11 +87,11 @@ def sparse_matrix_product(data, indices, indptr, vect):
 
     for j in range(n_cols):
         col = np.zeros(n_rows)
-        start, end = indptr[j:j+2]
+        start, end = indptr[j : j + 2]
         for ind in range(start, end):
-            col[indices[ind]] = data[ind] 
+            col[indices[ind]] = data[ind]
 
-        tmp_prod = 0.
+        tmp_prod = 0.0
 
         for i in range(n_rows):
             tmp_prod += col[i] * vect[i]
@@ -124,7 +124,6 @@ def main():
 
     print("result = ", vect.dot(A))
 
-    
 
 if __name__ == "__main__":
     main()

@@ -4,6 +4,9 @@ import scipy
 import matplotlib
 import matplotlib.pyplot as plt
 
+from xgboost import XGBRegressor
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.model_selection import KFold
 from numba import njit
 from scipy.stats import skew
 from scipy.stats.stats import pearsonr
@@ -135,6 +138,85 @@ def split_train_test(dataset, train):
     return X_train, X_test, y
 
 
+################################################################
+#                       Folds
+################################################################
+
+
+def compute_cv(X_train, y_train, n_splits, lmbda, epsilon, f, n_epochs,
+               screening, store_history):
+
+   
+    # Pipeline
+    numeric_feats = numeric_features(X_train)
+    numeric_transformer = Pipeline(steps=[
+        ('imputer', SimpleImputer(strategy='median')),
+        ('scaler', StandardScaler()),
+        ('binning', KBinsDiscretizer(n_bins=3, encode='onehot',
+                                     strategy='quantile'))])
+
+    categorical_feats = categorical_features(X_train)
+    categorical_transformer = Pipeline(steps=[
+        ('imputer', SimpleImputer(strategy='constant', fill_value='missing')),
+        ('onehot', OneHotEncoder(handle_unknown='ignore'))])
+
+    preprocessor = ColumnTransformer(transformers=[
+        ('num', numeric_transformer, numeric_feats),
+        ('cat', categorical_transformer, categorical_feats)])
+
+    kf = KFold(n_splits=n_splits, shuffle=True, random_state=None)
+
+    scores_lasso = []
+    scores_xgb = []
+    scores_rf = []
+    X_train = X_train.to_records()
+    print(X_train.array.shape)
+    y_train = y_train.to_numpy()
+    for fold in kf.split(X_train):
+        
+        X_tr = X_train[fold[0]]
+        y_tr = y_train[fold[0]]
+        X_te = X_train[fold[1]]
+        y_te = y_train[fold[1]]
+
+        lasso = Lasso(lmbda=lmbda, epsilon=epsilon, f=f, n_epochs=n_splits,
+                      screening=screening,
+                      store_history=store_history)
+
+        pipe_lasso = Pipeline(steps=[('preprocessor', preprocessor),
+                                     ('regressor', lasso)])
+
+        print(X_tr.shape)                                     
+
+        pipe_lasso.fit(X_tr, y_tr)
+
+        scores_lasso.append(pipe_lasso.score(X_te, y_te))
+
+        xgb = XGBRegressor()
+
+        pipe_xgb = Pipeline(steps=[('preprocessor', preprocessor),
+                                     ('regressor', xgb)])
+
+        pipe_xgb.fit(X_tr, y_tr)
+
+        scores_xgb.append(pipe_xgb.score(X_te, y_te))
+
+        rf = RandomForestRegressor()
+
+        pipe_rf = Pipeline(steps=[('preprocessor', preprocessor),
+                                  ('regressor', rf)])
+
+        pipe_rf.fit(X_tr, y_tr)
+
+        scores_rf.append(pipe_rf.score(X_te, y_te))
+
+    cv_lasso = scores_lasso.mean()
+    cv_xgb = scores_xgb.mean()
+    cv_rf = scores_rf.mean()
+
+    return cv_lasso, cv_xgb, cv_rf
+
+
 def main():
     # data_dir = "../Datasets"
     data_dir = "/home/mrivoire/Documents/M2DS_Polytechnique/Stage_INRIA/Datasets"
@@ -144,34 +226,77 @@ def main():
     head_train = train_set.head()
     test_set = read_csv(fname_test)
     head_test = test_set.head()
+
+    lmbda = 1.
+    epsilon = 1e-15
+    f = 10
+    n_splits = 5
+    screening = True
+    store_history = True
+    n_epochs = 1000
     # print("Housing Prices Training Set Header : ", head_train)
     # print("Housing Prices Testing Set Header : ", head_test)
 
     all_data = concat(train_set, test_set)
     head_all_data = all_data.head()
-    print("All data : ", head_all_data)
+    # print("All data : ", head_all_data)
 
     log_sale_price = log_transform(train_set['SalePrice'])
     # print("log target : ", log_sale_price)
 
-    skewed_feats = skewness(train_set)
-    # print("skewed features : ", skewed_feats)
+    # skewed_feats = skewness(train_set)
+    # # print("skewed features : ", skewed_feats)
 
-    numeric_feats = numeric_features(all_data)
-    # print("numeric features : ", numeric_feats)
+    # numeric_feats = numeric_features(all_data)
+    # # print("numeric features : ", numeric_feats)
 
-    numeric_transformer = Pipeline(steps=[
-        ('imputer', SimpleImputer(strategy='median')),
-        ('scaler', StandardScaler()),
-        ('binning', KBinsDiscretizer(n_bins=3, encode='onehot',
-                                     strategy='quantile'))])
+    # numeric_transformer = Pipeline(steps=[
+    #     ('imputer', SimpleImputer(strategy='median')),
+    #     ('scaler', StandardScaler()),
+    #     ('binning', KBinsDiscretizer(n_bins=3, encode='onehot',
+    #                                  strategy='quantile'))])
 
-    print("numeric transformer = ", numeric_transformer)
+    # print("numeric transformer = ", numeric_transformer)
 
-    categorical_feats = categorical_features(all_data)
-    print("categorical features = ", categorical_feats)
-    
-    
+    # categorical_feats = categorical_features(all_data)
+    # categorical_transformer = Pipeline(steps=[
+    #     ('imputer', SimpleImputer(strategy='constant', fill_value='missing')),
+    #     ('onehot', OneHotEncoder(handle_unknown='ignore'))])
+    # print("categorical transformer = ", categorical_transformer)
+
+    # preprocessor = ColumnTransformer(transformers=[
+    #     ('num', numeric_transformer, numeric_feats),
+    #     ('cat', categorical_transformer, categorical_feats)])
+
+    # print("preprocessor : ", preprocessor)
+
+    # n_features = len(numeric_feats) + len(categorical_feats)
+
+    # # Append Lasso to preprocessing pipeline.
+    # # Now we have a full prediction pipeline.
+    # pipeline = Pipeline(steps=[('preprocessor', preprocessor),
+    #                     ('regressor', sklearn_Lasso(alpha=1,
+    #                                     fit_intercept=False,
+    #                                     normalize=False,
+    #                                     max_iter=2000,
+    #                                     tol=1e-5))])
+
+    X_train, X_test, y_train = split_train_test(all_data, train_set)
+
+    # pipeline.fit(X_train, y_train)
+
+    # pipeline.predict(X_test)
+
+    cv_lasso, cv_xgb, cv_rf = compute_cv(X_train=X_train, y_train=y_train, 
+                                         n_splits=n_splits, lmbda=lmbda, 
+                                         epsilon=epsilon, f=f, 
+                                         n_epochs=n_epochs,
+                                         screening=screening, 
+                                         store_history=store_history)
+
+    # lasso.fit(X_train, y_train)
+    # print("model score: %.3f" % clf.score(X_test, y_test))
+
     # all_data = onehot_encoding(all_data)
     # # print("onehot data : ", all_data)
 

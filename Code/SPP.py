@@ -138,11 +138,6 @@ def max_val(X_binned_data, X_binned_indices, X_binned_indptr, residuals,
         id of the feature allowing to maximize the inner product
     """
 
-    X_binned = X_binned.tocsc()
-    X_binned_data = X_binned.data
-    X_binned_indices = X_binned.indices
-    X_binned_indptr = X_binned.indptr
-
     n_features = len(X_binned_indptr) - 1
     n_samples = max(X_binned_indices) + 1
 
@@ -176,6 +171,75 @@ def max_val(X_binned_data, X_binned_indices, X_binned_indptr, residuals,
     # function with index of adjacent node.
 
     return max_val, key
+
+
+def compute_inner_prod(data1, ind1, residuals):
+    """
+    Parameters
+    ----------
+
+    Returns
+    -------
+    """
+
+    inner_prod = 0
+    inner_prod_pos = 0
+    inner_prod_neg = 0
+
+    count1 = 0
+    count2 = 0
+
+    while count1 < len(ind1) and count2 < len(residuals):
+        if ind1[count1] == count2:
+            prod = data1[count1] * residuals[count2]
+            inner_prod += prod 
+
+            if residuals[count2] >= 0:
+                inner_prod_pos += prod 
+            else:
+                inner_prod_neg += prod 
+
+            count1 += 1
+            count2 += 1
+        elif ind1[count1] < count2:
+            count1 += 1
+        else:
+            count2 += 1
+
+    return inner_prod, inner_prod_neg, inner_prod_pos
+
+
+def compute_interactions(data1, ind1, data2, ind2):
+    """
+    Parameters
+    ----------
+
+    Returns
+    -------
+    """
+
+    inner_prod = 0
+
+    count1 = 0
+    count2 = 0
+
+    inter_feat_ind = list()
+    inter_feat_data = list()
+
+    while count1 < len(ind1) and count2 < len(ind2):
+        if ind1[count1] == ind2[count2]:
+            prod = data1[count1] * data2[count2]
+            inner_prod += prod 
+            inter_feat_ind.append(ind1[count1])
+            inter_feat_data.append(prod)
+            count1 += 1
+            count2 += 1
+        elif ind1[count1] < ind2[count2]:
+            count1 += 1
+        else:
+            count2 += 1
+
+    return inter_feat_data, inter_feat_ind
 
 
 def max_val_rec(X_binned_data, X_binned_indices, X_binned_indptr, 
@@ -247,69 +311,24 @@ def max_val_rec(X_binned_data, X_binned_indices, X_binned_indptr,
         child_indices[X_binned_indices[ind]] = X_binned_indices[ind]
         child_data[X_binned_indices[ind]] = X_binned_data[ind] 
 
-    min_ind_size = min(len(child_indices), len(parent_indices))
-
-    interactions_feat_data = list()
-    interactions_feat_indices = list()
 
     # How to scan arrays from different sizes in the same time ?
     # How to move in the two vectors of indices (child and parent) in the same 
     # time whereas we have not to move at the same speed ?
-    
-    if min_ind_size == len(child_indices):
-        for i in range(min_ind_size):
-            if child_indices[i] == parent_indices[i]:
-                interactions_feat_data.append(child_data[i] * parent_data[i])
-            if child_indices[i] > parent_indices[i]:
-                parent_indices[i+1]
-            if child_indices[i] < parent_indices[i]:
-                child_indices[i+1]
+    (inter_feat_data, 
+     inter_feat_ind) = compute_interactions(child_data, child_indices, 
+                                            parent_data, parent_indices)
 
-    # current_feature = np.zeros(n_samples)
-    # parent1_feature = np.zeros(n_samples)
-    # parent2_feature = np.zeros(n_samples)
-
-    # start1, end1 = X_binned_indptr[parent: parent + 2]
-    # start2, end2 = X_binned_indptr[j: j+2]
-
-    # for ind in range(start1, end1):
-    #     parent1_feature[X_binned_indices[ind]] = X_binned_data[ind]
-
-    # for ind in range(start2, end2):
-    #     parent2_feature[X_binned_indices[ind]] = X_binned_data[ind]
-
-    # for i in range(n_samples):
-    #     current_feature[i] = parent1_feature[i] * parent2_feature[i]
-
-    # Compute the criterion (and the inner product with the residuals)
-    inner_prod_pos = 0
-    inner_prod_neg = 0
-    inner_prod = 0
-    max_val = 0
-
-    for i in range(n_samples):
-        if residuals[i] >= 0:
-            if i == parent_indices[i]:
-                inner_prod_pos += parent_data[i] * residuals[i]
-            if i < parent_data[i]:
-                # compare residuals[i+1] with parent_indices[i]
-            if i > parent_indices[i]:
-                # compare parent_indices[i+1] with i 
-
-        else:
-            if i == parent_indices[i]:
-                inner_prod_pos += parent_data[i] * residuals[i]
-            if i < parent_data[i]:
-                # compare residuals[i+1] with parent_indices[i]
-            if i > parent_indices[i]:
-                # compare parent_indices[i+1] with i 
-
-    inner_prod = inner_prod_pos + inner_prod_neg
+    (inner_prod, 
+     inner_prod_neg, 
+     inner_prod_pos) = compute_inner_prod(parent_data, 
+                                          parent_indices, 
+                                          residuals)
 
     # If the criterion is verified
         # return the current maxval
 
-    upper_bound = max(parent_inner_prod_pos, -parent_inner_prod_neg)
+    upper_bound = max(inner_prod_pos, -inner_prod_neg)
 
     if upper_bound <= current_max_val:
         return current_max_val, key
@@ -518,9 +537,10 @@ def main():
 
     # Test max_val function
     max_depth = 2
-    ids_list = list(range(n_features))
 
-    max_inner_prod, key = max_val(X_binned=X_binned, ids_list=ids_list,
+    max_inner_prod, key = max_val(X_binned_data=X_binned_data, 
+                                  X_binned_indices=X_binned_indices, 
+                                  X_binned_indptr=X_binned_indptr, 
                                   residuals=residuals, max_depth=max_depth)
 
     print("max inner prod = ", max_inner_prod)

@@ -1,13 +1,13 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import pytest
-import numba 
+import numba
 
 from numpy.random import randn
 from numpy.random import multivariate_normal
 from scipy.linalg import toeplitz
 from sklearn.linear_model import Lasso as sklearn_Lasso
-from numba import njit 
+from numba import njit
 
 ######################################################################
 #     Iterative Solver With Gap Safe Rules
@@ -55,9 +55,9 @@ def simu(beta, n_samples=1000, corr=0.5, for_logreg=False):
 #   Minimization of the Primal Problem with Coordinate Descent Algorithm
 ##############################################################################
 
-@njit 
-def cyclic_coordinate_descent(X, y, lmbda, epsilon, f, n_epochs=5000,
-                              screening=True):
+
+@njit
+def cyclic_coordinate_descent(X, y, lmbda, epsilon, f, n_epochs=5000, screening=True):
     """Solver : cyclic coordinate descent
 
     Parameters
@@ -122,7 +122,7 @@ def cyclic_coordinate_descent(X, y, lmbda, epsilon, f, n_epochs=5000,
 
     # Computation of the lipschitz constants vector
 
-    L = (X**2).sum(0)
+    L = (X ** 2).sum(0)
 
     A_c = range(n_features)
 
@@ -179,8 +179,19 @@ def cyclic_coordinate_descent(X, y, lmbda, epsilon, f, n_epochs=5000,
                 if np.abs(G_lmbda) <= epsilon:
                     break
 
-    return (beta, primal_hist, dual_hist, gap_hist, r_list, n_active_features,
-            all_objs, theta, P_lmbda, D_lmbda, G_lmbda)
+    return (
+        beta,
+        primal_hist,
+        dual_hist,
+        gap_hist,
+        r_list,
+        n_active_features,
+        all_objs,
+        theta,
+        P_lmbda,
+        D_lmbda,
+        G_lmbda,
+    )
 
 
 ###########################################################################
@@ -212,9 +223,12 @@ def R_primal(X, y, beta, lmbda):
                  primal radius of the dome
     """
 
-    R_hat_lmbda = ((1 / lmbda)*np.max(np.linalg.norm(y)**2
-                   - np.linalg.norm(np.dot(X, beta) - y)**2
-                   - 2*lmbda*np.linalg.norm(beta, 1), 0)**(1/2))
+    R_hat_lmbda = (1 / lmbda) * np.max(
+        np.linalg.norm(y) ** 2
+        - np.linalg.norm(np.dot(X, beta) - y) ** 2
+        - 2 * lmbda * np.linalg.norm(beta, 1),
+        0,
+    ) ** (1 / 2)
 
     return R_hat_lmbda
 
@@ -251,6 +265,7 @@ def R_dual(y, theta, lmbda):
 #    Radius of the safe sphere in closed form : Theorem 2
 ##################################################################
 
+
 @njit
 def radius(G_lmbda, lmbda):
     """
@@ -268,13 +283,14 @@ def radius(G_lmbda, lmbda):
        radius of the safe sphere
     """
 
-    r = np.sqrt(2*np.abs(G_lmbda))/lmbda
+    r = np.sqrt(2 * np.abs(G_lmbda)) / lmbda
     return r
 
 
 ############################################################################
 #   Mu Function applied to the safe sphere in closed form : Equation 9
 ############################################################################
+
 
 @njit
 def mu_B(x_j, c, r):
@@ -308,7 +324,8 @@ def mu_B(x_j, c, r):
 #    compute dual point
 ###############################################################
 
-@njit 
+
+@njit
 def compute_theta_k(X, y, beta_hat, lmbda):
     """Maximization of the dual problem
        Orthogonal projection of the center of the safe sphere
@@ -335,7 +352,7 @@ def compute_theta_k(X, y, beta_hat, lmbda):
         dual optimal parameters vector
     """
     # Link equation : Equation 3
-    residuals = (y - np.dot(X, beta_hat))/lmbda
+    residuals = (y - np.dot(X, beta_hat)) / lmbda
 
     # Orthogonal projection of theta_hat onto the feasible set
     theta_hat = residuals / max(np.max(np.abs(residuals)), 1)
@@ -346,6 +363,7 @@ def compute_theta_k(X, y, beta_hat, lmbda):
 ################################################
 #    Active set and zero set : Equation 7
 ################################################
+
 
 @njit
 def active_set_vs_zero_set(X, c, r):
@@ -413,7 +431,8 @@ def sign(x):
 #    Soft-Thresholding Function
 ######################################
 
-@njit 
+
+@njit
 def soft_thresholding(u, x):
     """
     Parameters
@@ -439,7 +458,8 @@ def soft_thresholding(u, x):
 #                  Primal Problem : Equation 1
 ##########################################################
 
-@njit 
+
+@njit
 def primal_pb(X, y, beta, lmbda):
     """
     Parameters
@@ -463,7 +483,7 @@ def primal_pb(X, y, beta, lmbda):
              value of the primal problem for a given beta vector
     """
 
-    P_lmbda = 0.5 * np.linalg.norm(np.dot(X, beta) - y, 2)**2
+    P_lmbda = 0.5 * np.linalg.norm(np.dot(X, beta) - y, 2) ** 2
     P_lmbda += lmbda * np.linalg.norm(beta, 1)
 
     return P_lmbda
@@ -472,6 +492,7 @@ def primal_pb(X, y, beta, lmbda):
 ##########################################################
 #                  Dual Problem : Equation 2
 ##########################################################
+
 
 @njit
 def dual_pb(y, theta, lmbda):
@@ -491,8 +512,8 @@ def dual_pb(y, theta, lmbda):
     D_lmbda: float
              value of the dual problem for a given theta vector
     """
-    D_lmbda = 0.5*np.linalg.norm(y, ord=2)**2
-    D_lmbda -= ((lmbda**2) / 2) * np.linalg.norm(theta - y / lmbda, ord=2)**2
+    D_lmbda = 0.5 * np.linalg.norm(y, ord=2) ** 2
+    D_lmbda -= ((lmbda ** 2) / 2) * np.linalg.norm(theta - y / lmbda, ord=2) ** 2
 
     return D_lmbda
 
@@ -501,7 +522,8 @@ def dual_pb(y, theta, lmbda):
 #                  Duality Gap : Equation 2
 ##########################################################
 
-@njit 
+
+@njit
 def duality_gap(P_lmbda, D_lmbda):
     """
     Parameters
@@ -577,10 +599,11 @@ def main():
     X, y = simu(beta, n_samples=n_samples, corr=0.5, for_logreg=False)
 
     # Minimization of the Primal Problem with Coordinate Descent Algorithm
-    epsilon = 10**(-20)
+    epsilon = 10 ** (-20)
     f = 10
 
-    (beta_hat_cyclic_cd_false,
+    (
+        beta_hat_cyclic_cd_false,
         primal_hist,
         dual_hist,
         gap_hist,
@@ -590,17 +613,15 @@ def main():
         theta_hat_cyclic_cd,
         P_lmbda,
         D_lmbda,
-        G_lmbda) = cyclic_coordinate_descent(X,
-                                             y,
-                                             lmbda,
-                                             epsilon,
-                                             f,
-                                             n_epochs=10000,
-                                             screening=False)
+        G_lmbda,
+    ) = cyclic_coordinate_descent(
+        X, y, lmbda, epsilon, f, n_epochs=10000, screening=False
+    )
 
     # print("Beta without screening : ", beta_hat_cyclic_cd_false)
 
-    (beta_hat_cyclic_cd_true,
+    (
+        beta_hat_cyclic_cd_true,
         primal_hist,
         dual_hist,
         gap_hist,
@@ -610,67 +631,68 @@ def main():
         theta_hat_cyclic_cd,
         P_lmbda,
         D_lmbda,
-        G_lmbda) = cyclic_coordinate_descent(X,
-                                             y,
-                                             lmbda,
-                                             epsilon,
-                                             f,
-                                             n_epochs=10000,
-                                             screening=True)
+        G_lmbda,
+    ) = cyclic_coordinate_descent(
+        X, y, lmbda, epsilon, f, n_epochs=10000, screening=True
+    )
 
     obj = objs_cyclic_cd
 
-    x = np.arange(1, len(obj)+1)
+    x = np.arange(1, len(obj) + 1)
 
-    plt.plot(x, obj, label='cyclic_cd', color='blue')
-    plt.yscale('log')
+    plt.plot(x, obj, label="cyclic_cd", color="blue")
+    plt.yscale("log")
     plt.title("Cyclic CD Objective")
-    plt.xlabel('n_iter')
-    plt.ylabel('f obj')
-    plt.legend(loc='best')
+    plt.xlabel("n_iter")
+    plt.ylabel("f obj")
+    plt.legend(loc="best")
     plt.show()
 
     # Plots
     list_epochs = []
     for i in range(len(dual_hist)):
-        list_epochs.append(10*i)
+        list_epochs.append(10 * i)
 
     # Plot history of the radius
-    plt.plot(list_epochs, r_list, label='radius', color='red')
-    plt.yscale('log')
+    plt.plot(list_epochs, r_list, label="radius", color="red")
+    plt.yscale("log")
     plt.title("Convergence of the radius of the safe sphere")
     plt.xlabel("n_epochs")
     plt.ylabel("Radius")
-    plt.legend(loc='best')
+    plt.legend(loc="best")
     plt.show()
 
     # Plot Dual history vs Primal history
-    plt.plot(list_epochs, dual_hist, label='dual', color='red')
-    plt.plot(list_epochs, obj, label='primal', color='blue')
-    plt.yscale('log')
+    plt.plot(list_epochs, dual_hist, label="dual", color="red")
+    plt.plot(list_epochs, obj, label="primal", color="blue")
+    plt.yscale("log")
     plt.title("Primal VS Dual Monitoring")
-    plt.xlabel('n_epochs')
-    plt.ylabel('optimization problem')
-    plt.legend(loc='best')
+    plt.xlabel("n_epochs")
+    plt.ylabel("optimization problem")
+    plt.legend(loc="best")
     plt.show()
 
     # Plot Dual gap
-    plt.plot(list_epochs, gap_hist, label='dual gap', color='cyan')
-    plt.yscale('log')
+    plt.plot(list_epochs, gap_hist, label="dual gap", color="cyan")
+    plt.yscale("log")
     plt.title("Convergence of the Duality Gap")
-    plt.xlabel('n_epochs')
-    plt.ylabel('Duality gap')
-    plt.legend(loc='best')
+    plt.xlabel("n_epochs")
+    plt.ylabel("Duality gap")
+    plt.legend(loc="best")
     plt.show()
 
     # Plot number of features in active set
-    plt.plot(list_epochs, n_active_features_true,
-             label='number of active features', color='magenta')
-    plt.yscale('log')
+    plt.plot(
+        list_epochs,
+        n_active_features_true,
+        label="number of active features",
+        color="magenta",
+    )
+    plt.yscale("log")
     plt.title("Evolution of the number of active features")
-    plt.xlabel('n_epochs')
-    plt.ylabel('Number of active features')
-    plt.legend(loc='best')
+    plt.xlabel("n_epochs")
+    plt.ylabel("Number of active features")
+    plt.legend(loc="best")
     plt.show()
 
 

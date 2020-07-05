@@ -46,8 +46,7 @@ the cost of each iteration while keeping the same convergence behaviour.
 #############################################################################
 
 
-def simu(beta, n_samples=1000, corr=0.5, for_logreg=False,
-         random_state=None):
+def simu(beta, n_samples=1000, corr=0.5, for_logreg=False, random_state=None):
     n_features = len(beta)
     cov = toeplitz(corr ** np.arange(0, n_features))
 
@@ -72,8 +71,9 @@ def simu(beta, n_samples=1000, corr=0.5, for_logreg=False,
 
 
 @njit
-def cyclic_coordinate_descent(X, y, lmbda, epsilon, f, n_epochs, screening,
-                              store_history):
+def cyclic_coordinate_descent(
+    X, y, lmbda, epsilon, f, n_epochs, screening, store_history
+):
     """Solver : dense cyclic coordinate descent
 
     Parameters
@@ -154,14 +154,14 @@ def cyclic_coordinate_descent(X, y, lmbda, epsilon, f, n_epochs, screening,
     G_lmbda = 0
     # y_norm2 = 0
 
-    y_norm2 = np.linalg.norm(y, ord=2)**2
+    y_norm2 = np.linalg.norm(y, ord=2) ** 2
     # for i in range(n_samples):
     #     y_norm2 += y[i]**2
 
     residuals = y.copy()
 
     # Computation of the lipschitz constants vector
-    L = (X**2).sum(axis=0)
+    L = (X ** 2).sum(axis=0)
 
     safeset_membership = np.ones(n_features)
 
@@ -188,7 +188,7 @@ def cyclic_coordinate_descent(X, y, lmbda, epsilon, f, n_epochs, screening,
 
             # Update of the residuals
             delta_beta_j = old_beta_j - beta[j]
-            if delta_beta_j != 0.:
+            if delta_beta_j != 0.0:
                 for i in range(n_samples):
                     residuals[i] += delta_beta_j * X[i, j]
                 # residuals += delta_beta_j * X[:, j]
@@ -198,8 +198,7 @@ def cyclic_coordinate_descent(X, y, lmbda, epsilon, f, n_epochs, screening,
             XTR_absmax = 0
             for j in range(n_features):
                 if safeset_membership[j]:
-                    XTR_absmax = max(abs(X[:, j].dot(residuals)),
-                                     XTR_absmax)
+                    XTR_absmax = max(abs(X[:, j].dot(residuals)), XTR_absmax)
 
             theta = residuals / max(XTR_absmax, lmbda)
 
@@ -213,9 +212,9 @@ def cyclic_coordinate_descent(X, y, lmbda, epsilon, f, n_epochs, screening,
 
             # Computation of the dual problem
             D_lmbda = 0.5 * y_norm2
-            D_lmbda -= (((lmbda**2) / 2)
-                        * np.linalg.norm(theta - y
-                                         / lmbda, ord=2)**2)
+            D_lmbda -= ((lmbda ** 2) / 2) * np.linalg.norm(
+                theta - y / lmbda, ord=2
+            ) ** 2
 
             # Computation of the dual gap
             G_lmbda = P_lmbda - D_lmbda
@@ -236,8 +235,7 @@ def cyclic_coordinate_descent(X, y, lmbda, epsilon, f, n_epochs, screening,
                 # Computation of the active set
                 for j in range(n_features):
                     if safeset_membership[j] == 1:
-                        mu = (np.abs(X[:, j].T.dot(theta))
-                              + r * np.sqrt(L[j]))
+                        mu = np.abs(X[:, j].T.dot(theta)) + r * np.sqrt(L[j])
 
                         if mu < 1:
                             safeset_membership[j] = 0
@@ -248,9 +246,19 @@ def cyclic_coordinate_descent(X, y, lmbda, epsilon, f, n_epochs, screening,
             if np.abs(G_lmbda) <= epsilon:
                 break
 
-    return (beta, primal_hist, dual_hist, gap_hist, r_list,
-            n_active_features, theta, P_lmbda, D_lmbda, G_lmbda, 
-            safeset_membership)
+    return (
+        beta,
+        primal_hist,
+        dual_hist,
+        gap_hist,
+        r_list,
+        n_active_features,
+        theta,
+        P_lmbda,
+        D_lmbda,
+        G_lmbda,
+        safeset_membership,
+    )
 
 
 #########################################################################
@@ -259,8 +267,18 @@ def cyclic_coordinate_descent(X, y, lmbda, epsilon, f, n_epochs, screening,
 
 
 @njit
-def sparse_cd(X_data, X_indices, X_indptr, y, lmbda, epsilon, f, n_epochs,
-              screening, store_history):
+def sparse_cd(
+    X_data,
+    X_indices,
+    X_indptr,
+    y,
+    lmbda,
+    epsilon,
+    f,
+    n_epochs,
+    screening,
+    store_history,
+):
     """Solver : sparse cyclic coordinate descent
 
     Parameters
@@ -340,7 +358,7 @@ def sparse_cd(X_data, X_indices, X_indptr, y, lmbda, epsilon, f, n_epochs,
     beta = np.zeros(n_features)
     theta = np.zeros(n_samples)
 
-    y_norm2 = np.linalg.norm(y, ord=2)**2
+    y_norm2 = np.linalg.norm(y, ord=2) ** 2
     residuals = np.copy(y)
     n_active_features = []
     r_list = []
@@ -361,13 +379,13 @@ def sparse_cd(X_data, X_indices, X_indptr, y, lmbda, epsilon, f, n_epochs,
     L = np.zeros(n_features)
 
     for j in range(n_features):
-        start, end = X_indptr[j:j + 2]
+        start, end = X_indptr[j : j + 2]
         for ind in range(start, end):
             L[j] += X_data[ind] ** 2
 
     for k in range(n_epochs):
         for j in range(n_features):
-            if L[j] == 0.:
+            if L[j] == 0.0:
                 continue
 
             if safeset_membership[j] == 0:
@@ -376,8 +394,8 @@ def sparse_cd(X_data, X_indices, X_indptr, y, lmbda, epsilon, f, n_epochs,
             old_beta_j = beta[j]
 
             # Matrix product between the features matrix X and the residuals
-            start, end = X_indptr[j:j + 2]
-            grad = 0.
+            start, end = X_indptr[j : j + 2]
+            grad = 0.0
             for ind in range(start, end):
                 grad += X_data[ind] * residuals[X_indices[ind]]
 
@@ -399,8 +417,8 @@ def sparse_cd(X_data, X_indices, X_indptr, y, lmbda, epsilon, f, n_epochs,
             # Matrix product between the features matrix X and the residuals
             for j in range(n_features):
                 if safeset_membership[j] == 1:
-                    start, end = X_indptr[j:j + 2]
-                    dot = 0.
+                    start, end = X_indptr[j : j + 2]
+                    dot = 0.0
                     for ind in range(start, end):
                         dot += X_data[ind] * residuals[X_indices[ind]]
                     XTR_absmax = max(abs(dot), XTR_absmax)
@@ -413,9 +431,9 @@ def sparse_cd(X_data, X_indices, X_indptr, y, lmbda, epsilon, f, n_epochs,
 
             # Computation of the dual problem
             D_lmbda = 0.5 * y_norm2
-            D_lmbda -= (((lmbda**2) / 2)
-                        * np.linalg.norm(theta - y
-                                         / lmbda, ord=2)**2)
+            D_lmbda -= ((lmbda ** 2) / 2) * np.linalg.norm(
+                theta - y / lmbda, ord=2
+            ) ** 2
 
             # Computation of the dual gap
             G_lmbda = P_lmbda - D_lmbda
@@ -436,13 +454,13 @@ def sparse_cd(X_data, X_indices, X_indptr, y, lmbda, epsilon, f, n_epochs,
                 # Computation of the active set
                 for j in range(n_features):
                     if safeset_membership[j] == 1:
-                        start, end = X_indptr[j:j + 2]
-                        dot = 0.
-                        norm = 0.
+                        start, end = X_indptr[j : j + 2]
+                        dot = 0.0
+                        norm = 0.0
 
                         for ind in range(start, end):
                             dot += X_data[ind] * theta[X_indices[ind]]
-                            norm += X_data[ind]**2
+                            norm += X_data[ind] ** 2
 
                         norm = np.sqrt(norm)
                         dot = np.abs(dot)
@@ -458,9 +476,20 @@ def sparse_cd(X_data, X_indices, X_indptr, y, lmbda, epsilon, f, n_epochs,
                 if np.abs(G_lmbda) <= epsilon:
                     break
 
-    return (beta, primal_hist, dual_hist, gap_hist, r_list,
-            n_active_features, theta, P_lmbda, D_lmbda, G_lmbda,
-            safeset_membership)
+    return (
+        beta,
+        primal_hist,
+        dual_hist,
+        gap_hist,
+        r_list,
+        n_active_features,
+        theta,
+        P_lmbda,
+        D_lmbda,
+        G_lmbda,
+        safeset_membership,
+    )
+
 
 # https://stackoverflow.com/questions/52299420/scipy-csr-matrix-understand-indptr
 
@@ -469,8 +498,8 @@ def sparse_cd(X_data, X_indices, X_indptr, y, lmbda, epsilon, f, n_epochs,
 #                           Class Dense Lasso
 ###########################################################################
 
-class Lasso:
 
+class Lasso:
     def __init__(self, lmbda, epsilon, f, n_epochs, screening, store_history):
 
         self.lmbda = lmbda
@@ -504,35 +533,53 @@ class Lasso:
             X_indices = X.indices
             X_indptr = X.indptr
 
-            (beta_hat_cyclic_cd_true,
-             primal_hist,
-             dual_hist,
-             gap_hist,
-             r_list,
-             n_active_features_true,
-             theta_hat_cyclic_cd,
-             P_lmbda,
-             D_lmbda,
-             G_lmbda,
-             safe_set) = sparse_cd(X_data, X_indices, X_indptr, y, self.lmbda,
-                                   self.epsilon, self.f, self.n_epochs,
-                                   self.screening, self.store_history)
+            (
+                beta_hat_cyclic_cd_true,
+                primal_hist,
+                dual_hist,
+                gap_hist,
+                r_list,
+                n_active_features_true,
+                theta_hat_cyclic_cd,
+                P_lmbda,
+                D_lmbda,
+                G_lmbda,
+                safe_set,
+            ) = sparse_cd(
+                X_data,
+                X_indices,
+                X_indptr,
+                y,
+                self.lmbda,
+                self.epsilon,
+                self.f,
+                self.n_epochs,
+                self.screening,
+                self.store_history,
+            )
         else:
-            (beta_hat_cyclic_cd_true,
-             primal_hist,
-             dual_hist,
-             gap_hist,
-             r_list,
-             n_active_features_true,
-             theta_hat_cyclic_cd,
-             P_lmbda,
-             D_lmbda,
-             G_lmbda,
-             safe_set) = cyclic_coordinate_descent(X, y, self.lmbda,
-                                                   self.epsilon,
-                                                   self.f, self.n_epochs,
-                                                   self.screening,
-                                                   self.store_history)
+            (
+                beta_hat_cyclic_cd_true,
+                primal_hist,
+                dual_hist,
+                gap_hist,
+                r_list,
+                n_active_features_true,
+                theta_hat_cyclic_cd,
+                P_lmbda,
+                D_lmbda,
+                G_lmbda,
+                safe_set,
+            ) = cyclic_coordinate_descent(
+                X,
+                y,
+                self.lmbda,
+                self.epsilon,
+                self.f,
+                self.n_epochs,
+                self.screening,
+                self.store_history,
+            )
 
         self.slopes = beta_hat_cyclic_cd_true
         self.G_lmbda = G_lmbda
@@ -579,8 +626,8 @@ class Lasso:
             negative to keep the semantic that higher is better
         """
 
-        u = ((y - self.predict(X))**2).sum()
-        v = ((y - np.mean(y))**2).sum()
+        u = ((y - self.predict(X)) ** 2).sum()
+        v = ((y - np.mean(y)) ** 2).sum()
         score = 1 - u / v
 
         return score
@@ -589,6 +636,7 @@ class Lasso:
 ##########################################################
 #                    Sign Function
 ##########################################################
+
 
 @njit
 def sign(x):
@@ -616,6 +664,7 @@ def sign(x):
 ######################################
 #    Soft-Thresholding Function
 ######################################
+
 
 @njit
 def soft_thresholding(u, x):
@@ -654,16 +703,16 @@ def main():
     rng = check_random_state(0)
     n_samples, n_features = 100, 100
     beta = rng.randn(n_features)
-    lmbda = 1.
+    lmbda = 1.0
     f = 10
     epsilon = 1e-14
     n_epochs = 100000
     screening = True
     store_history = True
-    encode = 'onehot'
-    strategy = 'quantile'
+    encode = "onehot"
+    strategy = "quantile"
 
-    X, y = simu(beta, n_samples=n_samples, corr=0.5, for_logreg=False,
+    X, y = simu(beta, n_samples=n_samples, corr=0.5, for_logreg=False, 
                 random_state=rng)
 
     # X = csc_matrix(X)
@@ -695,9 +744,8 @@ def main():
     #                                  n_epochs=n_epochs, screening=screening,
     #                                  store_history=store_history)
 
-
     # print("safe set sparse : ", safe_set_sparse)
-    
+
     # sparse_lasso_sklearn = sklearn_Lasso(alpha=(lmbda / X_binned.shape[0]),
     #                                      fit_intercept=False,
     #                                      normalize=False,
@@ -1069,23 +1117,28 @@ def main():
     # fig.tight_layout()
     # plt.show()
 
-    # Performance figures 
+    # Performance figures
 
     delay_list_dense = list()
     delay_list_dense_sklearn = list()
 
     primal_dense_list = list()
     primal_dense_list_sklearn = list()
-    dense_cv_list = list()    
+    dense_cv_list = list()
     dense_cv_list_sklearn = list()
 
     for n_epochs in range(1000, 100000, 1000):
 
         start_dense = time.time()
 
-        dense_lasso = Lasso(lmbda=lmbda, epsilon=epsilon, f=f, 
-                            n_epochs=n_epochs, screening=screening, 
-                            store_history=store_history).fit(X, y)
+        dense_lasso = Lasso(
+            lmbda=lmbda,
+            epsilon=epsilon,
+            f=f,
+            n_epochs=n_epochs,
+            screening=screening,
+            store_history=store_history,
+        ).fit(X, y)
 
         end_dense = time.time()
         delay_dense = end_dense - start_dense
@@ -1098,22 +1151,24 @@ def main():
         dense_cv_list.append(dense_cv_score)
 
         start_dense_sklearn = time.time()
-    
-        dense_lasso_sklearn = sklearn_Lasso(alpha=(lmbda / X.shape[0]),
-                                            fit_intercept=False,
-                                            normalize=False,
-                                            max_iter=n_epochs,
-                                            tol=1e-15).fit(X, y)
+
+        dense_lasso_sklearn = sklearn_Lasso(
+            alpha=(lmbda / X.shape[0]),
+            fit_intercept=False,
+            normalize=False,
+            max_iter=n_epochs,
+            tol=1e-15,
+        ).fit(X, y)
 
         end_dense_sklearn = time.time()
         delay_dense_sklearn = end_dense_sklearn - start_dense_sklearn
         delay_list_dense_sklearn.append(delay_dense_sklearn)
 
         slopes = dense_lasso_sklearn.coef_
-    
-        primal_function = ((1 / 2)
-                           * np.linalg.norm(y - X.dot(slopes.T), 2)**2
-                           + lmbda * np.linalg.norm(slopes, 1))
+
+        primal_function = (1 / 2) * np.linalg.norm(
+            y - X.dot(slopes.T), 2
+        ) ** 2 + lmbda * np.linalg.norm(slopes, 1)
 
         primal_dense_list_sklearn.append(primal_function)
 
@@ -1130,7 +1185,7 @@ def main():
     print("delay dense lasso sklearn = ", delay_list_dense_sklearn)
     print("shape = ", np.shape(delay_list_dense_sklearn))
 
-    print ("dense cv score = ", dense_cv_list)
+    print("dense cv score = ", dense_cv_list)
     print("shape = ", np.shape(dense_cv_list))
     print("dense cv score sklearn = ", dense_cv_list_sklearn)
     print("shape = ", np.shape(dense_cv_list_sklearn))
