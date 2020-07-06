@@ -7,10 +7,9 @@ from sklearn.ensemble import RandomForestRegressor
 from scipy.stats import skew
 # from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import KBinsDiscretizer
-# from sklearn.linear_model import Lasso
 # from sklearn.decomposition import PCA
 from sklearn.model_selection import cross_val_score
-# from sklearn.linear_model import Lasso as sklearn_Lasso
+from sklearn import linear_model
 from sklearn.compose import ColumnTransformer
 from sklearn.pipeline import Pipeline
 from sklearn.impute import SimpleImputer
@@ -169,15 +168,8 @@ def compute_cv(X, y, n_splits, lmbda, epsilon, f, n_epochs,
 
     Returns
     -------
-    cv_lasso: float
-        cross validation score of the lasso solver
-
-    cv_xgb: float
-        cross validation score of the xgboost solver
-
-    cv_rf: float
-        cross validation score of the random forest solver
-
+    cv_scores: dict
+        cross validation scores for different models
     """
     # Pipeline
     numeric_feats = numeric_features(X)
@@ -205,27 +197,38 @@ def compute_cv(X, y, n_splits, lmbda, epsilon, f, n_epochs,
         ('cat', categorical_transformer, categorical_feats)])
 
     y = y.to_numpy().astype('float')
+    cv_scores = {}
 
     # Lasso
     lasso = Lasso(lmbda=lmbda, epsilon=epsilon, f=f, n_epochs=n_epochs,
                   screening=screening, store_history=store_history)
     pipe_lasso = Pipeline(steps=[('preprocessor', preprocessor),
                                  ('regressor', lasso)])
-    cv_lasso = cross_val_score(pipe_lasso, X, y, cv=n_splits).mean()
+    cv_scores['lasso'] = cross_val_score(pipe_lasso, X, y, cv=n_splits).mean()
+
+    # LassoCV
+    pipe_lasso_cv = Pipeline(steps=[('preprocessor', preprocessor),
+                                    ('regressor', linear_model.LassoCV())])
+    cv_scores['lasso_cv'] = cross_val_score(pipe_lasso_cv, X, y, cv=n_splits).mean()
+
+    # RidgeCV
+    pipe_ridge_cv = Pipeline(steps=[('preprocessor', preprocessor),
+                                    ('regressor', linear_model.RidgeCV())])
+    cv_scores['ridge_cv'] = cross_val_score(pipe_ridge_cv, X, y, cv=n_splits).mean()
 
     # XGBoost
     xgb = XGBRegressor()
     pipe_xgb = Pipeline(steps=[('preprocessor', rf_preprocessor),
                                ('regressor', xgb)])
-    cv_xgb = cross_val_score(pipe_xgb, X, y, cv=n_splits).mean()
+    cv_scores['xgb'] = cross_val_score(pipe_xgb, X, y, cv=n_splits).mean()
 
     # Random Forest
     rf = RandomForestRegressor()
     pipe_rf = Pipeline(steps=[('preprocessor', rf_preprocessor),
                               ('regressor', rf)])
-    cv_rf = cross_val_score(pipe_rf, X, y, cv=n_splits).mean()
+    cv_scores['rf'] = cross_val_score(pipe_rf, X, y, cv=n_splits).mean()
 
-    return cv_lasso, cv_xgb, cv_rf
+    return cv_scores
 
 
 def main():
@@ -248,16 +251,15 @@ def main():
     store_history = True
     n_epochs = 10000
 
-    cv_lasso, cv_xgb, cv_rf = compute_cv(X=X, y=y,
-                                         n_splits=n_splits, lmbda=lmbda,
-                                         epsilon=epsilon, f=f,
-                                         n_epochs=n_epochs,
-                                         screening=screening,
-                                         store_history=store_history)
+    cv_scores = compute_cv(X=X, y=y,
+                           n_splits=n_splits, lmbda=lmbda,
+                           epsilon=epsilon, f=f,
+                           n_epochs=n_epochs,
+                           screening=screening,
+                           store_history=store_history)
 
-    print("cv lasso = ", cv_lasso)
-    print("cv xgb = ", cv_xgb)
-    print("cv rf = ", cv_rf)
+    for k, v in cv_scores.items():
+        print(f'{k}: {v}')
 
     # Plots
     # matplotlib.rcParams['figure.figsize'] = (12.0, 6.0)
