@@ -1,31 +1,23 @@
 import numpy as np
 import pandas as pd
-import scipy
-import matplotlib
 import matplotlib.pyplot as plt
 
 from xgboost import XGBRegressor
 from sklearn.ensemble import RandomForestRegressor
-from sklearn.model_selection import KFold
-from numba import njit
 from scipy.stats import skew
-from scipy.stats.stats import pearsonr
-from sklearn.model_selection import train_test_split
+# from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import KBinsDiscretizer
-from sklearn.linear_model import LinearRegression
-from sklearn.linear_model import Lasso
-from sklearn.decomposition import PCA
+# from sklearn.linear_model import Lasso
+# from sklearn.decomposition import PCA
 from sklearn.model_selection import cross_val_score
-from scipy.sparse import issparse
-from sklearn.linear_model import Lasso as sklearn_Lasso
+# from sklearn.linear_model import Lasso as sklearn_Lasso
 from sklearn.compose import ColumnTransformer
 from sklearn.pipeline import Pipeline
 from sklearn.impute import SimpleImputer
 from sklearn.preprocessing import StandardScaler, OneHotEncoder
-from sklearn.model_selection import train_test_split, GridSearchCV
+# from sklearn.model_selection import train_test_split, GridSearchCV
 
-from cd_solver_lasso_numba import Lasso, cyclic_coordinate_descent, sparse_cd
-
+from cd_solver_lasso_numba import Lasso
 
 #######################################
 #              Read CSV
@@ -143,19 +135,19 @@ def split_train_test(dataset, train):
 ################################################################
 
 
-def compute_cv(X_train, y_train, n_splits, lmbda, epsilon, f, n_epochs,
+def compute_cv(X, y, n_splits, lmbda, epsilon, f, n_epochs,
                screening, store_history):
     """
     Parameters
     ----------
-    X_train: numpy.ndarray(), shape = (n_samples, n_features)
-        train features matrix 
+    X: numpy.ndarray(), shape = (n_samples, n_features)
+        features matrix
 
-    y_train: numpy.array(), shape = '(n_samples, )
-        train target vector
+    y: numpy.array(), shape = '(n_samples, )
+        target vector
 
     n_splits: int
-        number of folds 
+        number of folds
 
     lmbda: float
         regularization parameter
@@ -164,7 +156,7 @@ def compute_cv(X_train, y_train, n_splits, lmbda, epsilon, f, n_epochs,
         tolerance
 
     f: int
-        frequency 
+        frequency
 
     n_epochs: int
         number of epochs
@@ -173,7 +165,7 @@ def compute_cv(X_train, y_train, n_splits, lmbda, epsilon, f, n_epochs,
         indicates if we run the solver with or without screening process
 
     store_history: bool
-        indicates if we store the history variables when we run the solver 
+        indicates if we store the history variables when we run the solver
 
     Returns
     -------
@@ -183,12 +175,12 @@ def compute_cv(X_train, y_train, n_splits, lmbda, epsilon, f, n_epochs,
     cv_xgb: float
         cross validation score of the xgboost solver
 
-    cv_rf: float 
+    cv_rf: float
         cross validation score of the random forest solver
 
     """
     # Pipeline
-    numeric_feats = numeric_features(X_train)
+    numeric_feats = numeric_features(X)
     numeric_transformer = Pipeline(steps=[
         ('imputer', SimpleImputer(strategy='median')),
         ('scaler', StandardScaler()),
@@ -199,7 +191,7 @@ def compute_cv(X_train, y_train, n_splits, lmbda, epsilon, f, n_epochs,
         ('imputer', SimpleImputer(strategy='median')),
         ('scaler', StandardScaler())])
 
-    categorical_feats = categorical_features(X_train)
+    categorical_feats = categorical_features(X)
     categorical_transformer = Pipeline(steps=[
         ('imputer', SimpleImputer(strategy='constant', fill_value='missing')),
         ('onehot', OneHotEncoder(handle_unknown='ignore'))])
@@ -212,70 +204,55 @@ def compute_cv(X_train, y_train, n_splits, lmbda, epsilon, f, n_epochs,
         ('num', rf_numeric_transformer, numeric_feats),
         ('cat', categorical_transformer, categorical_feats)])
 
-    X_train = X_train
-    y_train = y_train.to_numpy().astype('float')
+    y = y.to_numpy().astype('float')
 
+    # Lasso
     lasso = Lasso(lmbda=lmbda, epsilon=epsilon, f=f, n_epochs=n_epochs,
                   screening=screening, store_history=store_history)
-
     pipe_lasso = Pipeline(steps=[('preprocessor', preprocessor),
                                  ('regressor', lasso)])
+    cv_lasso = cross_val_score(pipe_lasso, X, y, cv=n_splits).mean()
 
-    pipe_lasso.fit(X_train, y_train)
-
-    cv_lasso = cross_val_score(pipe_lasso, X_train, y_train, cv=n_splits).mean()
-
+    # XGBoost
     xgb = XGBRegressor()
-
-    pipe_xgb = Pipeline(steps=[('preprocessor', preprocessor),
+    pipe_xgb = Pipeline(steps=[('preprocessor', rf_preprocessor),
                                ('regressor', xgb)])
+    cv_xgb = cross_val_score(pipe_xgb, X, y, cv=n_splits).mean()
 
-    pipe_xgb.fit(X_train, y_train)
-
-    cv_xgb = cross_val_score(pipe_xgb, X_train, y_train, cv=n_splits).mean()
-
+    # Random Forest
     rf = RandomForestRegressor()
-
     pipe_rf = Pipeline(steps=[('preprocessor', rf_preprocessor),
                               ('regressor', rf)])
-
-    pipe_rf.fit(X_train, y_train)
-
-    cv_rf = cross_val_score(pipe_rf, X_train, y_train, cv=n_splits).mean()
+    cv_rf = cross_val_score(pipe_rf, X, y, cv=n_splits).mean()
 
     return cv_lasso, cv_xgb, cv_rf
 
 
 def main():
-    # data_dir = "./Datasets"
-    data_dir = "/home/mrivoire/Documents/M2DS_Polytechnique/Stage_INRIA/Datasets"
+    data_dir = "./Datasets"
+    # data_dir = "/home/mrivoire/Documents/M2DS_Polytechnique/Stage_INRIA/Datasets"
     fname_train = data_dir + "/housing_prices_train"
-    fname_test = data_dir + "/housing_prices_test"
-    train_set = read_csv(fname_train)
-    head_train = train_set.head()
-    test_set = read_csv(fname_test)
-    head_test = test_set.head()
+    # fname_test = data_dir + "/housing_prices_test"
+    X_train = read_csv(fname_train)
+    # X_test = read_csv(fname_test)
+
+    X = X_train  # keep only train data
+    y = X['SalePrice']
+    X = X.drop('SalePrice', axis=1)
 
     lmbda = 1.
-    epsilon = 1e-15
+    epsilon = 1e-7
     f = 10
     n_splits = 5
     screening = True
     store_history = True
-    n_epochs = 100000
+    n_epochs = 10000
 
-    all_data = concat(train_set, test_set)
-    head_all_data = all_data.head()
- 
-    log_sale_price = log_transform(train_set['SalePrice'])
-
-    X_train, X_test, y_train = split_train_test(all_data, train_set)
-
-    cv_lasso, cv_xgb, cv_rf = compute_cv(X_train=X_train, y_train=y_train, 
-                                         n_splits=n_splits, lmbda=lmbda, 
-                                         epsilon=epsilon, f=f, 
+    cv_lasso, cv_xgb, cv_rf = compute_cv(X=X, y=y,
+                                         n_splits=n_splits, lmbda=lmbda,
+                                         epsilon=epsilon, f=f,
                                          n_epochs=n_epochs,
-                                         screening=screening, 
+                                         screening=screening,
                                          store_history=store_history)
 
     print("cv lasso = ", cv_lasso)
