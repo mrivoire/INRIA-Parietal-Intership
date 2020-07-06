@@ -148,15 +148,15 @@ def max_val(X_binned_data, X_binned_indices, X_binned_indptr, residuals,
     parent_indices = np.arange(n_samples)
 
     for i in range(n_features):
-        max_val, key = max_val_rec(X_binned_data=X_binned_data, 
-                                   X_binned_indices=X_binned_indices, 
-                                   X_binned_indptr=X_binned_indptr, 
-                                   parent_data=parent_data,
-                                   parent_indices=parent_indices,
-                                   current_max_val=max_val, j=i,
-                                   residuals=residuals,
-                                   max_depth=max_depth,
-                                   depth=depth)
+        max_val = max_val_rec(X_binned_data=X_binned_data, 
+                              X_binned_indices=X_binned_indices, 
+                              X_binned_indptr=X_binned_indptr, 
+                              parent_data=parent_data,
+                              parent_indices=parent_indices,
+                              current_max_val=max_val, j=i,
+                              residuals=residuals,
+                              max_depth=max_depth,
+                              depth=depth)
 
 
     # the recursion is used to scan the tree from the root to the leaves ?
@@ -170,16 +170,86 @@ def max_val(X_binned_data, X_binned_indices, X_binned_indptr, residuals,
     # 3. Traverse all the adjacent and unmarked nodes and call the recursive
     # function with index of adjacent node.
 
-    return max_val, key
+    return max_val
 
 
 def compute_inner_prod(data1, ind1, residuals):
     """
     Parameters
     ----------
+    data1: numpy.array(), shape = (n_non_zero_coeffs, )
+        contains all the non-zero elements of the sparse verctor
+
+    ind1: numpy.array(), shape = (n_non_zero_coeffs, )
+        contains the indices of the rows in the dense matrix of the 
+        non-zero elements
+
+    residuals: numpy.array(), shape = (n_samples, )
+        contains the residuals between the predictions and the ground-truth
+        values y 
 
     Returns
     -------
+    inner_prod: float
+        inner product between the sparse vector data1 and the vector of 
+        residuals
+
+    inner_prod_neg: float
+        negative part of the inner product 
+
+    inner_prod_pos: float
+        positive part of the inner product 
+    """
+
+    inner_prod = 0
+    inner_prod_pos = 0
+    inner_prod_neg = 0
+
+    # only for loop 
+    # not to scan residuals 
+    # only access to the elements corresponding to the indices stored in ind1
+
+    for count1 in range(len(ind1)):
+        prod = data1[count1] * residuals[ind1[count1]]
+        inner_prod += prod 
+
+        if residuals[ind1[count1]] >= 0:
+            inner_prod_pos += prod 
+        else:
+            inner_prod_neg += prod 
+
+    return inner_prod, inner_prod_neg, inner_prod_pos
+
+
+def compute_sparse_inner_prod(data1, ind1, data2, ind2):
+     """
+    Parameters
+    ----------
+    data1: numpy.array(), shape = (n_non_zero_coeffs, )
+        contains all the non-zero elements of the 1st sparse verctor
+
+    ind1: numpy.array(), shape = (n_non_zero_coeffs, )
+        contains the indices of the rows in the dense matrix of the 
+        non-zero elements of the 1st sparse vector
+
+    data2: numpy.array(), shape = (n_non_zero_coeffs, )
+        contains all the non-zero elements of the 2nd sparse vector 
+
+    ind2: numpy.array(), shape = (n_non_zero_coeffs, )
+        contains the indices of the rows in the dense matrix of the non-zero 
+        elements of the 2nd sparse vector
+        
+    Returns
+    -------
+    inner_prod: float
+        inner product between the sparse vector data1 and the vector of 
+        residuals
+
+    inner_prod_neg: float
+        negative part of the inner product 
+
+    inner_prod_pos: float
+        positive part of the inner product 
     """
 
     inner_prod = 0
@@ -188,20 +258,23 @@ def compute_inner_prod(data1, ind1, residuals):
 
     count1 = 0
     count2 = 0
+    # only for loop 
+    # not to scan residuals 
+    # only access to the elements corresponding to the indices stored in ind1
 
-    while count1 < len(ind1) and count2 < len(residuals):
+    while count1 < len(ind1) and count2 < len(ind2):
         if ind1[count1] == count2:
-            prod = data1[count1] * residuals[count2]
+            prod = data1[count1] * data2[count2]
             inner_prod += prod 
 
-            if residuals[count2] >= 0:
+            if data2[count2] >= 0:
                 inner_prod_pos += prod 
             else:
                 inner_prod_neg += prod 
 
             count1 += 1
             count2 += 1
-        elif ind1[count1] < count2:
+        elif ind1[count1] < ind2[count2]:
             count1 += 1
         else:
             count2 += 1
@@ -213,9 +286,30 @@ def compute_interactions(data1, ind1, data2, ind2):
     """
     Parameters
     ----------
+    data1: numpy.array(), shape = (n_non_zero_coeffs, )
+        contains all the non-zero elements of the 1st sparse verctor
+
+    ind1: numpy.array(), shape = (n_non_zero_coeffs, )
+        contains the indices of the rows in the dense matrix of the 
+        non-zero elements of the 1st sparse vector
+
+    data2: numpy.array(), shape = (n_non_zero_coeffs, )
+        contains all the non-zero elements of the 2nd sparse vector 
+
+    ind2: numpy.array(), shape = (n_non_zero_coeffs, )
+        contains the indices of the rows in the dense matrix of the non-zero 
+        elements of the 2nd sparse vector
 
     Returns
     -------
+    inter_feat_data: numpy.array(), shape = (n_non_zero_elements, )
+        contains the non-zero elements of the sparse vector of interactions 
+        resulting in the product of the non-zero coefficients of same indices 
+        of the two parent vectors data1 and data2
+
+    inter_feat_indices: numpy.array(), shape = (n_non_zero_elements, )
+        contains the indices of the rows of the non-zero elements in the dense
+        matrix 
     """
 
     inner_prod = 0
@@ -301,37 +395,25 @@ def max_val_rec(X_binned_data, X_binned_indices, X_binned_indptr,
     # interaction result feature x
 
     n_features = len(X_binned_indptr) - 1
-    n_samples = max(X_binned_indices) + 1
 
-    child_data = np.zeros(n_samples)
-    child_indices = np.zeros(n_samples)
+    start, end = X_binned_indptr[j:j+2]
+    X_j_indices = X_binned_indices[start:end] 
+    X_j_data = X_binned_data[start:end]
 
-    start, end = X_binned_indptr[j, j+2]
-    for ind in range(start, end):
-        child_indices[X_binned_indices[ind]] = X_binned_indices[ind]
-        child_data[X_binned_indices[ind]] = X_binned_data[ind] 
-
-
-    # How to scan arrays from different sizes in the same time ?
-    # How to move in the two vectors of indices (child and parent) in the same 
-    # time whereas we have not to move at the same speed ?
     (inter_feat_data, 
-     inter_feat_ind) = compute_interactions(child_data, child_indices, 
+     inter_feat_ind) = compute_interactions(X_j_data, X_j_indices, 
                                             parent_data, parent_indices)
 
     (inner_prod, 
      inner_prod_neg, 
-     inner_prod_pos) = compute_inner_prod(parent_data, 
-                                          parent_indices, 
+     inner_prod_pos) = compute_inner_prod(inter_feat_data, 
+                                          inter_feat_ind, 
                                           residuals)
-
-    # If the criterion is verified
-        # return the current maxval
 
     upper_bound = max(inner_prod_pos, -inner_prod_neg)
 
     if upper_bound <= current_max_val:
-        return current_max_val, key
+        return current_max_val
 
     else:
     # If the criterion is not satisfied:
@@ -339,7 +421,8 @@ def max_val_rec(X_binned_data, X_binned_indices, X_binned_indptr,
         # compute max_val
         # update max_val if required
 
-        current_max_val = inner_prod
+        if inner_prod > current_max_val:
+            current_max_val = inner_prod
 
         # If depth < max_depth:
             # for loop over the child nodes (number of children = n_features)
@@ -348,20 +431,20 @@ def max_val_rec(X_binned_data, X_binned_indices, X_binned_indptr,
 
         if depth < max_depth: # start from 0 to max_depth
             # recursive call of the function on the following stage
-            for ind in range(j+1, n_features):
-                current_max_val, key = max_val_rec(X_binned_data, 
-                                                   X_binned_indices, 
-                                                   X_binned_indptr,  
-                                                   parent_data, 
-                                                   parent_indices, 
-                                                   current_max_val, 
-                                                   j+1, residuals, 
-                                                   max_depth, depth + 1)
+            for k in range(j+1, n_features):
+                current_max_val = max_val_rec(X_binned_data, 
+                                              X_binned_indices, 
+                                              X_binned_indptr,  
+                                              inter_feat_data, 
+                                              inter_feat_ind, 
+                                              current_max_val, 
+                                              k, residuals, 
+                                              max_depth, depth + 1)
 
         # We keep the same parent node and we change the child nodes ? 
         # How to find the key of the feature providing the maxval ?
 
-        return current_max_val, key
+        return current_max_val
 
 # #############################################################################
 # #                           Safe Pattern Pruning

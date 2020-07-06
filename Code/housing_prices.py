@@ -145,8 +145,8 @@ def split_train_test(dataset, train):
 
 def compute_cv(X_train, y_train, n_splits, lmbda, epsilon, f, n_epochs,
                screening, store_history):
-
-   
+    """
+    """
     # Pipeline
     numeric_feats = numeric_features(X_train)
     numeric_transformer = Pipeline(steps=[
@@ -169,14 +169,13 @@ def compute_cv(X_train, y_train, n_splits, lmbda, epsilon, f, n_epochs,
     scores_lasso = []
     scores_xgb = []
     scores_rf = []
-    X_train = X_train.to_records()
-    print(X_train.array.shape)
-    y_train = y_train.to_numpy()
+    X_train = X_train
+    y_train = y_train.to_numpy().astype('float')
     for fold in kf.split(X_train):
         
-        X_tr = X_train[fold[0]]
+        X_tr = X_train.iloc[fold[0]]
         y_tr = y_train[fold[0]]
-        X_te = X_train[fold[1]]
+        X_te = X_train.iloc[fold[1]]
         y_te = y_train[fold[1]]
 
         lasso = Lasso(lmbda=lmbda, epsilon=epsilon, f=f, n_epochs=n_splits,
@@ -185,8 +184,6 @@ def compute_cv(X_train, y_train, n_splits, lmbda, epsilon, f, n_epochs,
 
         pipe_lasso = Pipeline(steps=[('preprocessor', preprocessor),
                                      ('regressor', lasso)])
-
-        print(X_tr.shape)                                     
 
         pipe_lasso.fit(X_tr, y_tr)
 
@@ -203,16 +200,16 @@ def compute_cv(X_train, y_train, n_splits, lmbda, epsilon, f, n_epochs,
 
         rf = RandomForestRegressor()
 
-        pipe_rf = Pipeline(steps=[('preprocessor', preprocessor),
-                                  ('regressor', rf)])
+        # pipe_rf = Pipeline(steps=[('preprocessor', preprocessor),
+        #                           ('regressor', rf)])
 
-        pipe_rf.fit(X_tr, y_tr)
+        rf.fit(X_tr, y_tr)
 
-        scores_rf.append(pipe_rf.score(X_te, y_te))
+        scores_rf.append(rf.score(X_te, y_te))
 
-    cv_lasso = scores_lasso.mean()
-    cv_xgb = scores_xgb.mean()
-    cv_rf = scores_rf.mean()
+    cv_lasso = np.mean(scores_lasso)
+    cv_xgb = np.mean(scores_xgb)
+    cv_rf = np.mean(scores_rf)
 
     return cv_lasso, cv_xgb, cv_rf
 
