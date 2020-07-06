@@ -215,8 +215,8 @@ def compute_cv(X_train, y_train, n_splits, lmbda, epsilon, f, n_epochs,
 
 
 def main():
-    # data_dir = "../Datasets"
-    data_dir = "/home/mrivoire/Documents/M2DS_Polytechnique/Stage_INRIA/Datasets"
+    data_dir = "./Datasets"
+    # data_dir = "/home/mrivoire/Documents/M2DS_Polytechnique/Stage_INRIA/Datasets"
     fname_train = data_dir + "/housing_prices_train"
     fname_test = data_dir + "/housing_prices_test"
     train_set = read_csv(fname_train)

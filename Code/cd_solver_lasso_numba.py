@@ -529,6 +529,7 @@ class Lasso:
         """
 
         if issparse(X):
+            X = X.tocsc()
             X_data = X.data
             X_indices = X.indices
             X_indptr = X.indptr
