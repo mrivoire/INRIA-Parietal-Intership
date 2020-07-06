@@ -146,6 +146,46 @@ def split_train_test(dataset, train):
 def compute_cv(X_train, y_train, n_splits, lmbda, epsilon, f, n_epochs,
                screening, store_history):
     """
+    Parameters
+    ----------
+    X_train: numpy.ndarray(), shape = (n_samples, n_features)
+        train features matrix 
+
+    y_train: numpy.array(), shape = '(n_samples, )
+        train target vector
+
+    n_splits: int
+        number of folds 
+
+    lmbda: float
+        regularization parameter
+
+    epsilon: float
+        tolerance
+
+    f: int
+        frequency 
+
+    n_epochs: int
+        number of epochs
+
+    screening: bool
+        indicates if we run the solver with or without screening process
+
+    store_history: bool
+        indicates if we store the history variables when we run the solver 
+
+    Returns
+    -------
+    cv_lasso: float
+        cross validation score of the lasso solver
+
+    cv_xgb: float
+        cross validation score of the xgboost solver
+
+    cv_rf: float 
+        cross validation score of the random forest solver
+
     """
     # Pipeline
     numeric_feats = numeric_features(X_train)
@@ -154,6 +194,10 @@ def compute_cv(X_train, y_train, n_splits, lmbda, epsilon, f, n_epochs,
         ('scaler', StandardScaler()),
         ('binning', KBinsDiscretizer(n_bins=3, encode='onehot',
                                      strategy='quantile'))])
+
+    rf_numeric_transformer = Pipeline(steps=[
+        ('imputer', SimpleImputer(strategy='median')),
+        ('scaler', StandardScaler())])
 
     categorical_feats = categorical_features(X_train)
     categorical_transformer = Pipeline(steps=[
@@ -164,59 +208,47 @@ def compute_cv(X_train, y_train, n_splits, lmbda, epsilon, f, n_epochs,
         ('num', numeric_transformer, numeric_feats),
         ('cat', categorical_transformer, categorical_feats)])
 
-    kf = KFold(n_splits=n_splits, shuffle=True, random_state=None)
+    rf_preprocessor = ColumnTransformer(transformers=[
+        ('num', rf_numeric_transformer, numeric_feats),
+        ('cat', categorical_transformer, categorical_feats)])
 
-    scores_lasso = []
-    scores_xgb = []
-    scores_rf = []
     X_train = X_train
     y_train = y_train.to_numpy().astype('float')
-    for fold in kf.split(X_train):
-        
-        X_tr = X_train.iloc[fold[0]]
-        y_tr = y_train[fold[0]]
-        X_te = X_train.iloc[fold[1]]
-        y_te = y_train[fold[1]]
 
-        lasso = Lasso(lmbda=lmbda, epsilon=epsilon, f=f, n_epochs=n_splits,
-                      screening=screening,
-                      store_history=store_history)
+    lasso = Lasso(lmbda=lmbda, epsilon=epsilon, f=f, n_epochs=n_epochs,
+                  screening=screening, store_history=store_history)
 
-        pipe_lasso = Pipeline(steps=[('preprocessor', preprocessor),
-                                     ('regressor', lasso)])
+    pipe_lasso = Pipeline(steps=[('preprocessor', preprocessor),
+                                 ('regressor', lasso)])
 
-        pipe_lasso.fit(X_tr, y_tr)
+    pipe_lasso.fit(X_train, y_train)
 
-        scores_lasso.append(pipe_lasso.score(X_te, y_te))
+    cv_lasso = cross_val_score(pipe_lasso, X_train, y_train, cv=n_splits).mean()
 
-        xgb = XGBRegressor()
+    xgb = XGBRegressor()
 
-        pipe_xgb = Pipeline(steps=[('preprocessor', preprocessor),
-                                     ('regressor', xgb)])
+    pipe_xgb = Pipeline(steps=[('preprocessor', preprocessor),
+                               ('regressor', xgb)])
 
-        pipe_xgb.fit(X_tr, y_tr)
+    pipe_xgb.fit(X_train, y_train)
 
-        scores_xgb.append(pipe_xgb.score(X_te, y_te))
+    cv_xgb = cross_val_score(pipe_xgb, X_train, y_train, cv=n_splits).mean()
 
-        rf = RandomForestRegressor()
+    rf = RandomForestRegressor()
 
-        # pipe_rf = Pipeline(steps=[('preprocessor', preprocessor),
-        #                           ('regressor', rf)])
+    pipe_rf = Pipeline(steps=[('preprocessor', rf_preprocessor),
+                              ('regressor', rf)])
 
-        rf.fit(X_tr, y_tr)
+    pipe_rf.fit(X_train, y_train)
 
-        scores_rf.append(rf.score(X_te, y_te))
-
-    cv_lasso = np.mean(scores_lasso)
-    cv_xgb = np.mean(scores_xgb)
-    cv_rf = np.mean(scores_rf)
+    cv_rf = cross_val_score(pipe_rf, X_train, y_train, cv=n_splits).mean()
 
     return cv_lasso, cv_xgb, cv_rf
 
 
 def main():
-    data_dir = "./Datasets"
-    # data_dir = "/home/mrivoire/Documents/M2DS_Polytechnique/Stage_INRIA/Datasets"
+    # data_dir = "./Datasets"
+    data_dir = "/home/mrivoire/Documents/M2DS_Polytechnique/Stage_INRIA/Datasets"
     fname_train = data_dir + "/housing_prices_train"
     fname_test = data_dir + "/housing_prices_test"
     train_set = read_csv(fname_train)
@@ -230,59 +262,14 @@ def main():
     n_splits = 5
     screening = True
     store_history = True
-    n_epochs = 1000
-    # print("Housing Prices Training Set Header : ", head_train)
-    # print("Housing Prices Testing Set Header : ", head_test)
+    n_epochs = 100000
 
     all_data = concat(train_set, test_set)
     head_all_data = all_data.head()
-    # print("All data : ", head_all_data)
-
+ 
     log_sale_price = log_transform(train_set['SalePrice'])
-    # print("log target : ", log_sale_price)
-
-    # skewed_feats = skewness(train_set)
-    # # print("skewed features : ", skewed_feats)
-
-    # numeric_feats = numeric_features(all_data)
-    # # print("numeric features : ", numeric_feats)
-
-    # numeric_transformer = Pipeline(steps=[
-    #     ('imputer', SimpleImputer(strategy='median')),
-    #     ('scaler', StandardScaler()),
-    #     ('binning', KBinsDiscretizer(n_bins=3, encode='onehot',
-    #                                  strategy='quantile'))])
-
-    # print("numeric transformer = ", numeric_transformer)
-
-    # categorical_feats = categorical_features(all_data)
-    # categorical_transformer = Pipeline(steps=[
-    #     ('imputer', SimpleImputer(strategy='constant', fill_value='missing')),
-    #     ('onehot', OneHotEncoder(handle_unknown='ignore'))])
-    # print("categorical transformer = ", categorical_transformer)
-
-    # preprocessor = ColumnTransformer(transformers=[
-    #     ('num', numeric_transformer, numeric_feats),
-    #     ('cat', categorical_transformer, categorical_feats)])
-
-    # print("preprocessor : ", preprocessor)
-
-    # n_features = len(numeric_feats) + len(categorical_feats)
-
-    # # Append Lasso to preprocessing pipeline.
-    # # Now we have a full prediction pipeline.
-    # pipeline = Pipeline(steps=[('preprocessor', preprocessor),
-    #                     ('regressor', sklearn_Lasso(alpha=1,
-    #                                     fit_intercept=False,
-    #                                     normalize=False,
-    #                                     max_iter=2000,
-    #                                     tol=1e-5))])
 
     X_train, X_test, y_train = split_train_test(all_data, train_set)
-
-    # pipeline.fit(X_train, y_train)
-
-    # pipeline.predict(X_test)
 
     cv_lasso, cv_xgb, cv_rf = compute_cv(X_train=X_train, y_train=y_train, 
                                          n_splits=n_splits, lmbda=lmbda, 
@@ -291,85 +278,9 @@ def main():
                                          screening=screening, 
                                          store_history=store_history)
 
-    # lasso.fit(X_train, y_train)
-    # print("model score: %.3f" % clf.score(X_test, y_test))
-
-    # all_data = onehot_encoding(all_data)
-    # # print("onehot data : ", all_data)
-
-    # prop_NaN = proportion_NaN(all_data)
-    # # print("proportion NaN values :", prop_NaN)
-
-    # all_data = fill_NaN(all_data)
-    # # print(all_data.head())
-
-    # X_train, X_test, y_train = split_train_test(all_data, train_set)
-
-    # print("X_train :", X_train.head())
-    # print("X_test : ", X_test.head())
-    # print("y_train : ", y_train.head())
-
-    # Tests with dense features matrices
-
-    # X = X_train.to_numpy()
-    # y = y_train.to_numpy()
-
-    # print("shape of X_train : ", X.shape)
-    # print("columns of X_train", X_train.columns)
-
-    # lmbda = 1.
-    # f = 10
-    # epsilon = 1e-14
-    # n_epochs = 100000
-    # screening = True
-    # store_history = True
-
-    # lasso = Lasso()
-    # scores = cross_val_score(lasso, X, y, cv=5)
-    # print(scores)
-
-    # dense_lasso = Lasso(lmbda=lmbda, epsilon=epsilon, f=f,
-    #                     n_epochs=n_epochs, screening=screening,
-    #                     store_history=store_history).fit(X, y)
-
-    # dense_cv_score = dense_lasso.score(X, y)
-
-    # print("dense cv score : ", dense_cv_score)
-
-    # dense_lasso_sklearn = sklearn_Lasso(alpha=lmbda / len(X),
-    #                                     fit_intercept=False,
-    #                                     normalize=False, max_iter=n_epochs,
-    #                                     tol=1e-15).fit(X, y)
-
-    # dense_cv_sklearn = dense_lasso_sklearn.score(X_train, y)
-    # print("dense cv score sklearn : ", dense_cv_sklearn)
-
-    # n_bins = 3
-    # encode = 'onehot'
-    # strategy = 'quantile'
-    # enc = KBinsDiscretizer(n_bins=n_bins, encode=encode, strategy=strategy)
-    # X_binned = enc.fit_transform(X)
-    # X_binned = X_binned.tocsc()
-
-    # sparse_lasso_sklearn = sklearn_Lasso(alpha=lmbda / len(X),
-    #                                      fit_intercept=False,
-    #                                      normalize=False, max_iter=n_epochs,
-    #                                      tol=1e-15).fit(X_binned, y)
-
-    # sparse_cv_sklearn = sparse_lasso_sklearn.score(X_binned, y)
-
-    # print("sparse cv score sklearn : ", sparse_cv_sklearn)
-
-    # sparse_lasso = Lasso(lmbda=lmbda, epsilon=epsilon, f=f,
-    #                      n_epochs=n_epochs,
-    #                      screening=screening,
-    #                      store_history=store_history).fit(X, y)
-
-    # sparse_cv_score = sparse_lasso.score(X_binned, y)
-
-    # print("sparse crossval score : ", sparse_cv_score)
-
-    # print("X type : ", type(X))
+    print("cv lasso = ", cv_lasso)
+    print("cv xgb = ", cv_xgb)
+    print("cv rf = ", cv_rf)
 
     # Plots
     # matplotlib.rcParams['figure.figsize'] = (12.0, 6.0)
