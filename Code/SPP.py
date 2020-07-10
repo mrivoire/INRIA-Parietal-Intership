@@ -561,8 +561,9 @@ def main():
                 data3 = []
                 ind3 = []
                 for m in range(n_samples):
-                    data3.append(X[m, k])
-                    ind3.append(m)
+                    if X[m, k] != 0:
+                        data3.append(X[m, k])
+                        ind3.append(m)
 
                 (inter_feat2_data, 
                  inter_feat2_ind) = compute_interactions(inter_feat1_data, 
