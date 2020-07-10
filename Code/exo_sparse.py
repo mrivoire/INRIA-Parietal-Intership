@@ -100,6 +100,72 @@ def sparse_matrix_product(data, indices, indptr, vect):
     return prod
 
 
+#######################################################################
+#                       Sparse Inner Product 
+#######################################################################
+
+
+def compute_sparse_inner_prod(data1, ind1, data2, ind2):
+    """
+    Parameters
+    ----------
+    data1: numpy.array(), shape = (n_non_zero_coeffs, )
+        contains all the non-zero elements of the 1st sparse verctor
+
+    ind1: numpy.array(), shape = (n_non_zero_coeffs, )
+        contains the indices of the rows in the dense matrix of the 
+        non-zero elements of the 1st sparse vector
+
+    data2: numpy.array(), shape = (n_non_zero_coeffs, )
+        contains all the non-zero elements of the 2nd sparse vector 
+
+    ind2: numpy.array(), shape = (n_non_zero_coeffs, )
+        contains the indices of the rows in the dense matrix of the non-zero 
+        elements of the 2nd sparse vector
+        
+    Returns
+    -------
+    inner_prod: float
+        inner product between the sparse vector data1 and the vector of 
+        residuals
+
+    inner_prod_neg: float
+        negative part of the inner product 
+
+    inner_prod_pos: float
+        positive part of the inner product 
+    """
+    
+    inner_prod_pos = 0
+    inner_prod_neg = 0
+    inner_prod = 0
+
+    count1 = 0
+    count2 = 0
+    # only for loop 
+    # not to scan residuals 
+    # only access to the elements corresponding to the indices stored in ind1
+
+    while count1 < len(ind1) and count2 < len(ind2):
+        if ind1[count1] == ind2[count2]:
+            prod = data1[count1] * data2[count2]
+            inner_prod += prod 
+
+            if data2[count2] >= 0:
+                inner_prod_pos += prod 
+            else:
+                inner_prod_neg += prod 
+
+            count1 += 1
+            count2 += 1
+        elif ind1[count1] < ind2[count2]:
+            count1 += 1
+        else:
+            count2 += 1
+
+    return inner_prod, inner_prod_neg, inner_prod_pos
+
+
 def main():
 
     A = np.array([[0, 1, 0], [2, 0, 0], [3, 0, 4]])

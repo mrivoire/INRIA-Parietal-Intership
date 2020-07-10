@@ -706,7 +706,7 @@ def main():
     beta = rng.randn(n_features)
     lmbda = 1.0
     f = 10
-    epsilon = 1e-14
+    epsilon = 1e-15
     n_epochs = 100000
     screening = True
     store_history = True
@@ -998,209 +998,184 @@ def main():
     # use linear regression or decision tree.
 
     # Bar Plots
-    # encode = 'onehot'
-    # strategy = 'quantile'
-    # time_list = [0 for i in range(3)]
-    # time_list_sklearn = [0 for i in range(3)]
-    # scores_list = [0 for i in range(3)]
-    # sklearn_scores = [0 for i in range(3)]
+    encode = 'onehot'
+    strategy = 'quantile'
+    time_list = [0 for i in range(3)]
+    time_list_sklearn = [0 for i in range(3)]
+    scores_list = [0 for i in range(3)]
+    sklearn_scores = [0 for i in range(3)]
 
-    # for rep in range(100):
-    #     X, y = simu(beta, n_samples=10, corr=0.5, for_logreg=False,
-    #                 random_state=rep)
-    #     for n_bins in range(2, 5):
-    #         enc = KBinsDiscretizer(n_bins=n_bins, encode=encode,
-    #                                strategy=strategy)
-    #         X_binned = enc.fit_transform(X)
-    #         X_binned = X_binned.tocsc()
+    for rep in range(1):
+        X, y = simu(beta, n_samples=10, corr=0.5, for_logreg=False,
+                    random_state=rep)
+        for n_bins in range(2, 5):
+            enc = KBinsDiscretizer(n_bins=n_bins, encode=encode,
+                                   strategy=strategy)
+            X_binned = enc.fit_transform(X)
+            X_binned = X_binned.tocsc()
 
-    #         start1 = time.time()
+            start1 = time.time()
 
-    #         sparse_lasso = Lasso(lmbda=lmbda, epsilon=epsilon, f=f,
-    #                              n_epochs=n_epochs,
-    #                              screening=screening,
-    #                              store_history=False).fit(X_binned, y)
+            sparse_lasso = Lasso(lmbda=lmbda, epsilon=epsilon, f=f,
+                                 n_epochs=n_epochs,
+                                 screening=True,
+                                 store_history=False).fit(X_binned, y)
 
-    #         end1 = time.time()
-    #         delay_sparse = end1 - start1
+            end1 = time.time()
+            delay_sparse = end1 - start1
 
-    #         cv_score = sparse_lasso.score(X_binned, y)
-    #         scores_list[n_bins - 2] += cv_score
-    #         start2 = time.time()
+            cv_score = sparse_lasso.score(X_binned, y)
+            scores_list[n_bins - 2] += cv_score
+            start2 = time.time()
 
-    #         sparse_lasso_sklearn = sklearn_Lasso(alpha=(lmbda
-    #                                                     / X_binned.shape[0]),
-    #                                              fit_intercept=False,
-    #                                              normalize=False,
-    #                                              max_iter=n_epochs,
-    #                                              tol=1e-14).fit(X_binned, y)
+            sparse_lasso_sklearn = sklearn_Lasso(alpha=(lmbda
+                                                        / X_binned.shape[0]),
+                                                 fit_intercept=False,
+                                                 normalize=False,
+                                                 max_iter=n_epochs,
+                                                 tol=1e-15).fit(X_binned, y)
 
-    #         end2 = time.time()
-    #         delay_sklearn = end2 - start2
+            end2 = time.time()
+            delay_sklearn = end2 - start2
 
-    #         cv_score_sklearn = sparse_lasso_sklearn.score(X_binned, y)
-    #         sklearn_scores[n_bins - 2] += cv_score_sklearn
+            cv_score_sklearn = sparse_lasso_sklearn.score(X_binned, y)
+            sklearn_scores[n_bins - 2] += cv_score_sklearn
 
-    #         time_list[n_bins - 2] += delay_sparse
-    #         time_list_sklearn[n_bins - 2] += delay_sklearn
+            time_list[n_bins - 2] += delay_sparse
+            time_list_sklearn[n_bins - 2] += delay_sklearn
 
-    # sklearn_scores = [i / 100 for i in sklearn_scores]
-    # scores_list = [i / 100 for i in scores_list]
-    # time_list = [i / 100 for i in time_list]
-    # time_list_sklearn = [i / 1 for i in time_list_sklearn]
+    sklearn_scores = [i / 1 for i in sklearn_scores]
+    scores_list = [i / 1 for i in scores_list]
+    time_list = [i / 1 for i in time_list]
+    time_list_sklearn = [i / 1 for i in time_list_sklearn]
 
-    # print("list sklearn sparse cv scores : ", sklearn_scores)
-    # print("list time sklearn : ", time_list_sklearn)
-    # print("list sparse cv scores : ", scores_list)
-    # print("list time : ", time_list)
+    print("list sklearn sparse cv scores : ", sklearn_scores)
+    print("list time sklearn : ", time_list_sklearn)
+    print("list sparse cv scores : ", scores_list)
+    print("list time : ", time_list)
 
-    # bins = ['2', '3', '4']
+    bins = ['2', '3', '4']
 
-    # x = np.arange(len(bins))  # the label locations
-    # width = 0.35  # the width of the bars
-    # fig = plt.figure()
-    # ax = fig.add_subplot(111)
-    # rects1 = ax.bar(x - width/2, time_list, width,
-    #                 label='our sparse lasso solver')
-    # rects2 = ax.bar(x + width/2, time_list_sklearn, width,
-    #                 label='sklearn sparse lasso solver')
+    x = np.arange(len(bins))  # the label locations
+    width = 0.35  # the width of the bars
+    fig = plt.figure()
+    ax = fig.add_subplot(111)
+    rects1 = ax.bar(x - width/2, time_list, width,
+                    label='our sparse lasso solver')
+    rects2 = ax.bar(x + width/2, time_list_sklearn, width,
+                    label='sklearn sparse lasso solver')
 
-    # # Add some text for labels, title and custom x-axis tick labels, etc.
-    # ax.set_ylabel('execution time')
-    # ax.set_title('time by bins and solver')
-    # ax.set_xticks(x)
-    # ax.set_xticklabels(bins)
-    # ax.legend()
+    # Add some text for labels, title and custom x-axis tick labels, etc.
+    ax.set_ylabel('execution time')
+    ax.set_title('time by bins and solver')
+    ax.set_xticks(x)
+    ax.set_xticklabels(bins)
+    ax.legend()
 
-    # def autolabel(rects, scale):
-    #     """Attach a text label above each bar in *rects*, displaying its
-    #     height.
-    #     """
+    def autolabel(rects, scale):
+        """Attach a text label above each bar in *rects*, displaying its
+        height.
+        """
 
-    #     for rect in rects:
-    #         height = rect.get_height()
-    #         ax.annotate('{}'.format(round(height * scale, 0)/scale),
-    #                     xy=(rect.get_x() + rect.get_width() / 2, height),
-    #                     xytext=(0, 3),  # 3 points vertical offset
-    #                     textcoords="offset points",
-    #                     ha='center', va='bottom')
+        for rect in rects:
+            height = rect.get_height()
+            ax.annotate('{}'.format(round(height * scale, 0)/scale),
+                        xy=(rect.get_x() + rect.get_width() / 2, height),
+                        xytext=(0, 3),  # 3 points vertical offset
+                        textcoords="offset points",
+                        ha='center', va='bottom')
 
-    # autolabel(rects1, 10000)
-    # autolabel(rects2, 10000)
+    autolabel(rects1, 10000)
+    autolabel(rects2, 10000)
 
-    # fig.tight_layout()
-    # plt.show()
-    # bins = ['2', '3', '4']
-    # x = np.arange(len(bins))  # the label locations
-    # width = 0.35  # the width of the bars
+    fig.tight_layout()
+    plt.show()
+    
+    bins = ['2', '3', '4']
+    x = np.arange(len(bins))  # the label locations
+    width = 0.35  # the width of the bars
 
-    # print("scores list shape : ", len(scores_list))
-    # print("sklearn scores list shape : ", len(sklearn_scores))
-    # print("first element scores list : ", type(scores_list[0]))
-    # print("first element scores list sklearn : ", type(sklearn_scores[0]))
-    # fig = plt.figure()
-    # ax = fig.add_subplot(111)
-    # rects1_score = ax.bar(x - width/2, scores_list, width,
-    #                       label='our sparse lasso solver')
-    # rects2_score = ax.bar(x + width/2, sklearn_scores, width,
-    #                       label='sklearn sparse lasso solver')
+    print("scores list shape : ", len(scores_list))
+    print("sklearn scores list shape : ", len(sklearn_scores))
+    print("first element scores list : ", type(scores_list[0]))
+    print("first element scores list sklearn : ", type(sklearn_scores[0]))
+    fig = plt.figure()
+    ax = fig.add_subplot(111)
+    rects1_score = ax.bar(x - width/2, scores_list, width,
+                          label='our sparse lasso solver')
+    rects2_score = ax.bar(x + width/2, sklearn_scores, width,
+                          label='sklearn sparse lasso solver')
 
-    # # Add some text for labels, title and custom x-axis tick labels, etc.
-    # ax.set_ylabel('crossval score')
-    # ax.set_title('crossval score by bins and solver')
-    # ax.set_xticks(x)
-    # ax.set_xticklabels(bins)
-    # ax.legend()
+    # Add some text for labels, title and custom x-axis tick labels, etc.
+    ax.set_ylabel('crossval score')
+    ax.set_title('crossval score by bins and solver')
+    ax.set_xticks(x)
+    ax.set_xticklabels(bins)
+    ax.legend()
 
-    # autolabel(rects1_score, 1000)
-    # autolabel(rects2_score, 1000)
+    autolabel(rects1_score, 1000)
+    autolabel(rects2_score, 1000)
 
-    # fig.tight_layout()
-    # plt.show()
+    fig.tight_layout()
+    plt.show()
 
     # Performance figures
 
-    delay_list_dense = list()
-    delay_list_dense_sklearn = list()
+    # delay_list_dense = list()
+    # delay_list_dense_sklearn = list()
 
-    primal_dense_list = list()
-    primal_dense_list_sklearn = list()
-    dense_cv_list = list()
-    dense_cv_list_sklearn = list()
+    # primal_dense_list = list()
+    # primal_dense_list_sklearn = list()
+    # dense_cv_list = list()
+    # dense_cv_list_sklearn = list()
 
-    for n_epochs in range(1000, 100000, 1000):
+    # for n_epochs in range(1000, 100000, 1000):
 
-        start_dense = time.time()
+    #     start_dense = time.time()
 
-        dense_lasso = Lasso(
-            lmbda=lmbda,
-            epsilon=epsilon,
-            f=f,
-            n_epochs=n_epochs,
-            screening=screening,
-            store_history=store_history,
-        ).fit(X, y)
+    #     dense_lasso = Lasso(
+    #         lmbda=lmbda,
+    #         epsilon=epsilon,
+    #         f=f,
+    #         n_epochs=n_epochs,
+    #         screening=screening,
+    #         store_history=store_history,
+    #     ).fit(X, y)
 
-        end_dense = time.time()
-        delay_dense = end_dense - start_dense
-        delay_list_dense.append(delay_dense)
+    #     end_dense = time.time()
+    #     delay_dense = end_dense - start_dense
+    #     delay_list_dense.append(delay_dense)
 
-        primal_dense = dense_lasso.P_lmbda
-        primal_dense_list.append(primal_dense)
+    #     primal_dense = dense_lasso.P_lmbda
+    #     primal_dense_list.append(primal_dense)
 
-        dense_cv_score = dense_lasso.score(X, y)
-        dense_cv_list.append(dense_cv_score)
+    #     dense_cv_score = dense_lasso.score(X, y)
+    #     dense_cv_list.append(dense_cv_score)
 
-        start_dense_sklearn = time.time()
+    #     start_dense_sklearn = time.time()
 
-        dense_lasso_sklearn = sklearn_Lasso(
-            alpha=(lmbda / X.shape[0]),
-            fit_intercept=False,
-            normalize=False,
-            max_iter=n_epochs,
-            tol=1e-15,
-        ).fit(X, y)
+    #     dense_lasso_sklearn = sklearn_Lasso(
+    #         alpha=(lmbda / X.shape[0]),
+    #         fit_intercept=False,
+    #         normalize=False,
+    #         max_iter=n_epochs,
+    #         tol=1e-15,
+    #     ).fit(X, y)
 
-        end_dense_sklearn = time.time()
-        delay_dense_sklearn = end_dense_sklearn - start_dense_sklearn
-        delay_list_dense_sklearn.append(delay_dense_sklearn)
+    #     end_dense_sklearn = time.time()
+    #     delay_dense_sklearn = end_dense_sklearn - start_dense_sklearn
+    #     delay_list_dense_sklearn.append(delay_dense_sklearn)
 
-        slopes = dense_lasso_sklearn.coef_
+    #     slopes = dense_lasso_sklearn.coef_
 
-        primal_function = (1 / 2) * np.linalg.norm(
-            y - X.dot(slopes.T), 2
-        ) ** 2 + lmbda * np.linalg.norm(slopes, 1)
+    #     primal_function = (1 / 2) * np.linalg.norm(
+    #         y - X.dot(slopes.T), 2
+    #     ) ** 2 + lmbda * np.linalg.norm(slopes, 1)
 
-        primal_dense_list_sklearn.append(primal_function)
+    #     primal_dense_list_sklearn.append(primal_function)
 
-        dense_cv_score_sklearn = dense_lasso_sklearn.score(X, y)
-        dense_cv_list_sklearn.append(dense_cv_score_sklearn)
-
-    print("primal hist = ", primal_dense_list)
-    print("shape = ", np.shape(primal_dense_list))
-    print("primal dense sklearn = ", primal_dense_list_sklearn)
-    print("shape = ", np.shape(primal_dense_list_sklearn))
-
-    print("delay dense lasso = ", delay_list_dense)
-    print("shape = ", np.shape(delay_list_dense))
-    print("delay dense lasso sklearn = ", delay_list_dense_sklearn)
-    print("shape = ", np.shape(delay_list_dense_sklearn))
-
-    print("dense cv score = ", dense_cv_list)
-    print("shape = ", np.shape(dense_cv_list))
-    print("dense cv score sklearn = ", dense_cv_list_sklearn)
-    print("shape = ", np.shape(dense_cv_list_sklearn))
-
-    epochs = range(1000, 100000, 1000)
-
-    fig = plt.figure()
-    ax1 = fig.add_subplot(111)
-    plt.plot(delay_list_dense, primal_dense_list)
-
-    # ax2 = fig.add_subplot(211)
-    plt.plot(delay_list_dense_sklearn, primal_dense_list_sklearn)
-
-    plt.show()
+    #     dense_cv_score_sklearn = dense_lasso_sklearn.score(X, y)
+    #     dense_cv_list_sklearn.append(dense_cv_score_sklearn)
 
 
 if __name__ == "__main__":

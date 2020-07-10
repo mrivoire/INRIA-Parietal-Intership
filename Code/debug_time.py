@@ -19,7 +19,7 @@ y /= np.linalg.norm(y)
 
 f = 10
 n_epochs = 1000
-sparse = False
+sparse = True
 tol = 1e-15
 
 if sparse:
@@ -30,7 +30,7 @@ lasso = Lasso(
     epsilon=tol,
     f=f,
     n_epochs=n_epochs,
-    screening=True,
+    screening=False,
     store_history=False,
 )
 lasso.fit(X[:, :2], y)  # compile numba code

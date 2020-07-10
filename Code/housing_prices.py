@@ -14,6 +14,7 @@ from sklearn.compose import ColumnTransformer
 from sklearn.pipeline import Pipeline
 from sklearn.impute import SimpleImputer
 from sklearn.preprocessing import StandardScaler, OneHotEncoder
+from sklearn.model_selection import GridSearchCV
 # from sklearn.model_selection import train_test_split, GridSearchCV
 
 from cd_solver_lasso_numba import Lasso
@@ -134,7 +135,7 @@ def split_train_test(dataset, train):
 ################################################################
 
 
-def compute_cv(X, y, n_splits, lmbda, epsilon, f, n_epochs,
+def compute_cv(X, y, n_splits, lmbda, tuned_parameters, epsilon, f, n_epochs,
                screening, store_history):
     """
     Parameters
@@ -204,6 +205,9 @@ def compute_cv(X, y, n_splits, lmbda, epsilon, f, n_epochs,
                   screening=screening, store_history=store_history)
     pipe_lasso = Pipeline(steps=[('preprocessor', preprocessor),
                                  ('regressor', lasso)])
+
+    reg_lasso = GridSearchCV(pipe_lasso, tuned_parameters, cv=n_splits, refit=False)
+    reg_lasso.fit(X, y)
     cv_scores['lasso'] = cross_val_score(pipe_lasso, X, y, cv=n_splits).mean()
 
     # LassoCV
@@ -228,12 +232,13 @@ def compute_cv(X, y, n_splits, lmbda, epsilon, f, n_epochs,
                               ('regressor', rf)])
     cv_scores['rf'] = cross_val_score(pipe_rf, X, y, cv=n_splits).mean()
 
-    return cv_scores
+    return (cv_scores, pipe_lasso, pipe_lasso_cv, pipe_ridge_cv, pipe_xgb, 
+    pipe_rf)
 
 
 def main():
-    data_dir = "./Datasets"
-    # data_dir = "/home/mrivoire/Documents/M2DS_Polytechnique/Stage_INRIA/Datasets"
+    # data_dir = "./Datasets"
+    data_dir = "/home/mrivoire/Documents/M2DS_Polytechnique/Stage_INRIA/Datasets"
     fname_train = data_dir + "/housing_prices_train"
     # fname_test = data_dir + "/housing_prices_test"
     X_train = read_csv(fname_train)
@@ -251,7 +256,12 @@ def main():
     store_history = True
     n_epochs = 10000
 
-    cv_scores = compute_cv(X=X, y=y,
+    (cv_scores, 
+     pipe_lasso, 
+     pipe_lasso_cv, 
+     pipe_ridge_cv, 
+     pipe_xgb, 
+     pipe_rf) = compute_cv(X=X, y=y,
                            n_splits=n_splits, lmbda=lmbda,
                            epsilon=epsilon, f=f,
                            n_epochs=n_epochs,
@@ -260,6 +270,158 @@ def main():
 
     for k, v in cv_scores.items():
         print(f'{k}: {v}')
+
+    lmbdas = np.logspace(-4, -0.5, 30)
+    tuned_parameters = [{'alpha': lmbdas}]
+    # lmbdas_list = [1]
+    cv_scores_list = list()
+    for lmbda in lmbdas_list:
+        (cv_scores, 
+         pipe_lasso, 
+         pipe_lasso_cv, 
+         pipe_ridge_cv, 
+         pipe_xgb, 
+         pipe_rf) = compute_cv(X=X, y=y,
+                               n_splits=n_splits, lmbda=lmbda,
+                               epsilon=epsilon, f=f,
+                               n_epochs=n_epochs,
+                               screening=screening,
+                               store_history=store_history)
+
+        cv_scores_list.append(cv_scores)
+
+    # clf = GridSearchCV(lasso, tuned_parameters, cv=n_folds, refit=False)
+    # clf.fit(X, y)
+    # scores = clf.cv_results_['mean_test_score']
+    # scores_std = clf.cv_results_['std_test_score']
+    # plt.figure().set_size_inches(8, 6)
+    # plt.semilogx(alphas, scores)
+
+    cv_lasso = []
+    cv_lasso_sk = []
+    cv_ridge_sk = []
+    cv_xgb = []
+    cv_rf = []
+
+    for i in range(len(cv_scores_list)):
+        cv_lasso.append(cv_scores_list[i]['lasso'])
+        cv_lasso_sk.append(cv_scores_list[i]['lasso_cv'])
+        cv_ridge_sk.append(cv_scores_list[i]['ridge_cv'])
+        cv_xgb.append(cv_scores_list[i]['xgb'])
+        cv_rf.append(cv_scores_list[i]['rf'])
+
+    print("cv lasso = ", cv_lasso)
+    print("cv lasso sk = ", cv_lasso_sk)
+    print("cv ridge sk = ", cv_ridge_sk)
+    print("cv xgb = ", cv_xgb)
+    print("cv rf = ", cv_rf)
+
+    # def autolabel(rects, scale):
+    #     """Attach a text label above each bar in *rects*, displaying its
+    #     height.
+    #     """
+
+    #     for rect in rects:
+    #         height = rect.get_height()
+    #         ax.annotate('{}'.format(round(height * scale, 0)/scale),
+    #                     xy=(rect.get_x() + rect.get_width() / 2, height),
+    #                     xytext=(0, 3),  # 3 points vertical offset
+    #                     textcoords="offset points",
+    #                     ha='center', va='bottom')
+
+    # labels = ['0.1', '0.3', '0.5', '0.7', '0.9', '1', '1.5', '2', '2.5', '3']
+    # x = np.arange(len(labels))
+    # width = 0.35  # the width of the bars
+    # fig = plt.figure()
+    # ax = fig.add_subplot(111)
+    # rects1 = ax.bar(x - width, cv_lasso, width,
+    #                 label='cv lasso')
+    # # rects2 = ax.bar(x - width*(1/5), cv_lasso_sk, width,
+    #                 label='cv lasso sk')
+    # rects3 = ax.bar(x, cv_ridge_sk, width,
+    #                 label='cv ridge sk')
+    # rects4 = ax.bar(x + width*(1/5), cv_xgb, width,
+    #                 label='cv xgb')
+    # rects5 = ax.bar(x + width*(2/5), cv_rf, width,
+    #                 label='cv rf')
+    # Add some text for labels, title and custom x-axis tick labels, etc.
+    # ax.set_xlabel('lambda')
+    # ax.set_ylabel('crossval score')
+    # ax.set_title('crossval score vs lambdas')
+    # ax.set_xticks(x)
+    # ax.set_xticklabels(labels)
+    # ax.legend()
+
+    # autolabel(rects1, 1000)
+    # autolabel(rects2, 1000)
+    # autolabel(rects3, 1000)
+    # autolabel(rects4, 1000)
+    # autolabel(rects5, 1000)
+
+    # fig.tight_layout()
+    # plt.show()
+
+    # cv_scores_list = list()
+    # for n_epochs in range(1000, 10000, 1000):
+    #     (cv_scores, 
+    #      pipe_lasso, 
+    #      pipe_lasso_cv, 
+    #      pipe_ridge_cv, 
+    #      pipe_xgb, 
+    #      pipe_rf) = compute_cv(X=X, y=y,
+    #                            n_splits=n_splits, lmbda=lmbda,
+    #                            epsilon=epsilon, f=f,
+    #                            n_epochs=n_epochs,
+    #                            screening=screening,
+    #                            store_history=store_history)
+
+    #     cv_scores_list.append(cv_scores)
+
+    # cv_lasso_2 = []
+    # cv_lasso_sk_2 = []
+    # cv_ridge_sk_2 = []
+    # cv_xgb_2 = []
+    # cv_rf_2 = []
+
+    # for i in range(len(cv_scores_list)):
+    #     cv_lasso_2.append(cv_scores_list[i]['lasso'])
+    #     cv_lasso_sk_2.append(cv_scores_list[i]['lasso_cv'])
+    #     cv_ridge_sk_2.append(cv_scores_list[i]['ridge_cv'])
+    #     cv_xgb_2.append(cv_scores_list[i]['xgb'])
+    #     cv_rf_2.append(cv_scores_list[i]['rf'])
+
+    # x = np.arange(len(range(1000, 10000, 1000)))
+    # labels = range(1000, 10000, 1000)
+    # width = 0.35  # the width of the bars
+    # fig = plt.figure()
+    # ax = fig.add_subplot(111)
+    # rects1 = ax.bar(x - width*(2/5), cv_lasso_2, width,
+    #                 label='cv lasso')
+    # rects2 = ax.bar(x - width*(1/5), cv_lasso_sk_2, width,
+    #                 label='cv lasso sk')
+    # rects3 = ax.bar(x, cv_ridge_sk_2, width,
+    #                 label='cv ridge sk')
+    # rects4 = ax.bar(x + width*(1/5), cv_xgb_2, width,
+    #                 label='cv xgb')
+    # rects5 = ax.bar(x + width*(2/5), cv_rf_2, width,
+    #                 label='cv rf')
+    # Add some text for labels, title and custom x-axis tick labels, etc.
+    # ax.set_xlabel('n_epochs')
+    # ax.set_ylabel('crossval score')
+    # ax.set_title('crossval score vs number of epochs')
+    # ax.set_xticks(x)
+    # ax.set_xticklabels(labels)
+    # ax.legend()
+
+    # autolabel(rects1, 100000)
+    # autolabel(rects2, 1000)
+    # autolabel(rects3, 1000)
+    # autolabel(rects4, 1000)
+    # autolabel(rects5, 1000)
+
+    # fig.tight_layout()
+    # plt.show()
+
 
     # Plots
     # matplotlib.rcParams['figure.figsize'] = (12.0, 6.0)

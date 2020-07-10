@@ -112,7 +112,7 @@ def sign(x):
 #############################################################################
 
 
-def max_val(X_binned_data, X_binned_indices, X_binned_indptr, residuals, 
+def max_val(X_binned_data, X_binned_indices, X_binned_indptr, residuals,
             max_depth):
     """Compute the maximum inner product between X_binned.T and the residuals
        Return the feature and its id which allows to maximize the inner product
@@ -148,9 +148,9 @@ def max_val(X_binned_data, X_binned_indices, X_binned_indptr, residuals,
     parent_indices = np.arange(n_samples)
 
     for i in range(n_features):
-        max_val = max_val_rec(X_binned_data=X_binned_data, 
-                              X_binned_indices=X_binned_indices, 
-                              X_binned_indptr=X_binned_indptr, 
+        max_val = max_val_rec(X_binned_data=X_binned_data,
+                              X_binned_indices=X_binned_indices,
+                              X_binned_indptr=X_binned_indptr,
                               parent_data=parent_data,
                               parent_indices=parent_indices,
                               current_max_val=max_val, j=i,
@@ -181,103 +181,42 @@ def compute_inner_prod(data1, ind1, residuals):
         contains all the non-zero elements of the sparse verctor
 
     ind1: numpy.array(), shape = (n_non_zero_coeffs, )
-        contains the indices of the rows in the dense matrix of the 
+        contains the indices of the rows in the dense matrix of the
         non-zero elements
 
     residuals: numpy.array(), shape = (n_samples, )
         contains the residuals between the predictions and the ground-truth
-        values y 
+        values y
 
     Returns
     -------
     inner_prod: float
-        inner product between the sparse vector data1 and the vector of 
+        inner product between the sparse vector data1 and the vector of
         residuals
 
     inner_prod_neg: float
-        negative part of the inner product 
+        negative part of the inner product
 
     inner_prod_pos: float
-        positive part of the inner product 
+        positive part of the inner product
     """
 
     inner_prod = 0
     inner_prod_pos = 0
     inner_prod_neg = 0
 
-    # only for loop 
-    # not to scan residuals 
+    # only for loop
+    # not to scan residuals
     # only access to the elements corresponding to the indices stored in ind1
 
     for count1 in range(len(ind1)):
         prod = data1[count1] * residuals[ind1[count1]]
-        inner_prod += prod 
+        inner_prod += prod
 
         if residuals[ind1[count1]] >= 0:
-            inner_prod_pos += prod 
+            inner_prod_pos += prod
         else:
-            inner_prod_neg += prod 
-
-    return inner_prod, inner_prod_neg, inner_prod_pos
-
-
-def compute_sparse_inner_prod(data1, ind1, data2, ind2):
-     """
-    Parameters
-    ----------
-    data1: numpy.array(), shape = (n_non_zero_coeffs, )
-        contains all the non-zero elements of the 1st sparse verctor
-
-    ind1: numpy.array(), shape = (n_non_zero_coeffs, )
-        contains the indices of the rows in the dense matrix of the 
-        non-zero elements of the 1st sparse vector
-
-    data2: numpy.array(), shape = (n_non_zero_coeffs, )
-        contains all the non-zero elements of the 2nd sparse vector 
-
-    ind2: numpy.array(), shape = (n_non_zero_coeffs, )
-        contains the indices of the rows in the dense matrix of the non-zero 
-        elements of the 2nd sparse vector
-        
-    Returns
-    -------
-    inner_prod: float
-        inner product between the sparse vector data1 and the vector of 
-        residuals
-
-    inner_prod_neg: float
-        negative part of the inner product 
-
-    inner_prod_pos: float
-        positive part of the inner product 
-    """
-
-    inner_prod = 0
-    inner_prod_pos = 0
-    inner_prod_neg = 0
-
-    count1 = 0
-    count2 = 0
-    # only for loop 
-    # not to scan residuals 
-    # only access to the elements corresponding to the indices stored in ind1
-
-    while count1 < len(ind1) and count2 < len(ind2):
-        if ind1[count1] == count2:
-            prod = data1[count1] * data2[count2]
-            inner_prod += prod 
-
-            if data2[count2] >= 0:
-                inner_prod_pos += prod 
-            else:
-                inner_prod_neg += prod 
-
-            count1 += 1
-            count2 += 1
-        elif ind1[count1] < ind2[count2]:
-            count1 += 1
-        else:
-            count2 += 1
+            inner_prod_neg += prod
 
     return inner_prod, inner_prod_neg, inner_prod_pos
 
@@ -290,26 +229,26 @@ def compute_interactions(data1, ind1, data2, ind2):
         contains all the non-zero elements of the 1st sparse verctor
 
     ind1: numpy.array(), shape = (n_non_zero_coeffs, )
-        contains the indices of the rows in the dense matrix of the 
+        contains the indices of the rows in the dense matrix of the
         non-zero elements of the 1st sparse vector
 
     data2: numpy.array(), shape = (n_non_zero_coeffs, )
-        contains all the non-zero elements of the 2nd sparse vector 
+        contains all the non-zero elements of the 2nd sparse vector
 
     ind2: numpy.array(), shape = (n_non_zero_coeffs, )
-        contains the indices of the rows in the dense matrix of the non-zero 
+        contains the indices of the rows in the dense matrix of the non-zero
         elements of the 2nd sparse vector
 
     Returns
     -------
     inter_feat_data: numpy.array(), shape = (n_non_zero_elements, )
-        contains the non-zero elements of the sparse vector of interactions 
-        resulting in the product of the non-zero coefficients of same indices 
+        contains the non-zero elements of the sparse vector of interactions
+        resulting in the product of the non-zero coefficients of same indices
         of the two parent vectors data1 and data2
 
     inter_feat_indices: numpy.array(), shape = (n_non_zero_elements, )
         contains the indices of the rows of the non-zero elements in the dense
-        matrix 
+        matrix
     """
 
     inner_prod = 0
@@ -323,7 +262,7 @@ def compute_interactions(data1, ind1, data2, ind2):
     while count1 < len(ind1) and count2 < len(ind2):
         if ind1[count1] == ind2[count2]:
             prod = data1[count1] * data2[count2]
-            inner_prod += prod 
+            inner_prod += prod
             inter_feat_ind.append(ind1[count1])
             inter_feat_data.append(prod)
             count1 += 1
@@ -336,8 +275,8 @@ def compute_interactions(data1, ind1, data2, ind2):
     return inter_feat_data, inter_feat_ind
 
 
-def max_val_rec(X_binned_data, X_binned_indices, X_binned_indptr, 
-                parent_data, parent_indices, current_max_val, j, residuals, 
+def max_val_rec(X_binned_data, X_binned_indices, X_binned_indptr,
+                parent_data, parent_indices, current_max_val, j, residuals,
                 max_depth, depth):
     """Compute the maximal inner product value between the given feature and
         the vector of residuals provided thanks to the pre-solve processing
@@ -397,17 +336,17 @@ def max_val_rec(X_binned_data, X_binned_indices, X_binned_indptr,
     n_features = len(X_binned_indptr) - 1
 
     start, end = X_binned_indptr[j:j+2]
-    X_j_indices = X_binned_indices[start:end] 
+    X_j_indices = X_binned_indices[start:end]
     X_j_data = X_binned_data[start:end]
 
-    (inter_feat_data, 
-     inter_feat_ind) = compute_interactions(X_j_data, X_j_indices, 
+    (inter_feat_data,
+     inter_feat_ind) = compute_interactions(X_j_data, X_j_indices,
                                             parent_data, parent_indices)
 
-    (inner_prod, 
-     inner_prod_neg, 
-     inner_prod_pos) = compute_inner_prod(inter_feat_data, 
-                                          inter_feat_ind, 
+    (inner_prod,
+     inner_prod_neg,
+     inner_prod_pos) = compute_inner_prod(inter_feat_data,
+                                          inter_feat_ind,
                                           residuals)
 
     upper_bound = max(inner_prod_pos, -inner_prod_neg)
@@ -432,16 +371,16 @@ def max_val_rec(X_binned_data, X_binned_indices, X_binned_indptr,
         if depth < max_depth: # start from 0 to max_depth
             # recursive call of the function on the following stage
             for k in range(j+1, n_features):
-                current_max_val = max_val_rec(X_binned_data, 
-                                              X_binned_indices, 
-                                              X_binned_indptr,  
-                                              inter_feat_data, 
-                                              inter_feat_ind, 
-                                              current_max_val, 
-                                              k, residuals, 
+                current_max_val = max_val_rec(X_binned_data,
+                                              X_binned_indices,
+                                              X_binned_indptr,
+                                              inter_feat_data,
+                                              inter_feat_ind,
+                                              current_max_val,
+                                              k, residuals,
                                               max_depth, depth + 1)
 
-        # We keep the same parent node and we change the child nodes ? 
+        # We keep the same parent node and we change the child nodes ?
         # How to find the key of the feature providing the maxval ?
 
         return current_max_val
@@ -585,49 +524,72 @@ def main():
     residuals = y - X_binned.dot(sparse_lasso_sklearn.coef_)
     print("residuals : ", residuals)
 
-    parent1_feature = np.zeros(n_samples)
-    parent2_feature = np.zeros(n_samples)
-    child_feature = np.zeros(n_samples)
-
     interactions_feat_list = list()
 
     # Building of the interactions features
-    for j in range(n_features):
-        start1, end1 = X_binned_indptr[j:j+2]
-        for ind in range(start1, end1):
-            parent1_feature[X_binned_indices[ind]] = X_binned_data[ind]
-        for k in range(j+1, n_features):
-            start2, end2 = X_binned_indptr[k:k+2]
-            for ind in range(start2, end2):
-                parent2_feature[X_binned_indices[ind]] = X_binned_data[ind]
-
-            child_feature = np.zeros(n_samples)
-            for i in range(n_samples):
-                child_feature[i] = parent1_feature[i] * parent2_feature[i]
-            interactions_feat_list.append(child_feature)
-
+    data1 = []
+    ind1 = []
+    data2 = []
+    ind2 = []
+    data3 = []
+    ind3 = []
     max_val_test = 0
     inner_prod = 0
 
-    for ind, feat in enumerate(interactions_feat_list):
-        for i in range(n_samples):
-            inner_prod += feat[i] * residuals[i]
-            if inner_prod > max_val_test:
-                max_val_test = inner_prod
+    for i in range(n_features):
+        data1 = []
+        ind1 = []
+        for j in range(n_samples):
+            if X[j, i] != 0:
+                data1.append(X[j, i])
+                ind1.append(j)
 
-    print("max val = ", max_val_test)
+        for j in range(i+1, n_features):
+            data2 = []
+            ind2 = []
+            for k in range(n_samples):
+                if X[k, j] != 0:
+                    data2.append(X[k, j])
+                    ind2.append(k)  
 
+            inter_feat1_data, inter_feat1_ind = compute_interactions(data1, 
+                                                                     ind1, 
+                                                                     data2, 
+                                                                     ind2)
+
+            for k in range(j+1, n_features):
+                data3 = []
+                ind3 = []
+                for m in range(n_samples):
+                    data3.append(X[m, k])
+                    ind3.append(m)
+
+                (inter_feat2_data, 
+                 inter_feat2_ind) = compute_interactions(inter_feat1_data, 
+                                                         inter_feat1_ind, 
+                                                         data3, 
+                                                         ind3)
+
+                (inner_prod, 
+                 inner_prod_neg, 
+                 inner_prod_pos) = compute_inner_prod(inter_feat2_data, 
+                                                      inter_feat2_ind, 
+                                                      residuals)
+
+                if inner_prod > max_val_test:
+                    max_val = inner_prod
+
+    print("max val = ", max_val)
 
     # Test max_val function
     max_depth = 2
 
-    max_inner_prod, key = max_val(X_binned_data=X_binned_data, 
-                                  X_binned_indices=X_binned_indices, 
-                                  X_binned_indptr=X_binned_indptr, 
-                                  residuals=residuals, max_depth=max_depth)
+    max_inner_prod = max_val(X_binned_data=X_binned_data,
+                             X_binned_indices=X_binned_indices,
+                             X_binned_indptr=X_binned_indptr,
+                             residuals=residuals, max_depth=max_depth)
 
     print("max inner prod = ", max_inner_prod)
-    print("max key = ", key)
 
 
 if __name__ == "__main__":
