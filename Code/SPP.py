@@ -360,8 +360,8 @@ def max_val_rec(X_binned_data, X_binned_indices, X_binned_indptr,
         # compute max_val
         # update max_val if required
 
-        if inner_prod > current_max_val:
-            current_max_val = inner_prod
+        if abs(inner_prod) > current_max_val:
+            current_max_val = abs(inner_prod)
 
         # If depth < max_depth:
             # for loop over the child nodes (number of children = n_features)
@@ -523,65 +523,21 @@ def main():
 
     residuals = y - X_binned.dot(sparse_lasso_sklearn.coef_)
     print("residuals : ", residuals)
-
-    interactions_feat_list = list()
-
     # Building of the interactions features
-    data1 = []
-    ind1 = []
-    data2 = []
-    ind2 = []
-    data3 = []
-    ind3 = []
     max_val_test = 0
-    inner_prod = 0
+    X_binned = X_binned.toarray()
 
-    for i in range(n_features):
-        data1 = []
-        ind1 = []
-        for j in range(n_samples):
-            if X[j, i] != 0:
-                data1.append(X[j, i])
-                ind1.append(j)
+    for j in range(n_features):
+        for k in range(j, n_features):
+            inter_feat = X_binned[:, j] * X_binned[:, k]
 
-        for j in range(i+1, n_features):
-            data2 = []
-            ind2 = []
-            for k in range(n_samples):
-                if X[k, j] != 0:
-                    data2.append(X[k, j])
-                    ind2.append(k)  
-
-            inter_feat1_data, inter_feat1_ind = compute_interactions(data1, 
-                                                                     ind1, 
-                                                                     data2, 
-                                                                     ind2)
-
-            for k in range(j+1, n_features):
-                data3 = []
-                ind3 = []
-                for m in range(n_samples):
-                    if X[m, k] != 0:
-                        data3.append(X[m, k])
-                        ind3.append(m)
-
-                (inter_feat2_data, 
-                 inter_feat2_ind) = compute_interactions(inter_feat1_data, 
-                                                         inter_feat1_ind, 
-                                                         data3, 
-                                                         ind3)
-
-                (inner_prod, 
-                 inner_prod_neg, 
-                 inner_prod_pos) = compute_inner_prod(inter_feat2_data, 
-                                                      inter_feat2_ind, 
-                                                      residuals)
-
-                if inner_prod > max_val_test:
-                    max_val = inner_prod
-
-    print("max val = ", max_val)
-
+            inner_prod = inter_feat.dot(residuals)
+            if abs(inner_prod) > max_val_test:
+                max_val_test = abs(inner_prod)
+                print("key1 = ", k, j)
+                # print("key2 = ", j)
+ 
+    print("max val test = ", max_val_test)
     # Test max_val function
     max_depth = 2
 
