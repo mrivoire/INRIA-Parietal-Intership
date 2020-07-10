@@ -142,22 +142,26 @@ def max_val(X_binned_data, X_binned_indices, X_binned_indptr, residuals,
     n_samples = max(X_binned_indices) + 1
 
     max_val = 0
-    depth = 0
+    max_key = None
+    depth = 1
 
     parent_data = np.ones(n_samples)
     parent_indices = np.arange(n_samples)
 
     for i in range(n_features):
-        max_val = max_val_rec(X_binned_data=X_binned_data,
-                              X_binned_indices=X_binned_indices,
-                              X_binned_indptr=X_binned_indptr,
-                              parent_data=parent_data,
-                              parent_indices=parent_indices,
-                              current_max_val=max_val, j=i,
-                              residuals=residuals,
-                              max_depth=max_depth,
-                              depth=depth)
-
+        key = []
+        max_val, max_key = max_val_rec(X_binned_data=X_binned_data,
+                                       X_binned_indices=X_binned_indices,
+                                       X_binned_indptr=X_binned_indptr,
+                                       parent_data=parent_data,
+                                       parent_indices=parent_indices,
+                                       current_max_val=max_val,
+                                       current_max_key=max_key,
+                                       j=i,
+                                       key=key,
+                                       residuals=residuals,
+                                       max_depth=max_depth,
+                                       depth=depth)
 
     # the recursion is used to scan the tree from the root to the leaves ?
     # stopping criterion = when the pruned tree contains no more node for
@@ -170,7 +174,7 @@ def max_val(X_binned_data, X_binned_indices, X_binned_indptr, residuals,
     # 3. Traverse all the adjacent and unmarked nodes and call the recursive
     # function with index of adjacent node.
 
-    return max_val
+    return max_val, max_key
 
 
 def compute_inner_prod(data1, ind1, residuals):
@@ -276,8 +280,8 @@ def compute_interactions(data1, ind1, data2, ind2):
 
 
 def max_val_rec(X_binned_data, X_binned_indices, X_binned_indptr,
-                parent_data, parent_indices, current_max_val, j, residuals,
-                max_depth, depth):
+                parent_data, parent_indices, current_max_val, current_max_key,
+                j, key, residuals, max_depth, depth):
     """Compute the maximal inner product value between the given feature and
         the vector of residuals provided thanks to the pre-solve processing
 
@@ -333,6 +337,8 @@ def max_val_rec(X_binned_data, X_binned_indices, X_binned_indptr,
     # element wise product between parent and feature j to obtain the
     # interaction result feature x
 
+    key.append(j)
+
     n_features = len(X_binned_indptr) - 1
 
     start, end = X_binned_indptr[j:j+2]
@@ -352,7 +358,8 @@ def max_val_rec(X_binned_data, X_binned_indices, X_binned_indptr,
     upper_bound = max(inner_prod_pos, -inner_prod_neg)
 
     if upper_bound <= current_max_val:
-        return current_max_val
+        key.pop()
+        return current_max_val, current_max_key
 
     else:
     # If the criterion is not satisfied:
@@ -362,6 +369,7 @@ def max_val_rec(X_binned_data, X_binned_indices, X_binned_indptr,
 
         if abs(inner_prod) > current_max_val:
             current_max_val = abs(inner_prod)
+            current_max_key = key.copy()
 
         # If depth < max_depth:
             # for loop over the child nodes (number of children = n_features)
@@ -371,19 +379,22 @@ def max_val_rec(X_binned_data, X_binned_indices, X_binned_indptr,
         if depth < max_depth: # start from 0 to max_depth
             # recursive call of the function on the following stage
             for k in range(j+1, n_features):
-                current_max_val = max_val_rec(X_binned_data,
-                                              X_binned_indices,
-                                              X_binned_indptr,
-                                              inter_feat_data,
-                                              inter_feat_ind,
-                                              current_max_val,
-                                              k, residuals,
-                                              max_depth, depth + 1)
+                current_max_val, current_max_key = max_val_rec(X_binned_data,
+                                                               X_binned_indices,
+                                                               X_binned_indptr,
+                                                               inter_feat_data,
+                                                               inter_feat_ind,
+                                                               current_max_val,
+                                                               current_max_key,
+                                                               k, key,
+                                                               residuals,
+                                                               max_depth,
+                                                               depth + 1)
 
         # We keep the same parent node and we change the child nodes ?
         # How to find the key of the feature providing the maxval ?
-
-        return current_max_val
+        key.pop()
+        return current_max_val, current_max_key
 
 # #############################################################################
 # #                           Safe Pattern Pruning
@@ -488,7 +499,7 @@ def max_val_rec(X_binned_data, X_binned_indices, X_binned_indptr,
 def main():
 
     rng = check_random_state(0)
-    n_samples, n_features = 10, 30
+    n_samples, n_features = 100, 30
     beta = rng.randn(n_features)
     lmbda = 1.
     f = 10
@@ -536,17 +547,18 @@ def main():
                 max_val_test = abs(inner_prod)
                 print("key1 = ", k, j)
                 # print("key2 = ", j)
- 
+
     print("max val test = ", max_val_test)
     # Test max_val function
     max_depth = 2
 
-    max_inner_prod = max_val(X_binned_data=X_binned_data,
-                             X_binned_indices=X_binned_indices,
-                             X_binned_indptr=X_binned_indptr,
-                             residuals=residuals, max_depth=max_depth)
+    max_inner_prod, max_key = max_val(X_binned_data=X_binned_data,
+                                      X_binned_indices=X_binned_indices,
+                                      X_binned_indptr=X_binned_indptr,
+                                      residuals=residuals, max_depth=max_depth)
 
     print("max inner prod = ", max_inner_prod)
+    print("max key= ", max_key)
 
 
 if __name__ == "__main__":
