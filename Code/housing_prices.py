@@ -198,8 +198,7 @@ def get_models(X, **kwargs):
 
 
 
-def compute_cv(X, y, n_splits, lmbda, epsilon, f, n_epochs,
-               screening, store_history, n_jobs=1):
+def compute_cv(X, y, models, n_splits, n_jobs=1):
     """
     Parameters
     ----------
@@ -209,26 +208,14 @@ def compute_cv(X, y, n_splits, lmbda, epsilon, f, n_epochs,
     y: numpy.array(), shape = '(n_samples, )
         target vector
 
+    models : list
+        list of models
+
     n_splits: int
         number of folds
 
-    lmbda: float
-        regularization parameter
-
-    epsilon: float
-        tolerance
-
-    f: int
-        frequency
-
-    n_epochs: int
-        number of epochs
-
-    screening: bool
-        indicates if we run the solver with or without screening process
-
-    store_history: bool
-        indicates if we store the history variables when we run the solver
+    n_jobs: int
+        number of jobs in parallel
 
     Returns
     -------
@@ -238,9 +225,7 @@ def compute_cv(X, y, n_splits, lmbda, epsilon, f, n_epochs,
     y = y.to_numpy().astype('float')
     cv_scores = {}
 
-    for name, model in get_models(X, lmbda=lmbda, epsilon=epsilon, f=f,
-                                  n_epochs=n_epochs, screening=screening,
-                                  store_history=store_history)[0].items():
+    for name, model in models.items():
         cv_scores[name] = \
             cross_val_score(model, X, y, cv=n_splits, n_jobs=n_jobs).mean()
 
@@ -266,16 +251,25 @@ def main():
     screening = True
     store_history = True
     n_epochs = 10000
+    n_jobs = 4
 
-    cv_scores = compute_cv(X=X, y=y, n_jobs=4,
-                           n_splits=n_splits, lmbda=lmbda,
-                           epsilon=epsilon, f=f,
-                           n_epochs=n_epochs,
-                           screening=screening,
-                           store_history=store_history)
+    models, tuned_parameters = get_models(X, lmbda=lmbda, epsilon=epsilon, f=f,
+                                          n_epochs=n_epochs, screening=screening,
+                                          store_history=store_history)
+
+    cv_scores = compute_cv(X=X, y=y, models=models, n_splits=n_splits,
+                           n_jobs=n_jobs)
 
     for k, v in cv_scores.items():
         print(f'{k}: {v}')
+
+
+    # gs_scores = compute_gs(X=X, y=y, models=models,
+    #                        tuned_parameters=tuned_parameters, n_jobs=n_jobs)
+
+    # for k, v in gs_scores.items():
+    #     print(f'{k}: {v}')
+
 
 #     lmbdas = np.logspace(-4, -0.5, 30)
 #     tuned_parameters = [{'alpha': lmbdas}]
