@@ -11,6 +11,7 @@ from scipy.linalg import toeplitz
 
 from numba import njit, objmode
 from numba import jit
+from sklearn.base import BaseEstimator, RegressorMixin
 from sklearn.linear_model import LinearRegression
 from sklearn.preprocessing import KBinsDiscretizer
 from sklearn.tree import DecisionTreeRegressor
@@ -499,7 +500,7 @@ def sparse_cd(
 ###########################################################################
 
 
-class Lasso:
+class Lasso(BaseEstimator, RegressorMixin):
     def __init__(self, lmbda, epsilon, f, n_epochs, screening, store_history):
 
         self.lmbda = lmbda

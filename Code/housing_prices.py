@@ -168,31 +168,31 @@ def get_models(X, **kwargs):
     lasso = Lasso(**kwargs)
     models['lasso'] = Pipeline(steps=[('preprocessor', preprocessor),
                                ('regressor', lasso)])
-    lmbdas = np.logspace(-4, -0.5, 30)
+    lmbdas = np.logspace(-4, -0.5, 3)
     tuned_parameters['lasso'] = \
-        [{'regressor__alpha': lmbdas, 'preprocessor__num__binning': [2, 3]}]
+        {'regressor__lmbda': lmbdas, 'preprocessor__num__binning__n_bins': [2, 3]}
 
     # LassoCV
     models['lasso_cv'] = Pipeline(steps=[('preprocessor', preprocessor),
                                          ('regressor', linear_model.LassoCV())])
-    tuned_parameters['lasso_cv'] = [{'preprocessor__num__binning': [2, 3]}]
+    tuned_parameters['lasso_cv'] = {'preprocessor__num__binning__n_bins': [2, 3]}
 
     # RidgeCV
     models['ridge_cv'] = Pipeline(steps=[('preprocessor', preprocessor),
                                          ('regressor', linear_model.RidgeCV())])
-    tuned_parameters['ridge_cv'] = [{'preprocessor__num__binning': [2, 3]}]
+    tuned_parameters['ridge_cv'] = {'preprocessor__num__binning__n_bins': [2, 3]}
 
     # XGBoost
     xgb = XGBRegressor()
     models['xgb'] = Pipeline(steps=[('preprocessor', rf_preprocessor),
                                     ('regressor', xgb)])
-    tuned_parameters['xgb'] = [{'regressor__n_estimators': [30, 100]}]
+    tuned_parameters['xgb'] = {'regressor__n_estimators': [30, 100]}
 
     # Random Forest
     rf = RandomForestRegressor()
     models['rf'] = Pipeline(steps=[('preprocessor', rf_preprocessor),
                               ('regressor', rf)])
-    tuned_parameters['rf'] = [{'regressor__max_depth': [3, 5]}]
+    tuned_parameters['rf'] = {'regressor__max_depth': [3, 5]}
 
     return models, tuned_parameters
 
@@ -208,8 +208,8 @@ def compute_cv(X, y, models, n_splits, n_jobs=1):
     y: numpy.array(), shape = '(n_samples, )
         target vector
 
-    models : list
-        list of models
+    models : dict
+        dict of models
 
     n_splits: int
         number of folds
@@ -230,6 +230,46 @@ def compute_cv(X, y, models, n_splits, n_jobs=1):
             cross_val_score(model, X, y, cv=n_splits, n_jobs=n_jobs).mean()
 
     return cv_scores
+
+
+def compute_gs(X, y, models, tuned_parameters, n_splits, n_jobs=1):
+    """
+    Parameters
+    ----------
+    X: numpy.ndarray(), shape = (n_samples, n_features)
+        features matrix
+
+    y: numpy.array(), shape = '(n_samples, )
+        target vector
+
+    models : dict
+        dict of models
+
+    tuned_parameters : dict
+        dict of parameters to tune with grid-search
+
+    n_splits: int
+        number of folds
+
+    n_jobs: int
+        number of jobs in parallel
+
+    Returns
+    -------
+    cv_scores: dict
+        cross validation scores for different models
+    """
+    y = y.to_numpy().astype('float')
+    gs_models = {}
+
+    for name, model in models.items():
+        gs = \
+            GridSearchCV(model, cv=n_splits,
+                         param_grid=tuned_parameters[name], n_jobs=n_jobs)
+        gs.fit(X, y)
+        gs_models[name] = gs
+
+    return gs_models
 
 
 def main():
@@ -263,13 +303,12 @@ def main():
     for k, v in cv_scores.items():
         print(f'{k}: {v}')
 
+    gs_scores = compute_gs(X=X, y=y, models=models, n_splits=n_splits,
+                           tuned_parameters=tuned_parameters, n_jobs=n_jobs)
 
-    # gs_scores = compute_gs(X=X, y=y, models=models,
-    #                        tuned_parameters=tuned_parameters, n_jobs=n_jobs)
-
-    # for k, v in gs_scores.items():
-    #     print(f'{k}: {v}')
-
+    for k, v in gs_scores.items():
+        print(f'{k} -- best params = {v.best_params_}')
+        print(f'{k} -- cv scores = {v.best_score_}')
 
 #     lmbdas = np.logspace(-4, -0.5, 30)
 #     tuned_parameters = [{'alpha': lmbdas}]
