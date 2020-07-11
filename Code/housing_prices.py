@@ -135,8 +135,71 @@ def split_train_test(dataset, train):
 ################################################################
 
 
-def compute_cv(X, y, n_splits, lmbda, tuned_parameters, epsilon, f, n_epochs,
-               screening, store_history):
+def get_models(X, **kwargs):
+    # Pipeline
+    numeric_feats = numeric_features(X)
+    numeric_transformer = Pipeline(steps=[
+        ('imputer', SimpleImputer(strategy='median')),
+        ('scaler', StandardScaler()),
+        ('binning', KBinsDiscretizer(n_bins=3, encode='onehot',
+                                     strategy='quantile'))])
+
+    rf_numeric_transformer = Pipeline(steps=[
+        ('imputer', SimpleImputer(strategy='median')),
+        ('scaler', StandardScaler())])
+
+    categorical_feats = categorical_features(X)
+    categorical_transformer = Pipeline(steps=[
+        ('imputer', SimpleImputer(strategy='constant', fill_value='missing')),
+        ('onehot', OneHotEncoder(handle_unknown='ignore'))])
+
+    preprocessor = ColumnTransformer(transformers=[
+        ('num', numeric_transformer, numeric_feats),
+        ('cat', categorical_transformer, categorical_feats)])
+
+    rf_preprocessor = ColumnTransformer(transformers=[
+        ('num', rf_numeric_transformer, numeric_feats),
+        ('cat', categorical_transformer, categorical_feats)])
+
+    models = {}
+    tuned_parameters = {}
+
+    # Lasso
+    lasso = Lasso(**kwargs)
+    models['lasso'] = Pipeline(steps=[('preprocessor', preprocessor),
+                               ('regressor', lasso)])
+    lmbdas = np.logspace(-4, -0.5, 30)
+    tuned_parameters['lasso'] = \
+        [{'regressor__alpha': lmbdas, 'preprocessor__num__binning': [2, 3]}]
+
+    # LassoCV
+    models['lasso_cv'] = Pipeline(steps=[('preprocessor', preprocessor),
+                                         ('regressor', linear_model.LassoCV())])
+    tuned_parameters['lasso_cv'] = [{'preprocessor__num__binning': [2, 3]}]
+
+    # RidgeCV
+    models['ridge_cv'] = Pipeline(steps=[('preprocessor', preprocessor),
+                                         ('regressor', linear_model.RidgeCV())])
+    tuned_parameters['ridge_cv'] = [{'preprocessor__num__binning': [2, 3]}]
+
+    # XGBoost
+    xgb = XGBRegressor()
+    models['xgb'] = Pipeline(steps=[('preprocessor', rf_preprocessor),
+                                    ('regressor', xgb)])
+    tuned_parameters['xgb'] = [{'regressor__n_estimators': [30, 100]}]
+
+    # Random Forest
+    rf = RandomForestRegressor()
+    models['rf'] = Pipeline(steps=[('preprocessor', rf_preprocessor),
+                              ('regressor', rf)])
+    tuned_parameters['rf'] = [{'regressor__max_depth': [3, 5]}]
+
+    return models, tuned_parameters
+
+
+
+def compute_cv(X, y, n_splits, lmbda, epsilon, f, n_epochs,
+               screening, store_history, n_jobs=1):
     """
     Parameters
     ----------
@@ -172,73 +235,21 @@ def compute_cv(X, y, n_splits, lmbda, tuned_parameters, epsilon, f, n_epochs,
     cv_scores: dict
         cross validation scores for different models
     """
-    # Pipeline
-    numeric_feats = numeric_features(X)
-    numeric_transformer = Pipeline(steps=[
-        ('imputer', SimpleImputer(strategy='median')),
-        ('scaler', StandardScaler()),
-        ('binning', KBinsDiscretizer(n_bins=3, encode='onehot',
-                                     strategy='quantile'))])
-
-    rf_numeric_transformer = Pipeline(steps=[
-        ('imputer', SimpleImputer(strategy='median')),
-        ('scaler', StandardScaler())])
-
-    categorical_feats = categorical_features(X)
-    categorical_transformer = Pipeline(steps=[
-        ('imputer', SimpleImputer(strategy='constant', fill_value='missing')),
-        ('onehot', OneHotEncoder(handle_unknown='ignore'))])
-
-    preprocessor = ColumnTransformer(transformers=[
-        ('num', numeric_transformer, numeric_feats),
-        ('cat', categorical_transformer, categorical_feats)])
-
-    rf_preprocessor = ColumnTransformer(transformers=[
-        ('num', rf_numeric_transformer, numeric_feats),
-        ('cat', categorical_transformer, categorical_feats)])
-
     y = y.to_numpy().astype('float')
     cv_scores = {}
 
-    # Lasso
-    lasso = Lasso(lmbda=lmbda, epsilon=epsilon, f=f, n_epochs=n_epochs,
-                  screening=screening, store_history=store_history)
-    pipe_lasso = Pipeline(steps=[('preprocessor', preprocessor),
-                                 ('regressor', lasso)])
+    for name, model in get_models(X, lmbda=lmbda, epsilon=epsilon, f=f,
+                                  n_epochs=n_epochs, screening=screening,
+                                  store_history=store_history)[0].items():
+        cv_scores[name] = \
+            cross_val_score(model, X, y, cv=n_splits, n_jobs=n_jobs).mean()
 
-    reg_lasso = GridSearchCV(pipe_lasso, tuned_parameters, cv=n_splits, refit=False)
-    reg_lasso.fit(X, y)
-    cv_scores['lasso'] = cross_val_score(pipe_lasso, X, y, cv=n_splits).mean()
-
-    # LassoCV
-    pipe_lasso_cv = Pipeline(steps=[('preprocessor', preprocessor),
-                                    ('regressor', linear_model.LassoCV())])
-    cv_scores['lasso_cv'] = cross_val_score(pipe_lasso_cv, X, y, cv=n_splits).mean()
-
-    # RidgeCV
-    pipe_ridge_cv = Pipeline(steps=[('preprocessor', preprocessor),
-                                    ('regressor', linear_model.RidgeCV())])
-    cv_scores['ridge_cv'] = cross_val_score(pipe_ridge_cv, X, y, cv=n_splits).mean()
-
-    # XGBoost
-    xgb = XGBRegressor()
-    pipe_xgb = Pipeline(steps=[('preprocessor', rf_preprocessor),
-                               ('regressor', xgb)])
-    cv_scores['xgb'] = cross_val_score(pipe_xgb, X, y, cv=n_splits).mean()
-
-    # Random Forest
-    rf = RandomForestRegressor()
-    pipe_rf = Pipeline(steps=[('preprocessor', rf_preprocessor),
-                              ('regressor', rf)])
-    cv_scores['rf'] = cross_val_score(pipe_rf, X, y, cv=n_splits).mean()
-
-    return (cv_scores, pipe_lasso, pipe_lasso_cv, pipe_ridge_cv, pipe_xgb, 
-    pipe_rf)
+    return cv_scores
 
 
 def main():
-    # data_dir = "./Datasets"
-    data_dir = "/home/mrivoire/Documents/M2DS_Polytechnique/Stage_INRIA/Datasets"
+    data_dir = "./Datasets"
+    # data_dir = "/home/mrivoire/Documents/M2DS_Polytechnique/Stage_INRIA/Datasets"
     fname_train = data_dir + "/housing_prices_train"
     # fname_test = data_dir + "/housing_prices_test"
     X_train = read_csv(fname_train)
@@ -256,12 +267,7 @@ def main():
     store_history = True
     n_epochs = 10000
 
-    (cv_scores, 
-     pipe_lasso, 
-     pipe_lasso_cv, 
-     pipe_ridge_cv, 
-     pipe_xgb, 
-     pipe_rf) = compute_cv(X=X, y=y,
+    cv_scores = compute_cv(X=X, y=y, n_jobs=4,
                            n_splits=n_splits, lmbda=lmbda,
                            epsilon=epsilon, f=f,
                            n_epochs=n_epochs,
@@ -271,163 +277,163 @@ def main():
     for k, v in cv_scores.items():
         print(f'{k}: {v}')
 
-    lmbdas = np.logspace(-4, -0.5, 30)
-    tuned_parameters = [{'alpha': lmbdas}]
-    # lmbdas_list = [1]
-    cv_scores_list = list()
-    for lmbda in lmbdas_list:
-        (cv_scores, 
-         pipe_lasso, 
-         pipe_lasso_cv, 
-         pipe_ridge_cv, 
-         pipe_xgb, 
-         pipe_rf) = compute_cv(X=X, y=y,
-                               n_splits=n_splits, lmbda=lmbda,
-                               epsilon=epsilon, f=f,
-                               n_epochs=n_epochs,
-                               screening=screening,
-                               store_history=store_history)
+#     lmbdas = np.logspace(-4, -0.5, 30)
+#     tuned_parameters = [{'alpha': lmbdas}]
+#     # lmbdas_list = [1]
+#     cv_scores_list = list()
+#     for lmbda in lmbdas_list:
+#         (cv_scores, 
+#          pipe_lasso, 
+#          pipe_lasso_cv, 
+#          pipe_ridge_cv, 
+#          pipe_xgb, 
+#          pipe_rf) = compute_cv(X=X, y=y,
+#                                n_splits=n_splits, lmbda=lmbda,
+#                                epsilon=epsilon, f=f,
+#                                n_epochs=n_epochs,
+#                                screening=screening,
+#                                store_history=store_history)
 
-        cv_scores_list.append(cv_scores)
+#         cv_scores_list.append(cv_scores)
 
-    # clf = GridSearchCV(lasso, tuned_parameters, cv=n_folds, refit=False)
-    # clf.fit(X, y)
-    # scores = clf.cv_results_['mean_test_score']
-    # scores_std = clf.cv_results_['std_test_score']
-    # plt.figure().set_size_inches(8, 6)
-    # plt.semilogx(alphas, scores)
+#     # clf = GridSearchCV(lasso, tuned_parameters, cv=n_folds, refit=False)
+#     # clf.fit(X, y)
+#     # scores = clf.cv_results_['mean_test_score']
+#     # scores_std = clf.cv_results_['std_test_score']
+#     # plt.figure().set_size_inches(8, 6)
+#     # plt.semilogx(alphas, scores)
 
-    cv_lasso = []
-    cv_lasso_sk = []
-    cv_ridge_sk = []
-    cv_xgb = []
-    cv_rf = []
+#     cv_lasso = []
+#     cv_lasso_sk = []
+#     cv_ridge_sk = []
+#     cv_xgb = []
+#     cv_rf = []
 
-    for i in range(len(cv_scores_list)):
-        cv_lasso.append(cv_scores_list[i]['lasso'])
-        cv_lasso_sk.append(cv_scores_list[i]['lasso_cv'])
-        cv_ridge_sk.append(cv_scores_list[i]['ridge_cv'])
-        cv_xgb.append(cv_scores_list[i]['xgb'])
-        cv_rf.append(cv_scores_list[i]['rf'])
+#     for i in range(len(cv_scores_list)):
+#         cv_lasso.append(cv_scores_list[i]['lasso'])
+#         cv_lasso_sk.append(cv_scores_list[i]['lasso_cv'])
+#         cv_ridge_sk.append(cv_scores_list[i]['ridge_cv'])
+#         cv_xgb.append(cv_scores_list[i]['xgb'])
+#         cv_rf.append(cv_scores_list[i]['rf'])
 
-    print("cv lasso = ", cv_lasso)
-    print("cv lasso sk = ", cv_lasso_sk)
-    print("cv ridge sk = ", cv_ridge_sk)
-    print("cv xgb = ", cv_xgb)
-    print("cv rf = ", cv_rf)
+#     print("cv lasso = ", cv_lasso)
+#     print("cv lasso sk = ", cv_lasso_sk)
+#     print("cv ridge sk = ", cv_ridge_sk)
+#     print("cv xgb = ", cv_xgb)
+#     print("cv rf = ", cv_rf)
 
-    # def autolabel(rects, scale):
-    #     """Attach a text label above each bar in *rects*, displaying its
-    #     height.
-    #     """
+#     # def autolabel(rects, scale):
+#     #     """Attach a text label above each bar in *rects*, displaying its
+#     #     height.
+#     #     """
 
-    #     for rect in rects:
-    #         height = rect.get_height()
-    #         ax.annotate('{}'.format(round(height * scale, 0)/scale),
-    #                     xy=(rect.get_x() + rect.get_width() / 2, height),
-    #                     xytext=(0, 3),  # 3 points vertical offset
-    #                     textcoords="offset points",
-    #                     ha='center', va='bottom')
+#     #     for rect in rects:
+#     #         height = rect.get_height()
+#     #         ax.annotate('{}'.format(round(height * scale, 0)/scale),
+#     #                     xy=(rect.get_x() + rect.get_width() / 2, height),
+#     #                     xytext=(0, 3),  # 3 points vertical offset
+#     #                     textcoords="offset points",
+#     #                     ha='center', va='bottom')
 
-    # labels = ['0.1', '0.3', '0.5', '0.7', '0.9', '1', '1.5', '2', '2.5', '3']
-    # x = np.arange(len(labels))
-    # width = 0.35  # the width of the bars
-    # fig = plt.figure()
-    # ax = fig.add_subplot(111)
-    # rects1 = ax.bar(x - width, cv_lasso, width,
-    #                 label='cv lasso')
-    # # rects2 = ax.bar(x - width*(1/5), cv_lasso_sk, width,
-    #                 label='cv lasso sk')
-    # rects3 = ax.bar(x, cv_ridge_sk, width,
-    #                 label='cv ridge sk')
-    # rects4 = ax.bar(x + width*(1/5), cv_xgb, width,
-    #                 label='cv xgb')
-    # rects5 = ax.bar(x + width*(2/5), cv_rf, width,
-    #                 label='cv rf')
-    # Add some text for labels, title and custom x-axis tick labels, etc.
-    # ax.set_xlabel('lambda')
-    # ax.set_ylabel('crossval score')
-    # ax.set_title('crossval score vs lambdas')
-    # ax.set_xticks(x)
-    # ax.set_xticklabels(labels)
-    # ax.legend()
+#     # labels = ['0.1', '0.3', '0.5', '0.7', '0.9', '1', '1.5', '2', '2.5', '3']
+#     # x = np.arange(len(labels))
+#     # width = 0.35  # the width of the bars
+#     # fig = plt.figure()
+#     # ax = fig.add_subplot(111)
+#     # rects1 = ax.bar(x - width, cv_lasso, width,
+#     #                 label='cv lasso')
+#     # # rects2 = ax.bar(x - width*(1/5), cv_lasso_sk, width,
+#     #                 label='cv lasso sk')
+#     # rects3 = ax.bar(x, cv_ridge_sk, width,
+#     #                 label='cv ridge sk')
+#     # rects4 = ax.bar(x + width*(1/5), cv_xgb, width,
+#     #                 label='cv xgb')
+#     # rects5 = ax.bar(x + width*(2/5), cv_rf, width,
+#     #                 label='cv rf')
+#     # Add some text for labels, title and custom x-axis tick labels, etc.
+#     # ax.set_xlabel('lambda')
+#     # ax.set_ylabel('crossval score')
+#     # ax.set_title('crossval score vs lambdas')
+#     # ax.set_xticks(x)
+#     # ax.set_xticklabels(labels)
+#     # ax.legend()
 
-    # autolabel(rects1, 1000)
-    # autolabel(rects2, 1000)
-    # autolabel(rects3, 1000)
-    # autolabel(rects4, 1000)
-    # autolabel(rects5, 1000)
+#     # autolabel(rects1, 1000)
+#     # autolabel(rects2, 1000)
+#     # autolabel(rects3, 1000)
+#     # autolabel(rects4, 1000)
+#     # autolabel(rects5, 1000)
 
-    # fig.tight_layout()
-    # plt.show()
+#     # fig.tight_layout()
+#     # plt.show()
 
-    # cv_scores_list = list()
-    # for n_epochs in range(1000, 10000, 1000):
-    #     (cv_scores, 
-    #      pipe_lasso, 
-    #      pipe_lasso_cv, 
-    #      pipe_ridge_cv, 
-    #      pipe_xgb, 
-    #      pipe_rf) = compute_cv(X=X, y=y,
-    #                            n_splits=n_splits, lmbda=lmbda,
-    #                            epsilon=epsilon, f=f,
-    #                            n_epochs=n_epochs,
-    #                            screening=screening,
-    #                            store_history=store_history)
+#     # cv_scores_list = list()
+#     # for n_epochs in range(1000, 10000, 1000):
+#     #     (cv_scores, 
+#     #      pipe_lasso, 
+#     #      pipe_lasso_cv, 
+#     #      pipe_ridge_cv, 
+#     #      pipe_xgb, 
+#     #      pipe_rf) = compute_cv(X=X, y=y,
+#     #                            n_splits=n_splits, lmbda=lmbda,
+#     #                            epsilon=epsilon, f=f,
+#     #                            n_epochs=n_epochs,
+#     #                            screening=screening,
+#     #                            store_history=store_history)
 
-    #     cv_scores_list.append(cv_scores)
+#     #     cv_scores_list.append(cv_scores)
 
-    # cv_lasso_2 = []
-    # cv_lasso_sk_2 = []
-    # cv_ridge_sk_2 = []
-    # cv_xgb_2 = []
-    # cv_rf_2 = []
+#     # cv_lasso_2 = []
+#     # cv_lasso_sk_2 = []
+#     # cv_ridge_sk_2 = []
+#     # cv_xgb_2 = []
+#     # cv_rf_2 = []
 
-    # for i in range(len(cv_scores_list)):
-    #     cv_lasso_2.append(cv_scores_list[i]['lasso'])
-    #     cv_lasso_sk_2.append(cv_scores_list[i]['lasso_cv'])
-    #     cv_ridge_sk_2.append(cv_scores_list[i]['ridge_cv'])
-    #     cv_xgb_2.append(cv_scores_list[i]['xgb'])
-    #     cv_rf_2.append(cv_scores_list[i]['rf'])
+#     # for i in range(len(cv_scores_list)):
+#     #     cv_lasso_2.append(cv_scores_list[i]['lasso'])
+#     #     cv_lasso_sk_2.append(cv_scores_list[i]['lasso_cv'])
+#     #     cv_ridge_sk_2.append(cv_scores_list[i]['ridge_cv'])
+#     #     cv_xgb_2.append(cv_scores_list[i]['xgb'])
+#     #     cv_rf_2.append(cv_scores_list[i]['rf'])
 
-    # x = np.arange(len(range(1000, 10000, 1000)))
-    # labels = range(1000, 10000, 1000)
-    # width = 0.35  # the width of the bars
-    # fig = plt.figure()
-    # ax = fig.add_subplot(111)
-    # rects1 = ax.bar(x - width*(2/5), cv_lasso_2, width,
-    #                 label='cv lasso')
-    # rects2 = ax.bar(x - width*(1/5), cv_lasso_sk_2, width,
-    #                 label='cv lasso sk')
-    # rects3 = ax.bar(x, cv_ridge_sk_2, width,
-    #                 label='cv ridge sk')
-    # rects4 = ax.bar(x + width*(1/5), cv_xgb_2, width,
-    #                 label='cv xgb')
-    # rects5 = ax.bar(x + width*(2/5), cv_rf_2, width,
-    #                 label='cv rf')
-    # Add some text for labels, title and custom x-axis tick labels, etc.
-    # ax.set_xlabel('n_epochs')
-    # ax.set_ylabel('crossval score')
-    # ax.set_title('crossval score vs number of epochs')
-    # ax.set_xticks(x)
-    # ax.set_xticklabels(labels)
-    # ax.legend()
+#     # x = np.arange(len(range(1000, 10000, 1000)))
+#     # labels = range(1000, 10000, 1000)
+#     # width = 0.35  # the width of the bars
+#     # fig = plt.figure()
+#     # ax = fig.add_subplot(111)
+#     # rects1 = ax.bar(x - width*(2/5), cv_lasso_2, width,
+#     #                 label='cv lasso')
+#     # rects2 = ax.bar(x - width*(1/5), cv_lasso_sk_2, width,
+#     #                 label='cv lasso sk')
+#     # rects3 = ax.bar(x, cv_ridge_sk_2, width,
+#     #                 label='cv ridge sk')
+#     # rects4 = ax.bar(x + width*(1/5), cv_xgb_2, width,
+#     #                 label='cv xgb')
+#     # rects5 = ax.bar(x + width*(2/5), cv_rf_2, width,
+#     #                 label='cv rf')
+#     # Add some text for labels, title and custom x-axis tick labels, etc.
+#     # ax.set_xlabel('n_epochs')
+#     # ax.set_ylabel('crossval score')
+#     # ax.set_title('crossval score vs number of epochs')
+#     # ax.set_xticks(x)
+#     # ax.set_xticklabels(labels)
+#     # ax.legend()
 
-    # autolabel(rects1, 100000)
-    # autolabel(rects2, 1000)
-    # autolabel(rects3, 1000)
-    # autolabel(rects4, 1000)
-    # autolabel(rects5, 1000)
+#     # autolabel(rects1, 100000)
+#     # autolabel(rects2, 1000)
+#     # autolabel(rects3, 1000)
+#     # autolabel(rects4, 1000)
+#     # autolabel(rects5, 1000)
 
-    # fig.tight_layout()
-    # plt.show()
+#     # fig.tight_layout()
+#     # plt.show()
 
 
-    # Plots
-    # matplotlib.rcParams['figure.figsize'] = (12.0, 6.0)
-    # prices = pd.DataFrame({"price":train_set["SalePrice"],
-    #                        "log(price + 1)":np.log1p(train_set["SalePrice"])})
-    # prices.hist()
+#     # Plots
+#     # matplotlib.rcParams['figure.figsize'] = (12.0, 6.0)
+#     # prices = pd.DataFrame({"price":train_set["SalePrice"],
+#     #                        "log(price + 1)":np.log1p(train_set["SalePrice"])})
+#     # prices.hist()
 
 
 if __name__ == "__main__":
