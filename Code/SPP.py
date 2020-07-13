@@ -111,7 +111,7 @@ def sign(x):
 #                         Maximum Inner Product
 #############################################################################
 
-
+@njit
 def max_val(X_binned_data, X_binned_indices, X_binned_indptr, residuals,
             max_depth):
     """Compute the maximum inner product between X_binned.T and the residuals
@@ -176,7 +176,7 @@ def max_val(X_binned_data, X_binned_indices, X_binned_indptr, residuals,
 
     return max_val, max_key
 
-
+@njit
 def compute_inner_prod(data1, ind1, residuals):
     """
     Parameters
@@ -224,7 +224,7 @@ def compute_inner_prod(data1, ind1, residuals):
 
     return inner_prod, inner_prod_neg, inner_prod_pos
 
-
+@njit
 def compute_interactions(data1, ind1, data2, ind2):
     """
     Parameters
@@ -281,7 +281,7 @@ def compute_interactions(data1, ind1, data2, ind2):
 
     return inter_feat_data, inter_feat_ind
 
-
+@njit
 def max_val_rec(X_binned_data, X_binned_indices, X_binned_indptr,
                 parent_data, parent_indices, current_max_val, current_max_key,
                 j, key, residuals, max_depth, depth):
