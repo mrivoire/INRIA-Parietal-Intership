@@ -263,6 +263,9 @@ def compute_interactions(data1, ind1, data2, ind2):
     inter_feat_ind = list()
     inter_feat_data = list()
 
+    # inter_feat_ind = tableau de booléens avec des 1 là où on veut 
+    # prendre les indices
+
     while count1 < len(ind1) and count2 < len(ind2):
         if ind1[count1] == ind2[count2]:
             prod = data1[count1] * data2[count2]
@@ -499,7 +502,7 @@ def max_val_rec(X_binned_data, X_binned_indices, X_binned_indptr,
 def main():
 
     rng = check_random_state(0)
-    n_samples, n_features = 100, 30
+    n_samples, n_features = 100, 1000
     beta = rng.randn(n_features)
     lmbda = 1.
     f = 10

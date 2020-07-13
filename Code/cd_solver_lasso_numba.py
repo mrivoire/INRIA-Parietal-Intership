@@ -22,6 +22,15 @@ from sklearn.utils import check_random_state
 from scipy.sparse import csc_matrix
 from scipy.sparse import issparse
 
+from xgboost import XGBRegressor
+from sklearn.ensemble import RandomForestRegressor
+from sklearn import linear_model
+from sklearn.compose import ColumnTransformer
+from sklearn.pipeline import Pipeline
+from sklearn.impute import SimpleImputer
+from sklearn.preprocessing import StandardScaler, OneHotEncoder
+from sklearn.model_selection import GridSearchCV
+
 ######################################################################
 #     Iterative Solver With Gap Safe Rules
 ######################################################################
@@ -728,59 +737,60 @@ def main():
     X_binned_indices = X_binned.indices
     X_binned_indptr = X_binned.indptr
 
-    # (beta_hat_cyclic_cd_true_sparse,
-    #     primal_hist_sparse,
-    #     dual_hist_sparse,
-    #     gap_hist_sparse,
-    #     r_list_sparse,
-    #     n_active_features_true_sparse,
-    #     theta_hat_cyclic_cd_sparse,
-    #     P_lmbda_sparse,
-    #     D_lmbda_sparse,
-    #     G_lmbda_sparse,
-    #     safe_set_sparse) = sparse_cd(X_data=X_binned_data,
-    #                                  X_indices=X_binned_indices,
-    #                                  X_indptr=X_binned_indptr, y=y,
-    #                                  lmbda=lmbda,
-    #                                  epsilon=epsilon, f=f,
-    #                                  n_epochs=n_epochs, screening=screening,
-    #                                  store_history=store_history)
+    
+    (beta_hat_cyclic_cd_true_sparse,
+        primal_hist_sparse,
+        dual_hist_sparse,
+        gap_hist_sparse,
+        r_list_sparse,
+        n_active_features_true_sparse,
+        theta_hat_cyclic_cd_sparse,
+        P_lmbda_sparse,
+        D_lmbda_sparse,
+        G_lmbda_sparse,
+        safe_set_sparse) = sparse_cd(X_data=X_binned_data,
+                                     X_indices=X_binned_indices,
+                                     X_indptr=X_binned_indptr, y=y,
+                                     lmbda=lmbda,
+                                     epsilon=epsilon, f=f,
+                                     n_epochs=n_epochs, screening=screening,
+                                     store_history=store_history)
 
-    # print("safe set sparse : ", safe_set_sparse)
+    print("safe set sparse : ", safe_set_sparse)
 
-    # sparse_lasso_sklearn = sklearn_Lasso(alpha=(lmbda / X_binned.shape[0]),
-    #                                      fit_intercept=False,
-    #                                      normalize=False,
-    #                                      max_iter=n_epochs,
-    #                                      tol=1e-14).fit(X_binned, y)
+    sparse_lasso_sklearn = sklearn_Lasso(alpha=(lmbda / X_binned.shape[0]),
+                                         fit_intercept=False,
+                                         normalize=False,
+                                         max_iter=n_epochs,
+                                         tol=1e-14).fit(X_binned, y)
 
-    # slopes = sparse_lasso_sklearn.coef_
-    # intercept = sparse_lasso_sklearn.intercept_
+    slopes = sparse_lasso_sklearn.coef_
+    intercept = sparse_lasso_sklearn.intercept_
 
-    # primal_function = ((1 / 2)
-    #                    * np.linalg.norm(y - X_binned.dot(slopes.T), 2)**2
-    #                    + lmbda * np.linalg.norm(slopes, 1))
+    primal_function = ((1 / 2)
+                       * np.linalg.norm(y - X_binned.dot(slopes.T), 2)**2
+                       + lmbda * np.linalg.norm(slopes, 1))
 
-    # print("primal sklearn : ", primal_function)
-    # # X = X.toarray()
+    print("primal sklearn : ", primal_function)
+    X_binned = X_binned.toarray()
 
-    # (beta_hat_cyclic_cd_true,
-    #     primal_hist,
-    #     dual_hist,
-    #     gap_hist,
-    #     r_list,
-    #     n_active_features_true,
-    #     theta_hat_cyclic_cd,
-    #     P_lmbda,
-    #     D_lmbda,
-    #     G_lmbda,
-    #     safe_set_dense) = cyclic_coordinate_descent(X, y, lmbda=lmbda,
-    #                                                 epsilon=epsilon,
-    #                                                 f=f, n_epochs=n_epochs,
-    #                                                 screening=screening,
-    #                                                 store_history=True)
+    (beta_hat_cyclic_cd_true,
+        primal_hist,
+        dual_hist,
+        gap_hist,
+        r_list,
+        n_active_features_true,
+        theta_hat_cyclic_cd,
+        P_lmbda,
+        D_lmbda,
+        G_lmbda,
+        safe_set_dense) = cyclic_coordinate_descent(X_binned, y, lmbda=lmbda,
+                                                    epsilon=epsilon,
+                                                    f=f, n_epochs=n_epochs,
+                                                    screening=screening,
+                                                    store_history=True)
 
-    # print("safe set dense = ", safe_set_dense)
+    print("safe set dense = ", safe_set_dense)
 
     # # Plot primal objective function (=primal_hist)
     # obj = primal_hist
@@ -1122,61 +1132,112 @@ def main():
 
     # Performance figures
 
-    # delay_list_dense = list()
-    # delay_list_dense_sklearn = list()
+    delay_list_dense = list()
+    delay_list_dense_sklearn = list()
 
-    # primal_dense_list = list()
-    # primal_dense_list_sklearn = list()
-    # dense_cv_list = list()
-    # dense_cv_list_sklearn = list()
+    primal_dense_list = list()
+    primal_dense_list_sklearn = list()
+    dense_cv_list = list()
+    dense_cv_list_sklearn = list()
 
-    # for n_epochs in range(1000, 100000, 1000):
+    for n_epochs in range(1000, 100000, 1000):
 
-    #     start_dense = time.time()
+        start_dense = time.time()
 
-    #     dense_lasso = Lasso(
-    #         lmbda=lmbda,
-    #         epsilon=epsilon,
-    #         f=f,
-    #         n_epochs=n_epochs,
-    #         screening=screening,
-    #         store_history=store_history,
-    #     ).fit(X, y)
+        dense_lasso = Lasso(
+            lmbda=lmbda,
+            epsilon=epsilon,
+            f=f,
+            n_epochs=n_epochs,
+            screening=screening,
+            store_history=store_history,
+        ).fit(X_binned, y)
 
-    #     end_dense = time.time()
-    #     delay_dense = end_dense - start_dense
-    #     delay_list_dense.append(delay_dense)
+        end_dense = time.time()
+        delay_dense = end_dense - start_dense
+        delay_list_dense.append(delay_dense)
 
-    #     primal_dense = dense_lasso.P_lmbda
-    #     primal_dense_list.append(primal_dense)
+        primal_dense = dense_lasso.P_lmbda
+        primal_dense_list.append(primal_dense)
 
-    #     dense_cv_score = dense_lasso.score(X, y)
-    #     dense_cv_list.append(dense_cv_score)
+        dense_cv_score = dense_lasso.score(X_binned, y)
+        dense_cv_list.append(dense_cv_score)
 
-    #     start_dense_sklearn = time.time()
+        start_dense_sklearn = time.time()
 
-    #     dense_lasso_sklearn = sklearn_Lasso(
-    #         alpha=(lmbda / X.shape[0]),
-    #         fit_intercept=False,
-    #         normalize=False,
-    #         max_iter=n_epochs,
-    #         tol=1e-15,
-    #     ).fit(X, y)
+        dense_lasso_sklearn = sklearn_Lasso(
+            alpha=(lmbda / X_binned.shape[0]),
+            fit_intercept=False,
+            normalize=False,
+            max_iter=n_epochs,
+            tol=1e-15,
+        ).fit(X_binned, y)
 
-    #     end_dense_sklearn = time.time()
-    #     delay_dense_sklearn = end_dense_sklearn - start_dense_sklearn
-    #     delay_list_dense_sklearn.append(delay_dense_sklearn)
+        end_dense_sklearn = time.time()
+        delay_dense_sklearn = end_dense_sklearn - start_dense_sklearn
+        delay_list_dense_sklearn.append(delay_dense_sklearn)
 
-    #     slopes = dense_lasso_sklearn.coef_
+        slopes = dense_lasso_sklearn.coef_
 
-    #     primal_function = (1 / 2) * np.linalg.norm(
-    #         y - X.dot(slopes.T), 2
-    #     ) ** 2 + lmbda * np.linalg.norm(slopes, 1)
+        primal_function = (1 / 2) * np.linalg.norm(
+            y - X_binned.dot(slopes.T), 2
+        ) ** 2 + lmbda * np.linalg.norm(slopes, 1)
 
-    #     primal_dense_list_sklearn.append(primal_function)
+        primal_dense_list_sklearn.append(primal_function)
 
-    #     dense_cv_score_sklearn = dense_lasso_sklearn.score(X, y)
-    #     dense_cv_list_sklearn.append(dense_cv_score_sklearn)
+        dense_cv_score_sklearn = dense_lasso_sklearn.score(X_binned, y)
+        dense_cv_list_sklearn.append(dense_cv_score_sklearn)
+
+    bins = ['2', '3', '4']
+
+    print("shape = ", len(delay_list_dense))
+
+    x = np.arange(len(bins))  # the label locations
+    width = 0.35  # the width of the bars
+    fig = plt.figure()
+    ax = fig.add_subplot(111)
+    rects1 = ax.bar(x - width/2, delay_list_dense, width,
+                    label='our dense lasso solver')
+    rects2 = ax.bar(x + width/2, delay_list_dense_sklearn, width,
+                    label='sklearn dense lasso solver')
+
+    # Add some text for labels, title and custom x-axis tick labels, etc.
+    ax.set_ylabel('execution time')
+    ax.set_title('time by bins and solver in dense')
+    ax.set_xticks(x)
+    ax.set_xticklabels(bins)
+    ax.legend()
+
+    autolabel(rects1, 10000)
+    autolabel(rects2, 10000)
+
+    fig.tight_layout()
+    plt.show()
+    
+    bins = ['2', '3', '4']
+    x = np.arange(len(bins))  # the label locations
+    width = 0.35  # the width of the bars
+
+    fig = plt.figure()
+    ax = fig.add_subplot(111)
+    rects1_score = ax.bar(x - width/2, dense_cv_list, width,
+                          label='our dense lasso solver')
+    rects2_score = ax.bar(x + width/2, dense_cv_list_sklearn, width,
+                          label='sklearn dense lasso solver')
+
+    # Add some text for labels, title and custom x-axis tick labels, etc.
+    ax.set_ylabel('crossval score')
+    ax.set_title('crossval score by bins and solver in dense')
+    ax.set_xticks(x)
+    ax.set_xticklabels(bins)
+    ax.legend()
+
+    autolabel(rects1_score, 1000)
+    autolabel(rects2_score, 1000)
+
+    fig.tight_layout()
+    plt.show()
+
 
 
 if __name__ == "__main__":

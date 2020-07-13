@@ -186,16 +186,19 @@ def get_models(X, **kwargs):
     xgb = XGBRegressor()
     models['xgb'] = Pipeline(steps=[('preprocessor', rf_preprocessor),
                                     ('regressor', xgb)])
-    tuned_parameters['xgb'] = {'regressor__n_estimators': [30, 100]}
+    alphas = [0.0001, 0.001, 0.01, 0.1, 0.2, 0.3]
+    tuned_parameters['xgb'] = {'regressor__alpha': alphas,
+                               'regressor__n_estimators': [30, 100]}
+
+    # tuned_parameters['xgb'] = {'regressor__n_estimators': [30, 100]}
 
     # Random Forest
     rf = RandomForestRegressor()
     models['rf'] = Pipeline(steps=[('preprocessor', rf_preprocessor),
-                              ('regressor', rf)])
+                                   ('regressor', rf)])
     tuned_parameters['rf'] = {'regressor__max_depth': [3, 5]}
 
     return models, tuned_parameters
-
 
 
 def compute_cv(X, y, models, n_splits, n_jobs=1):
@@ -273,8 +276,8 @@ def compute_gs(X, y, models, tuned_parameters, n_splits, n_jobs=1):
 
 
 def main():
-    data_dir = "./Datasets"
-    # data_dir = "/home/mrivoire/Documents/M2DS_Polytechnique/Stage_INRIA/Datasets"
+    # data_dir = "./Datasets"
+    data_dir = "/home/mrivoire/Documents/M2DS_Polytechnique/Stage_INRIA/Datasets"
     fname_train = data_dir + "/housing_prices_train"
     # fname_test = data_dir + "/housing_prices_test"
     X_train = read_csv(fname_train)
@@ -294,32 +297,75 @@ def main():
     n_jobs = 4
 
     models, tuned_parameters = get_models(X, lmbda=lmbda, epsilon=epsilon, f=f,
-                                          n_epochs=n_epochs, screening=screening,
+                                          n_epochs=n_epochs,
+                                          screening=screening,
                                           store_history=store_history)
 
     cv_scores = compute_cv(X=X, y=y, models=models, n_splits=n_splits,
                            n_jobs=n_jobs)
+    list_cv_scores = []
 
     for k, v in cv_scores.items():
         print(f'{k}: {v}')
+        list_cv_scores.append(v)
+
+    print("cv_scores without tuning params = ", cv_scores)
 
     gs_scores = compute_gs(X=X, y=y, models=models, n_splits=n_splits,
                            tuned_parameters=tuned_parameters, n_jobs=n_jobs)
 
+    list_gs_scores = []
     for k, v in gs_scores.items():
         print(f'{k} -- best params = {v.best_params_}')
         print(f'{k} -- cv scores = {v.best_score_}')
+        list_gs_scores.append(v.best_score_)
+
+# Bar Plots For CV Scores
+
+    labels = ['Lasso', 'Lasso_cv', 'Ridge_cv', 'XGB', 'RF']
+
+    x = np.arange(len(labels))  # the label locations
+    width = 0.35  # the width of the bars
+
+    fig, ax = plt.subplots()
+    rects1 = ax.bar(x, list_gs_scores, width)
+    # Add some text for labels, title and custom x-axis tick labels, etc.
+    ax.set_ylabel('CV Scores')
+    ax.set_title('Crossval Scores By Predictive Model With Tuning')
+    ax.set_xticks(x)
+    ax.set_xticklabels(labels)
+    ax.legend()
+
+    def autolabel(rects, scale):
+        """Attach a text label above each bar in *rects*, displaying its
+        height.
+        """
+
+        for rect in rects:
+            height = rect.get_height()
+            ax.annotate('{}'.format(round(height * scale, 0)/scale),
+                        xy=(rect.get_x() + rect.get_width() / 2, height),
+                        xytext=(0, 3),  # 3 points vertical offset
+                        textcoords="offset points",
+                        ha='center', va='bottom')
+
+    autolabel(rects1, 1000)
+
+    fig.tight_layout()
+
+    plt.show()
+
 
 #     lmbdas = np.logspace(-4, -0.5, 30)
 #     tuned_parameters = [{'alpha': lmbdas}]
 #     # lmbdas_list = [1]
 #     cv_scores_list = list()
 #     for lmbda in lmbdas_list:
-#         (cv_scores, 
-#          pipe_lasso, 
-#          pipe_lasso_cv, 
-#          pipe_ridge_cv, 
-#          pipe_xgb, 
+#         (cv_scores,
+#          pipe_lasso,
+#          pipe_lasso_cv,
+#          pipe_ridge_cv,
+#          pipe_xgb,
 #          pipe_rf) = compute_cv(X=X, y=y,
 #                                n_splits=n_splits, lmbda=lmbda,
 #                                epsilon=epsilon, f=f,
@@ -402,11 +448,11 @@ def main():
 
 #     # cv_scores_list = list()
 #     # for n_epochs in range(1000, 10000, 1000):
-#     #     (cv_scores, 
-#     #      pipe_lasso, 
-#     #      pipe_lasso_cv, 
-#     #      pipe_ridge_cv, 
-#     #      pipe_xgb, 
+#     #     (cv_scores,
+#     #      pipe_lasso,
+#     #      pipe_lasso_cv,
+#     #      pipe_ridge_cv,
+#     #      pipe_xgb,
 #     #      pipe_rf) = compute_cv(X=X, y=y,
 #     #                            n_splits=n_splits, lmbda=lmbda,
 #     #                            epsilon=epsilon, f=f,
