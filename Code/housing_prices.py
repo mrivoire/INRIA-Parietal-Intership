@@ -170,17 +170,17 @@ def get_models(X, **kwargs):
                                ('regressor', lasso)])
     lmbdas = np.logspace(-4, -0.5, 3)
     tuned_parameters['lasso'] = \
-        {'regressor__lmbda': lmbdas, 'preprocessor__num__binning__n_bins': [2, 3]}
+        {'regressor__lmbda': lmbdas, 'preprocessor__num__binning__n_bins': [2, 3, 5, 7, 10, 12, 15]}
 
     # LassoCV
     models['lasso_cv'] = Pipeline(steps=[('preprocessor', preprocessor),
                                          ('regressor', linear_model.LassoCV())])
-    tuned_parameters['lasso_cv'] = {'preprocessor__num__binning__n_bins': [2, 3]}
+    tuned_parameters['lasso_cv'] = {'preprocessor__num__binning__n_bins': [2, 3, 5, 7, 10, 12, 15]}
 
     # RidgeCV
     models['ridge_cv'] = Pipeline(steps=[('preprocessor', preprocessor),
                                          ('regressor', linear_model.RidgeCV())])
-    tuned_parameters['ridge_cv'] = {'preprocessor__num__binning__n_bins': [2, 3]}
+    tuned_parameters['ridge_cv'] = {'preprocessor__num__binning__n_bins': [2, 3, 5, 7, 10, 12, 15]}
 
     # XGBoost
     xgb = XGBRegressor()
@@ -278,12 +278,12 @@ def compute_gs(X, y, models, tuned_parameters, n_splits, n_jobs=1):
 def main():
     # data_dir = "./Datasets"
     data_dir = "/home/mrivoire/Documents/M2DS_Polytechnique/Stage_INRIA/Datasets"
-    fname_train = data_dir + "/housing_prices_train"
+    fname_train = data_dir + "/Housing_Prices/housing_prices_train"
     # fname_test = data_dir + "/housing_prices_test"
     X_train = read_csv(fname_train)
     # X_test = read_csv(fname_test)
 
-    X = X_train  # keep only train data
+    X = X_train # keep only train data
     y = X['SalePrice']
     X = X.drop('SalePrice', axis=1)
 
@@ -328,7 +328,7 @@ def main():
     width = 0.35  # the width of the bars
 
     fig, ax = plt.subplots()
-    rects1 = ax.bar(x, list_gs_scores, width)
+    rects1 = ax.bar(x, list_cv_scores, width)
     # Add some text for labels, title and custom x-axis tick labels, etc.
     ax.set_ylabel('CV Scores')
     ax.set_title('Crossval Scores By Predictive Model With Tuning')
