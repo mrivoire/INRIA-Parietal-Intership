@@ -296,64 +296,74 @@ def main():
     n_epochs = 10000
     n_jobs = 4
 
-    models, tuned_parameters = get_models(X, lmbda=lmbda, epsilon=epsilon, f=f,
-                                          n_epochs=n_epochs,
-                                          screening=screening,
-                                          store_history=store_history)
+    numeric_feats = numeric_features(X_train)
+    print("numeric feats :", numeric_feats)
+    print("type : ", type(numeric_feats))
+    numeric_feats = numeric_feats.to_numpy()
+    print("new type : ", type(numeric_feats))
 
-    cv_scores = compute_cv(X=X, y=y, models=models, n_splits=n_splits,
-                           n_jobs=n_jobs)
-    list_cv_scores = []
+    for feat in enumerate(numeric_feats):
+        print("feat = ", X_train[feat[1]])
+    1/0
 
-    for k, v in cv_scores.items():
-        print(f'{k}: {v}')
-        list_cv_scores.append(v)
+    # models, tuned_parameters = get_models(X, lmbda=lmbda, epsilon=epsilon, f=f,
+    #                                       n_epochs=n_epochs,
+    #                                       screening=screening,
+    #                                       store_history=store_history)
 
-    print("cv_scores without tuning params = ", cv_scores)
+    # cv_scores = compute_cv(X=X, y=y, models=models, n_splits=n_splits,
+    #                        n_jobs=n_jobs)
+    # list_cv_scores = []
 
-    gs_scores = compute_gs(X=X, y=y, models=models, n_splits=n_splits,
-                           tuned_parameters=tuned_parameters, n_jobs=n_jobs)
+    # for k, v in cv_scores.items():
+    #     print(f'{k}: {v}')
+    #     list_cv_scores.append(v)
 
-    list_gs_scores = []
-    for k, v in gs_scores.items():
-        print(f'{k} -- best params = {v.best_params_}')
-        print(f'{k} -- cv scores = {v.best_score_}')
-        list_gs_scores.append(v.best_score_)
+    # print("cv_scores without tuning params = ", cv_scores)
+
+    # gs_scores = compute_gs(X=X, y=y, models=models, n_splits=n_splits,
+    #                        tuned_parameters=tuned_parameters, n_jobs=n_jobs)
+
+    # list_gs_scores = []
+    # for k, v in gs_scores.items():
+    #     print(f'{k} -- best params = {v.best_params_}')
+    #     print(f'{k} -- cv scores = {v.best_score_}')
+    #     list_gs_scores.append(v.best_score_)
 
 # Bar Plots For CV Scores
 
-    labels = ['Lasso', 'Lasso_cv', 'Ridge_cv', 'XGB', 'RF']
+    # labels = ['Lasso', 'Lasso_cv', 'Ridge_cv', 'XGB', 'RF']
 
-    x = np.arange(len(labels))  # the label locations
-    width = 0.35  # the width of the bars
+    # x = np.arange(len(labels))  # the label locations
+    # width = 0.35  # the width of the bars
 
-    fig, ax = plt.subplots()
-    rects1 = ax.bar(x, list_cv_scores, width)
-    # Add some text for labels, title and custom x-axis tick labels, etc.
-    ax.set_ylabel('CV Scores')
-    ax.set_title('Crossval Scores By Predictive Model With Tuning')
-    ax.set_xticks(x)
-    ax.set_xticklabels(labels)
-    ax.legend()
+    # fig, ax = plt.subplots()
+    # rects1 = ax.bar(x, list_cv_scores, width)
+    # # Add some text for labels, title and custom x-axis tick labels, etc.
+    # ax.set_ylabel('CV Scores')
+    # ax.set_title('Crossval Scores By Predictive Model With Tuning')
+    # ax.set_xticks(x)
+    # ax.set_xticklabels(labels)
+    # ax.legend()
 
-    def autolabel(rects, scale):
-        """Attach a text label above each bar in *rects*, displaying its
-        height.
-        """
+    # def autolabel(rects, scale):
+    #     """Attach a text label above each bar in *rects*, displaying its
+    #     height.
+    #     """
 
-        for rect in rects:
-            height = rect.get_height()
-            ax.annotate('{}'.format(round(height * scale, 0)/scale),
-                        xy=(rect.get_x() + rect.get_width() / 2, height),
-                        xytext=(0, 3),  # 3 points vertical offset
-                        textcoords="offset points",
-                        ha='center', va='bottom')
+    #     for rect in rects:
+    #         height = rect.get_height()
+    #         ax.annotate('{}'.format(round(height * scale, 0)/scale),
+    #                     xy=(rect.get_x() + rect.get_width() / 2, height),
+    #                     xytext=(0, 3),  # 3 points vertical offset
+    #                     textcoords="offset points",
+    #                     ha='center', va='bottom')
 
-    autolabel(rects1, 1000)
+    # autolabel(rects1, 1000)
 
-    fig.tight_layout()
+    # fig.tight_layout()
 
-    plt.show()
+    # plt.show()
 
 
 #     lmbdas = np.logspace(-4, -0.5, 30)

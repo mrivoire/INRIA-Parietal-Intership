@@ -1,0 +1,26 @@
+Benchmark SPP
+
+- Test n°1 : interactions with nested for loops vs max_val function with list
+		
+	     delay1 (for loops) = 3.1785356998443604
+	     max val test =  2.2553907492003478
+
+	     delay2 (max_val) = 133.0075671672821  
+             max inner prod =  2.2553907492003478
+	     max key=  [670, 1857]
+
+
+- Test n°2 : interactions with nested for loops vs max_val function with list and numba
+	     delay 1 =  3.4572391510009766
+	     max val test =  2.2553907492003478
+	     
+             delay 2 =  6.820566177368164
+	     max inner prod =  2.2553907492003478
+	     max key=  [670, 1857]
+
+
+
+
+
+	
+
