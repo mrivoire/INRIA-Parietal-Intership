@@ -321,7 +321,7 @@ def compute_interactions(data1, ind1, data2, ind2):
     inter_feat_ind = list()
     inter_feat_data = list()
 
-    # inter_feat_ind = tableau de booléens avec des 1 là où on veut 
+    # inter_feat_ind = tableau de booléens avec des 1 là où on veut
     # prendre les indices
 
     while count1 < len(ind1) and count2 < len(ind2):
@@ -337,6 +337,7 @@ def compute_interactions(data1, ind1, data2, ind2):
             count2 += 1
 
     return inter_feat_data, inter_feat_ind
+
 
 @njit
 def max_val_rec(X_binned_data, X_binned_indices, X_binned_indptr,
@@ -433,7 +434,7 @@ def max_val_rec(X_binned_data, X_binned_indices, X_binned_indptr,
         # Check the current node :
         # compute max_val
         # update max_val if required
-        
+
 
         if abs(inner_prod) > current_max_val:
             # print("criterion satisfied")
@@ -471,33 +472,156 @@ def max_val_rec(X_binned_data, X_binned_indices, X_binned_indptr,
 # #############################################################################
 
 
-# def safe_prune(t):
-#     """Safe Patterns Pruning Criterion at node t
+def safe_prune(X_binned_data, X_binned_indices, X_binned_indptr, 
+               features_list, features_keys, safe_sphere_center, 
+               safe_sphere_radius, residuals, max_depth):
+    """
+    Parameters
+    ----------
+    list of original variables with their ids
 
-#     Parameters
-#     ----------
-#     list of original variables with their ids
-#     center (feasible theta) and radius of the safe sphere
-#     maximum depth = maximum order of interactions
-#     Returns
-#     -------
-#     safe set : matrix sparse + list of ids or vector of nodes where the nodes
-#     are defined in the class node
-#     """
+    safe_sphere_center: numpy.array(), shape = (n_samples, )
+        feasible theta
 
-#     # recursif algorithm
+    safe_sphere_radius: float
+        radius of the safe sphere
 
-#     return sppc_t
+    max_depth: int
+        maximum order of interactions between the original features
+
+    Returns
+    -------
+    safe_set : list of list of int
+        contains the keys of each active feature
+        (features that are not pruned out and that take potentially part into
+        the optimal model)
+    (matrix sparse + list of ids or vector of nodes where the nodes
+    are defined in the class node)
+    """
+
+    # recursif algorithm
+    safe_set = list()
+
+    inter_feat_data = list()
+    inter_feat_ind = list()
+    data2 = list()
+    ind2 = list()
+    root_data = list()
+    root_ind = list()
+    
+    for key in features_keys:
+        depth_subtree = len(key)
+        root_key = key
+        depth = len(root_key)
+        for i, j in enumerate(key):
+            start1, end1 = X_binned_indptr[j:j+2]
+            start2, end2 = X_binned_indices[key[i+1]:key[i+1]+2]
+            for ind in range(start1, end1):
+                inter_feat_data.append(X_binned_data[ind])
+                inter_feat_ind.append(ind) 
+
+            for ind in range(start2, end2):
+                data2.append(X_binned_data[ind])
+                ind2.append(ind)
+            
+            (inter_feat_data, 
+             inter_feat_ind) = compute_interactions(inter_feat_data, 
+                                                    inter_feat_ind, 
+                                                    data2, 
+                                                    ind2)
+        root_data = inter_feat_data
+        root_ind = inter_feat_ind
+          
+        safe_set = safe_prune_rec(X_binned_data, X_binned_indices, 
+                                  X_binned_indptr, root_data, root_ind, 
+                                  root_key, residuals, safe_set, depth_subtree)
+
+    return safe_set
 
 
-# def safe_prune_rec(feature, safe_set_to_update):
-#     """
-#     take as input a single feature either original or interaction
-#     """
-#     # recursive function depth first search type
-#     # call safe prune rec on a feature i and
-#     # compute the interaction ij
-#     # apply the sppc criterion on the interaction feature ij
+def safe_prune_rec(X_binned_data, X_binned_indices, X_binned_indptr,
+                   root_data, root_ind, root_key, residuals, safe_set,
+                   depth_subtree):
+    """
+    Parameters
+    ----------
+    X_binned: numpy.ndarray(), shape = (n_samples, n_features)
+        binned features matrix
+
+    root: numpy.array(), shape = (n_samples, )
+        feature vector
+        corresponds to the root of the considered subset
+
+    safe_set: list()
+        list of active features
+
+    Returns
+    -------
+    safe_set: list()
+        new list of active features after having pruned or not the considered
+        subtree
+    """
+    # recursive function depth first search type
+    # call safe prune rec on a feature i and
+    # compute the interaction ij
+    # apply the sppc criterion on the interaction feature ij
+
+    # Test the SPPC criterion on the current feature
+    # If the SPPC criterion is satisfied prune the whole subtree for which
+    # the feature is the root otherwise test on the children
+
+    n_features = len(X_binned_indptr) - 1
+
+    # Compute the SPPC criterion
+
+    (inner_prod,
+     inner_prod_neg,
+     inner_prod_pos) = compute_inner_prod(root_data,
+                                          root_ind,
+                                          residuals)
+
+    upper_bound = max(inner_prod_pos, -inner_prod_neg)
+
+    current_max_val, max_key = max_val(X_binned_data, X_binned_indices,
+                                       X_binned_indptr, residuals,
+                                       depth_subtree)
+
+    new_root_data = list()
+    new_root_ind = list()
+    new_root_key = list(root_key)
+    safe_set = list(safe_set)
+    depth = len(root_key)
+
+    # If SPPC is satisfied we can prune the whole subtree from the root node
+    # In this case the active set remains unchanged since all the features of
+    # the subtree are pruned out
+
+    if upper_bound > current_max_val:
+        return safe_set
+
+    # If SPPC is not satisfied then we recursively call the function on
+    # we do not prune the whole subtree, we save the root key in the
+    # active set and we recursively call the function on the child nodes
+
+    else:
+
+        if depth < depth_subtree: 
+            safe_set.append(root_key)
+            for j in range(n_features):
+                start, end = X_binned_indptr[j:j+2]
+                for ind in range(start, end):
+                    new_root_data.append(X_binned_data[ind])
+                    new_root_ind.append(ind)
+
+                new_root_key.append(j)
+
+                safe_set = safe_prune_rec(X_binned_data, X_binned_indices,
+                                          X_binned_indptr, new_root_data,
+                                          new_root_ind, new_root_key,
+                                          residuals, 
+                                          safe_set, depth_subtree - 1)
+
+            return safe_set
 
 
 # def SPP(tau):
@@ -569,7 +693,7 @@ def max_val_rec(X_binned_data, X_binned_indices, X_binned_indptr,
 def main():
 
     rng = check_random_state(0)
-    n_samples, n_features = 500, 1000
+    n_samples, n_features = 500, 100
     beta = rng.randn(n_features)
     lmbda = 1.
     f = 10
@@ -584,7 +708,7 @@ def main():
                 random_state=rng)
 
     # Discretization by binning strategy
-    enc = KBinsDiscretizer(n_bins=5, encode=encode, strategy=strategy)
+    enc = KBinsDiscretizer(n_bins=3, encode=encode, strategy=strategy)
     X_binned = enc.fit_transform(X)
     X_binned = X_binned.tocsc()
     X_binned_data = X_binned.data
@@ -610,16 +734,14 @@ def main():
     start1 = time.time()
     for j in range(n_features):
         for k in range(j, n_features):
-            for i in range(k, n_features):
-                for m in range(i, n_features):
-                    for n in range(m, n_features):
-                        inter_feat = X_binned[:, j] * X_binned[:, k]
+            inter_feat = (X_binned[:, j]
+                            * X_binned[:, k])
 
-                        inner_prod = inter_feat.dot(residuals)
-                        if abs(inner_prod) > max_val_test:
-                            max_val_test = abs(inner_prod)
-                            print("key = ", j, k, i, m, n)
-                        
+            inner_prod = inter_feat.dot(residuals)
+            if abs(inner_prod) > max_val_test:
+                max_val_test = abs(inner_prod)
+                print("key = ", j, k)
+
     end1 = time.time()
     delay1 = end1 - start1
     print("delay 1 = ", delay1)
@@ -641,6 +763,13 @@ def main():
     print("max inner prod = ", max_inner_prod)
     print("max key= ", max_key)
 
+    safe_sphere_radius = 1
+    safe_sphere_center = rng.randn(n_samples)
+
+    # safe_set = safe_prune(X_binned_data, X_binned_indices, X_binned_indptr, 
+    #                       features_list, features_keys, safe_sphere_center, 
+    #                       safe_sphere_radius, residuals, max_depth)
+
     # Test for compute interactions function
 
     # ind1 = [0, 1, 2]
@@ -648,17 +777,17 @@ def main():
     # data1 = [1, 5, 3]
     # data2 = [4, 7, 9, 8]
 
-    # inter_feat_data, inter_feat_ind = compute_interactions(data1, 
-    #                                                        ind1, 
-    #                                                        data2, 
+    # inter_feat_data, inter_feat_ind = compute_interactions(data1,
+    #                                                        ind1,
+    #                                                        data2,
     #                                                        ind2)
 
     # print("inter feat data = ", inter_feat_data)
     # print("inter feat ind = ", inter_feat_ind)
 
     # Test for compute inner product
-    # (inner_prod, 
-    #  inner_prod_neg, 
+    # (inner_prod,
+    #  inner_prod_neg,
     #  inner_prod_pos) = compute_inner_prod(data1, ind1, residuals)
 
     # print("inner prod = ", inner_prod)
