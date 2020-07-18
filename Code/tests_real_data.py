@@ -6,6 +6,7 @@ import numpy as np
 import pandas as pd
 from sklearn import datasets
 import joblib
+import faulthandler
 
 import matplotlib.pyplot as plt
 
@@ -205,6 +206,7 @@ def compute_gs(X, y, models, tuned_parameters, n_splits, n_jobs=1):
 
 
 def main():
+    faulthandler.enable()
     mem = joblib.Memory(location='cache')
 
     raw_data = dict()
@@ -240,15 +242,18 @@ def main():
                                     data_id=openml_id, return_X_y=True,
                                     as_frame=True)
         raw_data[name] = X, y
-        
+
     # print("raw data = ", raw_data)
     auto_price_rawdata = raw_data['BNG(auto_price)']
     crimes_rawdata = raw_data['la_crimes']
     black_friday_rawdata = raw_data['black_friday']
 
-    # print("auto prices dataset : ", auto_price_rawdata)
-    # print("crimes dataset : ", crimes_rawdata)
-    # print("black friday dataset : ", black_friday_rawdata)
+    X_auto_raw = auto_price_rawdata[0]
+    y_auto_raw = auto_price_rawdata[1]
+    X_crimes_raw = crimes_rawdata[0]
+    y_crimes_raw = crimes_rawdata[1]
+    X_black_friday_raw = black_friday_rawdata[0]
+    y_black_friday_raw = black_friday_rawdata[1]
 
     # Encode the data to numerical matrices
 
@@ -295,6 +300,17 @@ def main():
 
     print("clean data = ", clean_data)
 
+    auto_price_data = clean_data['BNG(auto_price)']
+    crimes_data = clean_data['la_crimes']
+    black_friday_data = clean_data['black_friday']
+
+    X_auto = auto_price_data[0]
+    y_auto = auto_price_data[1]
+    X_crimes = crimes_data[0]
+    y_crimes = crimes_data[1]
+    X_black_friday = black_friday_data[0]
+    y_black_friday = black_friday_data[1]
+
     lmbda = 1.
     epsilon = 1e-7
     f = 10
@@ -304,46 +320,104 @@ def main():
     n_epochs = 10000
     n_jobs = 4
 
-    auto_price_data = clean_data['BNG(auto_price)']
-    crimes_data = clean_data['la_crimes']
-    black_friday_data = clean_data['black_friday']
+    # Auto Price Dataset with our preprocess
 
-    # print("auto price clean data : ", auto_price_data)
-    # print("crimes clean data : ", crimes_data)
-    # print("balck friday clean data : ", black_friday_data)
-    X_auto = auto_price_data[0]
-    y_auto = auto_price_data[1]
-    X_crimes = crimes_data[0]
-    y_crimes = crimes_data[1]
-    X_black_friday = black_friday_data[0]
-    y_black_friday = black_friday_data[1]
+    # models, tuned_parameters = get_models(X_auto_raw[:1000], lmbda=lmbda,
+    #                                       epsilon=epsilon,
+    #                                       f=f, n_epochs=n_epochs,
+    #                                       screening=screening,
+    #                                       store_history=store_history)
+
+    # cv_scores = compute_cv(X=X_auto_raw[:1000], y=y_auto_raw[:1000],
+    #                        models=models, n_splits=n_splits, n_jobs=n_jobs)
+    # list_cv_scores_auto = []
+
+    # for k, v in cv_scores.items():
+    #     print(f'{k}: {v}')
+    #     list_cv_scores_auto.append(v)
+
+    # print("cv_scores without tuning params = ", list_cv_scores_auto)
+
+    # gs_scores = compute_gs(X=X_auto_raw[:1000], y=y_auto_raw[:1000],
+    #                        models=models, n_splits=n_splits,
+    #                        tuned_parameters=tuned_parameters, n_jobs=n_jobs)
+
+    # list_gs_scores_auto = []
+    # for k, v in gs_scores.items():
+    #     print(f'{k} -- best params = {v.best_params_}')
+    #     print(f'{k} -- cv scores = {v.best_score_}')
+    #     list_gs_scores_auto.append(v.best_score_)
+
+    # print("cv_score with tuning params = ", list_gs_scores_auto)
 
 
-    models, tuned_parameters = get_models(X_auto, lmbda=lmbda, epsilon=epsilon, 
+    # Bar Plots on auto price dataset with our preprocess
+
+    # labels = ['Lasso', 'Lasso_cv', 'Ridge_cv', 'XGB', 'RF']
+
+    # x = np.arange(len(labels))  # the label locations
+    # width = 0.35  # the width of the bars
+
+    # fig, ax = plt.subplots()
+    # rects1 = ax.bar(x, list_gs_scores_auto, width)
+    # # Add some text for labels, title and custom x-axis tick labels, etc.
+    # ax.set_ylabel('CV Scores')
+    # ax.set_title('Crossval Scores By Predictive Model With Tuning For 1000 Samples')
+    # ax.set_xticks(x)
+    # ax.set_xticklabels(labels)
+    # ax.legend()
+
+    # def autolabel(rects, scale):
+    #     """Attach a text label above each bar in *rects*, displaying its
+    #     height.
+    #     """
+
+    #     for rect in rects:
+    #         height = rect.get_height()
+    #         ax.annotate('{}'.format(round(height * scale, 0)/scale),
+    #                     xy=(rect.get_x() + rect.get_width() / 2, height),
+    #                     xytext=(0, 3),  # 3 points vertical offset
+    #                     textcoords="offset points",
+    #                     ha='center', va='bottom')
+
+    # autolabel(rects1, 1000)
+
+    # fig.tight_layout()
+
+    # plt.show()
+
+    # Black Friday Dataset with our preprocess
+
+    models, tuned_parameters = get_models(X_black_friday_raw[:1000],
+                                          lmbda=lmbda,
+                                          epsilon=epsilon,
                                           f=f, n_epochs=n_epochs,
                                           screening=screening,
                                           store_history=store_history)
 
-    # cv_scores = compute_cv(X=X, y=y, models=models, n_splits=n_splits,
-    #                        n_jobs=n_jobs)
-    # list_cv_scores = []
+    cv_scores = compute_cv(X=X_black_friday_raw[:1000],
+                           y=y_black_friday_raw[:1000],
+                           models=models, n_splits=n_splits, n_jobs=n_jobs)
+    list_cv_scores_auto = []
 
-    # for k, v in cv_scores.items():
-    #     print(f'{k}: {v}')
-    #     list_cv_scores.append(v)
+    for k, v in cv_scores.items():
+        print(f'{k}: {v}')
+        list_cv_scores_auto.append(v)
 
-    # print("cv_scores without tuning params = ", list_cv_scores)
+    print("cv_scores without tuning params = ", list_cv_scores_auto)
 
-    # gs_scores = compute_gs(X=X, y=y, models=models, n_splits=n_splits,
-    #                        tuned_parameters=tuned_parameters, n_jobs=n_jobs)
+    gs_scores = compute_gs(X=X_black_friday_raw[:1000],
+                           y=y_black_friday_raw[:1000],
+                           models=models, n_splits=n_splits,
+                           tuned_parameters=tuned_parameters, n_jobs=n_jobs)
 
-    # list_gs_scores = []
-    # for k, v in gs_scores.items():
-    #     print(f'{k} -- best params = {v.best_params_}')
-    #     print(f'{k} -- cv scores = {v.best_score_}')
-    #     list_gs_scores.append(v.best_score_)
+    list_gs_scores_auto = []
+    for k, v in gs_scores.items():
+        print(f'{k} -- best params = {v.best_params_}')
+        print(f'{k} -- cv scores = {v.best_score_}')
+        list_gs_scores_auto.append(v.best_score_)
 
-    # print("cv_score with tuning params = ", list_gs_scores)
+    print("cv_score with tuning params = ", list_gs_scores_auto)
 
 
 if __name__ == "__main__":
