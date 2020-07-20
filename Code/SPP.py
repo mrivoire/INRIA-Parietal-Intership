@@ -150,8 +150,7 @@ def max_val(X_binned_data, X_binned_indices, X_binned_indptr, residuals,
     parent_indices = np.arange(n_samples)
 
     for i in range(n_features):
-        # key = []
-        key = List([int(x) for x in range(0)])
+        current_key = List([int(x) for x in range(0)])
         max_val, max_key = max_val_rec(X_binned_data=X_binned_data,
                                        X_binned_indices=X_binned_indices,
                                        X_binned_indptr=X_binned_indptr,
@@ -160,7 +159,7 @@ def max_val(X_binned_data, X_binned_indices, X_binned_indptr, residuals,
                                        current_max_val=max_val,
                                        current_max_key=max_key,
                                        j=i,
-                                       key=key,
+                                       current_key=current_key,
                                        residuals=residuals,
                                        max_depth=max_depth,
                                        depth=depth)
@@ -342,7 +341,7 @@ def compute_interactions(data1, ind1, data2, ind2):
 # @njit
 def max_val_rec(X_binned_data, X_binned_indices, X_binned_indptr,
                 parent_data, parent_indices, current_max_val, current_max_key,
-                j, key, residuals, max_depth, depth):
+                j, current_key, residuals, max_depth, depth):
     """Compute the maximal inner product value between the given feature and
         the vector of residuals provided thanks to the pre-solve processing
 
@@ -376,7 +375,7 @@ def max_val_rec(X_binned_data, X_binned_indices, X_binned_indptr,
     Returns
     -------
 
-    key: int
+    current_key: int
         index of the feature which provides the max_val
 
     current_max_val: float
@@ -398,7 +397,7 @@ def max_val_rec(X_binned_data, X_binned_indices, X_binned_indptr,
     # element wise product between parent and feature j to obtain the
     # interaction result feature x
 
-    key.append(j)
+    current_key.append(j)
 
     n_features = len(X_binned_indptr) - 1
 
@@ -425,7 +424,7 @@ def max_val_rec(X_binned_data, X_binned_indices, X_binned_indptr,
     # print("ok upper bound")
 
     if upper_bound <= current_max_val:
-        key.pop()
+        current_key.pop()
         # print("criterion non satisfied")
         return current_max_val, current_max_key
 
@@ -438,7 +437,7 @@ def max_val_rec(X_binned_data, X_binned_indices, X_binned_indptr,
         if abs(inner_prod) > current_max_val:
             # print("criterion satisfied")
             current_max_val = abs(inner_prod)
-            current_max_key = key.copy()
+            current_max_key = current_key.copy()
 
         # If depth < max_depth:
             # for loop over the child nodes (number of children = n_features)
@@ -458,14 +457,14 @@ def max_val_rec(X_binned_data, X_binned_indices, X_binned_indptr,
                                                 inter_feat_ind,
                                                 current_max_val,
                                                 current_max_key,
-                                                k, key,
+                                                k, current_key,
                                                 residuals,
                                                 max_depth,
                                                 depth + 1)
 
         # We keep the same parent node and we change the child nodes ?
         # How to find the key of the feature providing the maxval ?
-        key.pop()
+        current_key.pop()
         return current_max_val, current_max_key
 
 
@@ -509,28 +508,23 @@ def safe_prune(X_binned_data, X_binned_indices, X_binned_indptr,
     -------
     None
     """
-
-    # recursive algorithm
-    # no return only updates the safe set
-    # then initialize a safe set in SPP and return it
-
     n_features = len(X_binned_indptr) - 1
     n_samples = max(X_binned_indices) + 1
 
-    # safe_set_data 
-    current_safe_set_data = list()
-    current_safe_set_ind = list()
-    current_safe_set_key = list()
+    # safe_set_data
+    # safe_set_data = List([int(x) for x in range(0)])
+    # safe_set_ind = List([int(x) for x in range(0)])
+    # safe_set_key = List([int(x) for x in range(0)])
+    safe_set_data = list()
+    safe_set_ind = list()
+    safe_set_key = list()
 
-    # current_safe_set_data = List([int(x) for x in range(0)])
-    # current_safe_set_ind = List([int(x) for x in range(0)])
-    # current_safe_set_key = List([int(x) for x in range(0)])
     depth = 1
 
     parent_data = np.ones(n_samples)
     parent_indices = np.arange(n_samples)
+    # current_key = List([int(x) for x in range(0)])
     current_key = list()
-    # parent_key = List([int(x) for x in range(0)])
 
     for i in range(n_features):
         safe_prune_rec(X_binned_data=X_binned_data,
@@ -539,26 +533,22 @@ def safe_prune(X_binned_data, X_binned_indices, X_binned_indptr,
                        parent_data=parent_data,
                        parent_indices=parent_indices,
                        current_key=current_key,
-                       curent_safe_set_data=current_safe_set_data,
-                       current_safe_set_ind=current_safe_set_ind,
-                       current_safe_set_key=current_safe_set_key,
+                       safe_set_data=safe_set_data,
+                       safe_set_ind=safe_set_ind,
+                       safe_set_key=safe_set_key,
                        j=i,
                        safe_sphere_center=safe_sphere_center,
                        safe_sphere_radius=safe_sphere_radius,
-                       max_depth=max_depth, 
+                       max_depth=max_depth,
                        depth=depth)
-    
-    # print("current_safe_set_data : ", current_safe_set_data)
-    # print("current_safe_set_indices : ", current_safe_set_ind)
-    # print("current_safe_set_keys : ", current_safe_set_key)
 
-    return current_safe_set_data, current_safe_set_ind, current_safe_set_key
+    return safe_set_data, safe_set_ind, safe_set_key
+
 
 # @njit
 def safe_prune_rec(X_binned_data, X_binned_indices, X_binned_indptr,
                    parent_data, parent_indices, current_key,
-                   curent_safe_set_data, current_safe_set_ind,
-                   current_safe_set_key, j,
+                   safe_set_data, safe_set_ind, safe_set_key, j,
                    safe_sphere_center, safe_sphere_radius,
                    max_depth, depth):
     """Recursively update the active set with the active features for each
@@ -657,7 +647,6 @@ def safe_prune_rec(X_binned_data, X_binned_indices, X_binned_indptr,
     (inter_feat_data,
      inter_feat_ind) = compute_interactions(X_j_data, X_j_indices,
                                             parent_data, parent_indices)
-
     current_key.append(j)
 
     (inner_prod,
@@ -693,20 +682,19 @@ def safe_prune_rec(X_binned_data, X_binned_indices, X_binned_indptr,
     if sppc_t >= 1:
 
         if abs(inner_prod) + safe_sphere_radius * np.sqrt(v_t) >= 1:
-            curent_safe_set_data.append(inter_feat_data)
-            current_safe_set_ind.append(inter_feat_ind)
+            safe_set_data.append(inter_feat_data)
+            safe_set_ind.append(inter_feat_ind)
             key = current_key.copy()
-            current_safe_set_key.append(key)
+            safe_set_key.append(key)
 
         if depth < max_depth:
             for k in range(j+1, n_features):
                 safe_prune_rec(X_binned_data, X_binned_indices,
                                X_binned_indptr,
                                inter_feat_data, inter_feat_ind, current_key,
-                               curent_safe_set_data, current_safe_set_ind,
-                               current_safe_set_key, k,
-                               safe_sphere_center, safe_sphere_radius,
-                               max_depth, depth+1)
+                               safe_set_data, safe_set_ind,
+                               safe_set_key, k, safe_sphere_center,
+                               safe_sphere_radius, max_depth, depth+1)
 
     current_key.pop()
 
@@ -778,6 +766,9 @@ def safe_prune_rec(X_binned_data, X_binned_indices, X_binned_indptr,
 
 #     return list_of_sol # non-zero beta and the id
 
+def convert(list):
+    return tuple(list)
+
 
 def main():
 
@@ -809,13 +800,6 @@ def main():
 
     # Test function for max_val
 
-    # sparse_lasso_sklearn = sklearn_Lasso(alpha=(lmbda / X_binned.shape[0]),
-    #                                      fit_intercept=False,
-    #                                      normalize=False,
-    #                                      max_iter=n_epochs,
-    #                                      tol=1e-14).fit(X_binned, y)
-
-    # residuals = y - X_binned.dot(sparse_lasso_sklearn.coef_)
     residuals = rng.randn(n_samples)
     # Building of the interactions features
     max_val_test = 0
@@ -853,40 +837,99 @@ def main():
     # print("max inner prod = ", max_inner_prod)
     # print("max key= ", max_key)
 
-    safe_sphere_radius = 1
-    safe_sphere_center = rng.randn(n_samples)
+    # Lasso 
 
-    safe_prune(X_binned_data=X_binned_data,
-               X_binned_indices=X_binned_indices,
-               X_binned_indptr=X_binned_indptr,
-               safe_sphere_center=safe_sphere_center,
-               safe_sphere_radius=safe_sphere_radius,
-               max_depth=max_depth)
+    sparse_lasso_sklearn = sklearn_Lasso(alpha=(lmbda / X_binned.shape[0]),
+                                         fit_intercept=False,
+                                         normalize=False,
+                                         max_iter=n_epochs,
+                                         tol=1e-14).fit(X_binned, y)
+
+    beta_star = sparse_lasso_sklearn.coef_
+    residuals = y - X_binned.dot(beta_star)
+    XTR_absmax = 0
+    for j in range(n_features):
+        start, end = X_binned_indptr[j:j+2]
+        X_j_indices = X_binned_indices[start:end]
+        X_j_data = X_binned_data[start:end]
+
+        (inner_prod,
+        inner_prod_pos,
+        inner_prod_neg) = compute_inner_prod(X_j_data,
+                                             X_j_indices,
+                                             residuals) 
+
+        XTR_absmax = max(abs(inner_prod), XTR_absmax)
+
+    theta = residuals / max(XTR_absmax, lmbda)  # Why max(XTR_absmax, lmbda) ?
+
+    P_lmbda = 0.5 * residuals.dot(residuals)
+    P_lmbda += lmbda * np.linalg.norm(beta_star, 1)
+
+    D_lmbda = 0.5 * np.linalg.norm(y, ord=2) ** 2
+    D_lmbda -= (((lmbda ** 2) / 2) * np.linalg.norm(theta - y / lmbda, ord=2) 
+                ** 2)
+
+    # Computation of the dual gap
+    G_lmbda = P_lmbda - D_lmbda
+    safe_sphere_radius = np.sqrt(2 * G_lmbda)/lmbda
+    # safe_sphere_radius = 1
+    safe_sphere_center = theta 
+
+    (safe_set_data,
+     safe_set_ind,
+     safe_set_key) = safe_prune(X_binned_data=X_binned_data,
+                                X_binned_indices=X_binned_indices,
+                                X_binned_indptr=X_binned_indptr,
+                                safe_sphere_center=safe_sphere_center,
+                                safe_sphere_radius=safe_sphere_radius,
+                                max_depth=max_depth)
+
+    for ind in range(len(safe_set_data)):
+        safe_set_data[ind] = convert(safe_set_data[ind])
+        safe_set_ind[ind] = convert(safe_set_ind[ind])
+        safe_set_key[ind] = convert(safe_set_key[ind])
+
+    safe_set_data_card = []
+    for elmt in safe_set_data:
+        safe_set_data_card.append(len(elmt))
+
+    print("shape safe set data : ", len(safe_set_data))
 
     # Test function for safe prune
-    safe_set_key = []
-    safe_set_data = []
+    safe_set_key_test = []
+    safe_set_data_test = []
+    safe_set_data_card_test = []
     start = time.time()
     for j in range(n_features):
         for k in range(j, n_features):
             inter_feat = (X_binned[:, j]
                           * X_binned[:, k])
-
+            card = np.count_nonzero(inter_feat)
+            safe_set_data_card_test.append(card)
             u_t = inter_feat.dot(safe_sphere_center)
             v_t = 0
             v_t = (inter_feat**2).sum()
-            # for i in range(len(inter_feat)):
-            #     v_t += (inter_feat[i]**2).sum()
             sppc_t = abs(u_t) + safe_sphere_radius * np.sqrt(v_t)
 
             if sppc_t >= 1:
-                safe_set_data.append(inter_feat)
-                print("safe_set_data : ", safe_set_data)
-                safe_set_key.append((j, k))
-                print("current_safe_set_key = ", safe_set_key)
+                safe_set_data_test.append(inter_feat)
+                safe_set_key_test.append((j, k))
 
     end = time.time()
     delay1 = end - start
+    print("shape safe set data test : ", len(safe_set_data_test))
+
+    for ind in range(len(safe_set_data_test)):
+        safe_set_data_test[ind] = convert(safe_set_data_test[ind])
+        safe_set_key_test[ind] = convert(safe_set_key_test[ind])
+
+    # Test intersection of two lists
+
+    res_key = [ele1 for ele1 in safe_set_key
+               for ele2 in safe_set_key_test if ele1 == ele2]
+
+    print("length res_key = ", len(res_key))
 
     # Test for compute interactions function
 
