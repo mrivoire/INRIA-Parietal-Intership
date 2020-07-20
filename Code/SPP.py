@@ -517,6 +517,7 @@ def safe_prune(X_binned_data, X_binned_indices, X_binned_indptr,
     n_features = len(X_binned_indptr) - 1
     n_samples = max(X_binned_indices) + 1
 
+    # safe_set_data 
     current_safe_set_data = list()
     current_safe_set_ind = list()
     current_safe_set_key = list()
@@ -528,7 +529,7 @@ def safe_prune(X_binned_data, X_binned_indices, X_binned_indptr,
 
     parent_data = np.ones(n_samples)
     parent_indices = np.arange(n_samples)
-    parent_key = list()
+    current_key = list()
     # parent_key = List([int(x) for x in range(0)])
 
     for i in range(n_features):
@@ -537,7 +538,7 @@ def safe_prune(X_binned_data, X_binned_indices, X_binned_indptr,
                        X_binned_indptr=X_binned_indptr,
                        parent_data=parent_data,
                        parent_indices=parent_indices,
-                       parent_key=parent_key,
+                       current_key=current_key,
                        curent_safe_set_data=current_safe_set_data,
                        current_safe_set_ind=current_safe_set_ind,
                        current_safe_set_key=current_safe_set_key,
@@ -551,12 +552,10 @@ def safe_prune(X_binned_data, X_binned_indices, X_binned_indptr,
     # print("current_safe_set_indices : ", current_safe_set_ind)
     # print("current_safe_set_keys : ", current_safe_set_key)
 
-    return None
-
 
 # @njit
 def safe_prune_rec(X_binned_data, X_binned_indices, X_binned_indptr,
-                   parent_data, parent_indices, parent_key,
+                   parent_data, parent_indices, current_key,
                    curent_safe_set_data, current_safe_set_ind,
                    current_safe_set_key, j,
                    safe_sphere_center, safe_sphere_radius,
@@ -658,7 +657,7 @@ def safe_prune_rec(X_binned_data, X_binned_indices, X_binned_indptr,
      inter_feat_ind) = compute_interactions(X_j_data, X_j_indices,
                                             parent_data, parent_indices)
 
-    inter_feat_key = parent_key.append(j)
+    current_key.append(j)
 
     (inner_prod,
      inner_prod_neg,
@@ -668,6 +667,8 @@ def safe_prune_rec(X_binned_data, X_binned_indices, X_binned_indptr,
 
     u_t = max(inner_prod_pos, -inner_prod_neg)
     v_t = 0
+
+    # for element in inter_feat_data
     for i in range(len(inter_feat_data)):
         v_t += inter_feat_data[i]**2
 
@@ -693,20 +694,20 @@ def safe_prune_rec(X_binned_data, X_binned_indices, X_binned_indptr,
         if abs(inner_prod) >= 1:
             curent_safe_set_data.append(inter_feat_data)
             current_safe_set_ind.append(inter_feat_ind)
-            current_safe_set_key.append(inter_feat_key)
+            key = current_key.copy()
+            current_safe_set_key.append(key)
 
         if depth < max_depth:
-
             for k in range(j+1, n_features):
                 safe_prune_rec(X_binned_data, X_binned_indices,
                                X_binned_indptr,
-                               parent_data, parent_indices, parent_key,
+                               inter_feat_data, inter_feat_ind, current_key,
                                curent_safe_set_data, current_safe_set_ind,
                                current_safe_set_key, k,
                                safe_sphere_center, safe_sphere_radius,
                                max_depth, depth+1)
 
-    return None
+    current_key.pop(j)
 
 
 # def SPP(tau):
