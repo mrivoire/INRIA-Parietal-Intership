@@ -552,6 +552,7 @@ def safe_prune(X_binned_data, X_binned_indices, X_binned_indptr,
     # print("current_safe_set_indices : ", current_safe_set_ind)
     # print("current_safe_set_keys : ", current_safe_set_key)
 
+    return current_safe_set_data, current_safe_set_ind, current_safe_set_key
 
 # @njit
 def safe_prune_rec(X_binned_data, X_binned_indices, X_binned_indptr,
@@ -707,7 +708,7 @@ def safe_prune_rec(X_binned_data, X_binned_indices, X_binned_indptr,
                                safe_sphere_center, safe_sphere_radius,
                                max_depth, depth+1)
 
-    current_key.pop(j)
+    current_key.pop()
 
 
 # def SPP(tau):
