@@ -691,7 +691,7 @@ def safe_prune_rec(X_binned_data, X_binned_indices, X_binned_indptr,
 
     if sppc_t >= 1:
 
-        if abs(inner_prod) >= 1:
+        if abs(inner_prod) + safe_sphere_radius * np.sqrt(v_t) >= 1:
             curent_safe_set_data.append(inter_feat_data)
             current_safe_set_ind.append(inter_feat_ind)
             key = current_key.copy()
@@ -875,7 +875,7 @@ def main():
             v_t = 0
             for i in range(len(inter_feat)):
                 v_t += (inter_feat[i]**2).sum()
-            sppc_t = u_t + safe_sphere_radius * np.sqrt(v_t)
+            sppc_t = abs(u_t) + safe_sphere_radius * np.sqrt(v_t)
 
             if sppc_t >= 1:
                 safe_set_data.append(inter_feat)
