@@ -873,8 +873,9 @@ def main():
 
             u_t = inter_feat.dot(safe_sphere_center)
             v_t = 0
-            for i in range(len(inter_feat)):
-                v_t += (inter_feat[i]**2).sum()
+            v_t = (inter_feat**2).sum()
+            # for i in range(len(inter_feat)):
+            #     v_t += (inter_feat[i]**2).sum()
             sppc_t = abs(u_t) + safe_sphere_radius * np.sqrt(v_t)
 
             if sppc_t >= 1:
