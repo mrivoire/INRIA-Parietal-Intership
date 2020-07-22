@@ -22,6 +22,8 @@ from sklearn.utils import check_random_state
 from scipy.sparse import csc_matrix
 from scipy.sparse import issparse
 
+from cd_solver_lasso_numba import Lasso, cyclic_coordinate_descent, sparse_cd
+
 
 #######################################################################
 #                   Safe Pattern Pruning Algorithm
@@ -699,75 +701,139 @@ def safe_prune_rec(X_binned_data, X_binned_indices, X_binned_indptr,
     current_key.pop()
 
 
-# def SPP(tau):
-#     """Safe Patterns Pruning Algorithm
-#        Scan the tree from the root to the leaves and prunes out the subtree
-#        which statisfie the SPPC(t) criterion
+def SPP(X_binned, X_binned_data, X_binned_indices, X_binned_indptr, y,
+        residuals, max_depth, lmbdas_grid, epsilon, f, n_epochs, screening=True,
+        store_history=True):
+    """Safe Patterns Pruning Algorithm
+       Scan the tree from the root to the leaves and prunes out the subtrees
+       which statisfie the SPPC(t) criterion
 
-#     Parameters
-#     ----------
-#     tau: tree built over the whole set of patterns of the database
+    Parameters
+    ----------
+    tau: tree built over the whole set of patterns of the database
 
-#     Returns
-#     -------
+    Returns
+    -------
 
-#     A_hat: numpy.array, shape = (nb active features, )
-#         contains the active features taking part to the optimal
-#         predictive model
-#     """
-#     # compute lambda_max with max_val with beta = 0 and decrease it with a
-#     # logarithmic step
+    A_hat: numpy.array, shape = (nb active features, )
+        contains the active features taking part to the optimal
+        predictive model
+    """
+    # compute lambda_max with max_val with beta = 0 and decrease it with a
+    # logarithmic step
 
-#     for lambda_t in lambdas_list:
-#         # Pre-solve : solve the optimization problem with the new lambda on
-#         # the
-#         # previous optimal set of features. (epsilon not too small ~ 10^-8)
-#         # use the implemented lasso with as input only the previous
-#         # optimal subset on features
-#         # we obtain a beta_hat which is not the optimal beta but which is a
-#         # better optimization of beta since it is closer to the optimum then
-#         # the screening is better from the beginning
+    n_features = len(X_binned_indptr) - 1
+    n_samples = max(X_binned_indices) + 1
 
-#         # between pre-solve and safe prune
-#         # compute the dual gap (compute the primal and the dual)
-#         # compute of a feasible dual solution
-#         # rescaling of the solution to make it feasible
-#         max_val()
-#         # compute feasible theta with the max_val
-#         # compute the radius of the safe sphere
+    lambda_max, max_key = max_val(X_binned_data=X_binned_data,
+                                  X_binned_indices=X_binned_indices,
+                                  X_binned_indptr=X_binned_indptr,
+                                  residuals=residuals,
+                                  max_depth=max_depth)
 
-#         # Safe Prune after pre-solve :
-#         safe_prune():
+    beta_hat_t = np.zeros(n_features)
+    for lmbda_t in lmbdas_grid:
+        # Pre-solve : solve the optimization problem with the new lambda on
+        # the previous optimal set of features. (epsilon not too small ~ 10^-8)
+        # use the implemented lasso with as input only the previous
+        # optimal subset on features
+        # we obtain a beta_hat which is not the optimal beta but which is a
+        # better optimization of beta since it is closer to the optimum then
+        # the screening is better from the beginning
 
-#             # epoch == 0 => first perform spp then launch the solver with
-#             # screening
-#             # then SPP: we obtain a safe set
-#             # launch the solver taking as input the safe set
-#             # the solver will screen even more the features in the safe set
-#             # safe set vector which contains all the nodes which have not
-#             # been
-#             # screened
-#             # safe set contains both the sparse features and an id
-#             # (corresponding to the ancestors of the features)
-#             # representation of the id of the features
-#             # 2 vectors of same size : 1 with the sparse features
-#             # (vector of vectors = sparse matrix) and
-#             # 1 with the id (vector of tuples)
-#             # can be directly given as input to the solver
-#             # then remove the ids outside from the solver with regards to the
-#             # 0 coeffs of beta
-#             # or implement a class "node" with attribute key (id = tuple)
-#             # and the sparse
-#             # vector which represents the feature
-#             # then make a vector of node
+        sparse_lasso = Lasso(lmbda=lmbda_t, epsilon=epsilon, f=f,
+                             n_epochs=n_epochs,
+                             screening=screening,
+                             store_history=store_history)
 
-#         # launch the already implemented solver on the safe set
+        beta_hat_t = sparse_lasso.slopes
 
+        residuals = y - X_binned.dot(beta_hat_t)
 
-#     return list_of_sol # non-zero beta and the id
+        # between pre-solve and safe prune
+        # compute the dual gap (compute the primal and the dual)
+        # compute of a feasible dual solution
+        # rescaling of the solution to make it feasible
+        # compute feasible theta with the max_val
+        # compute the radius of the safe sphere
 
-def convert(list):
-    return tuple(list)
+        max_inner_prod, max_key = max_val(X_binned_data=X_binned_data,
+                                          X_binned_indices=X_binned_indices,
+                                          X_binned_indptr=X_binned_indptr,
+                                          residuals=residuals,
+                                          max_depth=max_depth)
+
+        theta = residuals / max(max_inner_prod, lmbda_t)
+
+        P_lmbda = 0.5 * residuals.dot(residuals)
+        P_lmbda += lmbda_t * np.linalg.norm(beta_hat_t, 1)
+
+        D_lmbda = 0.5 * np.linalg.norm(y, ord=2) ** 2
+        D_lmbda -= (((lmbda_t ** 2) / 2)
+                    * np.linalg.norm(theta - y / lmbda_t, ord=2) ** 2)
+
+        G_lmbda = P_lmbda - D_lmbda
+
+        safe_sphere_radius = np.sqrt(2 * G_lmbda)/lmbda_t
+        safe_sphere_center = theta
+
+        # Safe Prune after pre-solve:
+            # epoch == 0 => first perform spp then launch the solver with
+            # screening
+            # then SPP: we obtain a safe set
+            # launch the solver taking as input the safe set
+            # the solver will screen even more the features in the safe set
+            # safe set vector which contains all the nodes which have not
+            # been
+            # screened
+            # safe set contains both the sparse features and an id
+            # (corresponding to the ancestors of the features)
+            # representation of the id of the features
+            # 2 vectors of same size : 1 with the sparse features
+            # (vector of vectors = sparse matrix) and
+            # 1 with the id (vector of tuples)
+            # can be directly given as input to the solver
+            # then remove the ids outside from the solver with regards to the
+            # 0 coeffs of beta
+            # or implement a class "node" with attribute key (id = tuple)
+            # and the sparse
+            # vector which represents the feature
+            # then make a vector of node
+
+        # launch the already implemented solver on the safe set
+
+        for epoch in range(n_epochs):
+            (safe_set_data,
+             safe_set_ind,
+             safe_set_key) = safe_prune(X_binned_data=X_binned_data,
+                                        X_binned_indices=X_binned_indices,
+                                        X_binned_indptr=X_binned_indptr,
+                                        safe_sphere_center=safe_sphere_center,
+                                        safe_sphere_radius=safe_sphere_radius,
+                                        max_depth=max_depth)
+
+            (beta_hat_t,
+             primal_hist,
+             dual_hist,
+             gap_hist,
+             r_list,
+             n_active_features,
+             theta,
+             P_lmbda,
+             D_lmbda,
+             G_lmbda,
+             safeset_membership) = sparse_cd(X_data=safe_set_data,
+                                             X_indices=safe_set_ind,
+                                             X_indptr=safe_set_key,
+                                             y=y,
+                                             lmbda=lmbda_t,
+                                             epsilon=epsilon,
+                                             f=f,
+                                             n_epochs=n_epochs,
+                                             screening=screening,
+                                             store_history=store_history)
+
+    return beta_hat_t, safe_set_data, safe_set_ind, safe_set_key
 
 
 def main():
@@ -783,6 +849,7 @@ def main():
     store_history = True
     encode = 'onehot'
     strategy = 'quantile'
+    lmbdas_grid = [0.1, 0.3, 0.5, 0.7, 1, 2]
 
     X, y = simu(beta, n_samples=n_samples, corr=0.5, for_logreg=False,
                 random_state=rng)
@@ -798,7 +865,9 @@ def main():
     n_features = len(X_binned_indptr) - 1
     n_samples = max(X_binned_indices) + 1
 
-    # Test function for max_val
+    ######################################################
+    #             Test for max val function
+    ######################################################
 
     residuals = rng.randn(n_samples)
     # Building of the interactions features
@@ -837,7 +906,9 @@ def main():
     # print("max inner prod = ", max_inner_prod)
     # print("max key= ", max_key)
 
-    # Lasso 
+    ################################################################
+    #                           Lasso
+    ################################################################
 
     sparse_lasso_sklearn = sklearn_Lasso(alpha=(lmbda / X_binned.shape[0]),
                                          fit_intercept=False,
@@ -857,24 +928,32 @@ def main():
         inner_prod_pos,
         inner_prod_neg) = compute_inner_prod(X_j_data,
                                              X_j_indices,
-                                             residuals) 
+                                             residuals)
 
         XTR_absmax = max(abs(inner_prod), XTR_absmax)
 
-    theta = residuals / max(XTR_absmax, lmbda)  # Why max(XTR_absmax, lmbda) ?
+    # XTR_absmax = 0
+    # for j in range(n_features):
+    #     XTR_absmax = max(abs(X[:, j].dot(residuals)), XTR_absmax)
+
+    theta = residuals / max(XTR_absmax, lmbda)
 
     P_lmbda = 0.5 * residuals.dot(residuals)
     P_lmbda += lmbda * np.linalg.norm(beta_star, 1)
 
     D_lmbda = 0.5 * np.linalg.norm(y, ord=2) ** 2
-    D_lmbda -= (((lmbda ** 2) / 2) * np.linalg.norm(theta - y / lmbda, ord=2) 
+    D_lmbda -= (((lmbda ** 2) / 2) * np.linalg.norm(theta - y / lmbda, ord=2)
                 ** 2)
 
     # Computation of the dual gap
     G_lmbda = P_lmbda - D_lmbda
     safe_sphere_radius = np.sqrt(2 * G_lmbda)/lmbda
     # safe_sphere_radius = 1
-    safe_sphere_center = theta 
+    safe_sphere_center = theta
+
+    #####################################################################
+    #                       Test Safe Prune function
+    #####################################################################
 
     (safe_set_data,
      safe_set_ind,
@@ -886,9 +965,9 @@ def main():
                                 max_depth=max_depth)
 
     for ind in range(len(safe_set_data)):
-        safe_set_data[ind] = convert(safe_set_data[ind])
-        safe_set_ind[ind] = convert(safe_set_ind[ind])
-        safe_set_key[ind] = convert(safe_set_key[ind])
+        safe_set_data[ind] = tuple(safe_set_data[ind])
+        safe_set_ind[ind] = tuple(safe_set_ind[ind])
+        safe_set_key[ind] = tuple(safe_set_key[ind])
 
     safe_set_data_card = []
     for elmt in safe_set_data:
@@ -914,46 +993,73 @@ def main():
 
             if sppc_t >= 1:
                 safe_set_data_test.append(inter_feat)
-                safe_set_key_test.append((j, k))
+                if j == k:
+                    safe_set_key_test.append((j, ))
+                else:
+                    safe_set_key_test.append((j, k))
 
     end = time.time()
     delay1 = end - start
     print("shape safe set data test : ", len(safe_set_data_test))
 
     for ind in range(len(safe_set_data_test)):
-        safe_set_data_test[ind] = convert(safe_set_data_test[ind])
-        safe_set_key_test[ind] = convert(safe_set_key_test[ind])
+        safe_set_data_test[ind] = tuple(safe_set_data_test[ind])
+        safe_set_key_test[ind] = tuple(safe_set_key_test[ind])
 
-    # Test intersection of two lists
+    ###################################################################
+    #                  Test intersection of two lists
+    ###################################################################
 
-    res_key = [ele1 for ele1 in safe_set_key
-               for ele2 in safe_set_key_test if ele1 == ele2]
+    res_key = [ele1 for ele1 in safe_set_key if ele1 in safe_set_key_test]
 
     print("length res_key = ", len(res_key))
+    print("length safe set key : ", len(safe_set_key))
+    print("length safe set key test = ", len(safe_set_key))
 
-    # Test for compute interactions function
+    ##########################################################
+    #       Test for compute interactions function
+    ##########################################################
 
-    # ind1 = [0, 1, 2]
-    # ind2 = [0, 1, 2, 3]
-    # data1 = [1, 5, 3]
-    # data2 = [4, 7, 9, 8]
+    ind1 = [0, 1, 2]
+    ind2 = [0, 1, 2, 3]
+    data1 = [1, 5, 3]
+    data2 = [4, 7, 9, 8]
 
-    # inter_feat_data, inter_feat_ind = compute_interactions(data1,
-    #                                                        ind1,
-    #                                                        data2,
-    #                                                        ind2)
+    inter_feat_data, inter_feat_ind = compute_interactions(data1,
+                                                           ind1,
+                                                           data2,
+                                                           ind2)
 
-    # print("inter feat data = ", inter_feat_data)
-    # print("inter feat ind = ", inter_feat_ind)
+    print("inter feat data = ", inter_feat_data)
+    print("inter feat ind = ", inter_feat_ind)
 
-    # Test for compute inner product
-    # (inner_prod,
-    #  inner_prod_neg,
-    #  inner_prod_pos) = compute_inner_prod(data1, ind1, residuals)
+    ##############################################################
+    #             Test for compute inner product
+    ##############################################################
 
-    # print("inner prod = ", inner_prod)
-    # print("negative inner prod = ", inner_prod_neg)
-    # print("positive inner prod = ", inner_prod_pos)
+    (inner_prod,
+     inner_prod_neg,
+     inner_prod_pos) = compute_inner_prod(data1, ind1, residuals)
+
+
+     #################################################################
+     #                   Test for SPP function
+     #################################################################
+    (beta_hat_t,
+     safe_set_data,
+     safe_set_ind,
+     safe_set_key) = SPP(X_binned=X_binned, X_binned_data=X_binned_data,
+                         X_binned_indices=X_binned_indices,
+                         X_binned_indptr=X_binned_indptr,
+                         y=y,
+                         residuals=residuals,
+                         max_depth=max_depth,
+                         lmbdas_grid=lmbdas_grid,
+                         epsilon=epsilon,
+                         f=f,
+                         n_epochs=n_epochs,
+                         screening=True,
+                         store_history=True)                         
 
 
 if __name__ == "__main__":
