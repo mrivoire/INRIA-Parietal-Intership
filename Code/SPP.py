@@ -180,7 +180,7 @@ def max_val(X_binned_data, X_binned_indices, X_binned_indptr, residuals,
     return max_val, max_key
 
 
-# @njit
+@njit
 def compute_inner_prod(data1, ind1, residuals):
     """
     Parameters
@@ -285,7 +285,7 @@ def compute_inner_prod(data1, ind1, residuals):
 #     return inter_feat_data[0:counter], inter_feat_ind[0:counter]
 
 
-# @njit
+@njit
 def compute_interactions(data1, ind1, data2, ind2):
     """
     Parameters
@@ -319,8 +319,10 @@ def compute_interactions(data1, ind1, data2, ind2):
     count1 = 0
     count2 = 0
 
-    inter_feat_ind = list()
-    inter_feat_data = list()
+    # inter_feat_ind = list()
+    # inter_feat_data = list()
+    inter_feat_data = List([float(x) for x in range(0)])
+    inter_feat_ind = List([int(x) for x in range(0)])
 
     # inter_feat_ind = tableau de booléens avec des 1 là où on veut
     # prendre les indices
@@ -451,18 +453,11 @@ def max_val_rec(X_binned_data, X_binned_indices, X_binned_indptr,
             # recursive call of the function on the following stage
             # print("criterion satisfied and depth < max depth")
             for k in range(j+1, n_features):
-                (current_max_val,
-                 current_max_key) = max_val_rec(X_binned_data,
-                                                X_binned_indices,
-                                                X_binned_indptr,
-                                                inter_feat_data,
-                                                inter_feat_ind,
-                                                current_max_val,
-                                                current_max_key,
-                                                k, current_key,
-                                                residuals,
-                                                max_depth,
-                                                depth + 1)
+                current_max_val, current_max_key = max_val_rec(
+                    X_binned_data, X_binned_indices, X_binned_indptr,
+                    inter_feat_data, inter_feat_ind, current_max_val,
+                    current_max_key, k, current_key, residuals, max_depth,
+                    depth + 1)
 
         # We keep the same parent node and we change the child nodes ?
         # How to find the key of the feature providing the maxval ?
@@ -474,7 +469,7 @@ def max_val_rec(X_binned_data, X_binned_indices, X_binned_indptr,
 # #                           Safe Pattern Pruning
 # #############################################################################
 
-# @njit
+@njit
 def safe_prune(X_binned_data, X_binned_indices, X_binned_indptr,
                safe_sphere_center, safe_sphere_radius, max_depth):
 
@@ -517,16 +512,19 @@ def safe_prune(X_binned_data, X_binned_indices, X_binned_indptr,
     # safe_set_data = List([int(x) for x in range(0)])
     # safe_set_ind = List([int(x) for x in range(0)])
     # safe_set_key = List([int(x) for x in range(0)])
-    safe_set_data = list()
-    safe_set_ind = list()
-    safe_set_key = list()
+    safe_set_data = List([List([0.])])
+    safe_set_ind = List([List([0])])
+    safe_set_key = List([List([0])])
+    # safe_set_data = list()
+    # safe_set_ind = list()
+    # safe_set_key = list()
 
     depth = 1
 
     parent_data = np.ones(n_samples)
     parent_indices = np.arange(n_samples)
-    # current_key = List([int(x) for x in range(0)])
-    current_key = list()
+    current_key = List([int(x) for x in range(0)])
+    # current_key = list()
 
     for i in range(n_features):
         safe_prune_rec(X_binned_data=X_binned_data,
@@ -547,7 +545,7 @@ def safe_prune(X_binned_data, X_binned_indices, X_binned_indptr,
     return safe_set_data, safe_set_ind, safe_set_key
 
 
-# @njit
+@njit
 def safe_prune_rec(X_binned_data, X_binned_indices, X_binned_indptr,
                    parent_data, parent_indices, current_key,
                    safe_set_data, safe_set_ind, safe_set_key, j,
@@ -865,12 +863,14 @@ def main():
     n_features = len(X_binned_indptr) - 1
     n_samples = max(X_binned_indices) + 1
 
+    max_depth = 2
+
     ######################################################
     #             Test for max val function
     ######################################################
 
     residuals = rng.randn(n_samples)
-    # Building of the interactions features
+    # With nested loop
     max_val_test = 0
     X_binned = X_binned.toarray()
     start1 = time.time()
@@ -887,24 +887,21 @@ def main():
     end1 = time.time()
     delay1 = end1 - start1
     print("delay 1 = ", delay1)
-
     print("max val test = ", max_val_test)
-    # Test max_val function
-    max_depth = 2
 
-    # start2 = time.time()
-    # max_inner_prod, max_key = max_val(X_binned_data=X_binned_data,
-    #                                   X_binned_indices=X_binned_indices,
-    #                                   X_binned_indptr=X_binned_indptr,
-    #                                   residuals=residuals,
-    #                                   max_depth=max_depth)
+    # With recursive function
+    start2 = time.time()
+    max_inner_prod, max_key = max_val(X_binned_data=X_binned_data,
+                                      X_binned_indices=X_binned_indices,
+                                      X_binned_indptr=X_binned_indptr,
+                                      residuals=residuals,
+                                      max_depth=max_depth)
 
-    # end2 = time.time()
-    # delay2 = end2 - start2
-    # print("delay 2 = ", delay2)
-
-    # print("max inner prod = ", max_inner_prod)
-    # print("max key= ", max_key)
+    end2 = time.time()
+    delay2 = end2 - start2
+    print("delay 2 = ", delay2)
+    print("max inner prod = ", max_inner_prod)
+    print("max key= ", max_key)
 
     ################################################################
     #                           Lasso
@@ -955,6 +952,7 @@ def main():
     #                       Test Safe Prune function
     #####################################################################
 
+    # With recursive function
     (safe_set_data,
      safe_set_ind,
      safe_set_key) = safe_prune(X_binned_data=X_binned_data,
@@ -975,7 +973,7 @@ def main():
 
     print("shape safe set data : ", len(safe_set_data))
 
-    # Test function for safe prune
+    # With nested loop
     safe_set_key_test = []
     safe_set_data_test = []
     safe_set_data_card_test = []
