@@ -748,13 +748,12 @@ def SPP(X_binned, X_binned_data, X_binned_indices, X_binned_indptr, y,
     lambda_max, max_key = max_val(X_binned_data=X_binned_data,
                                   X_binned_indices=X_binned_indices,
                                   X_binned_indptr=X_binned_indptr,
-                                  residuals=y,
-                                  max_depth=max_depth)
+                                  residuals=y, max_depth=max_depth)
 
     beta_hat_t = np.zeros(n_features)
 
-    lmbdas_grid = np.logspace(start=0, stop=lambda_max, num=10, endpoint=True,
-                              base=10.0, dtype=None, axis=0)
+    lmbdas_grid = np.logspace(start=0, stop=lambda_max, num=n_val_gs, 
+                              endpoint=True, base=10.0, dtype=None, axis=0)
 
     active_set = []
 
@@ -884,7 +883,7 @@ def SPP(X_binned, X_binned_data, X_binned_indices, X_binned_indptr, y,
 def main():
 
     rng = check_random_state(0)
-    n_samples, n_features = 500, 40
+    n_samples, n_features = 100, 20
     beta = rng.randn(n_features)
     lmbda = 1.
     f = 10
@@ -895,6 +894,8 @@ def main():
     encode = 'onehot'
     strategy = 'quantile'
     lmbdas_grid = [0.1, 0.3, 0.5, 0.7, 1, 2]
+    n_bins = 3
+    max_depth = 2
 
     X, y = simu(beta, n_samples=n_samples, corr=0.5, for_logreg=False,
                 random_state=rng)
@@ -909,8 +910,7 @@ def main():
 
     n_features = len(X_binned_indptr) - 1
     n_samples = max(X_binned_indices) + 1
-
-    max_depth = 2
+    
     ######################################################
     #             Test for max val function
     ######################################################
@@ -1098,6 +1098,31 @@ def main():
     print("length safe set key : ", len(flat_safe_set_key))
     print("length safe set key test = ", len(safe_set_key_test))
 
+    #####################################################################
+    #                  Matrix of interaction features 
+    #####################################################################
+    inter_feat_list = []
+    for j in range(n_features):
+        for k in range(j, n_features):
+            inter_feat = (X_binned[:, j] * X_binned[:, k])
+            inter_feat_list.append(inter_feat)
+
+    flatten_inter_feat_list = []
+    for item in inter_feat_list:
+        for ind in item:   
+            flatten_inter_feat_list.append(ind)
+
+    inter_matrix = np.zeros((n_samples, len(inter_feat_list)))
+
+    for k in range(len(flatten_inter_feat_list)):
+        ind_col = 0
+        ind_row = k % n_samples 
+        inter_matrix[ind_row, ind_col] = flatten_inter_feat_list[k]
+        if ind_row == 0:
+            ind_col += 1
+
+    print("inter_matrix = ", inter_matrix)
+    
     ##########################################################
     #       Test for compute interactions function
     ##########################################################

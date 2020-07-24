@@ -1,7 +1,7 @@
 										Benchmark Performances Of Safe Prune Function 
 
 (Tests for n_samples = 500, n_features = 40, n_bins = 3, epsilon = 1e-14)
-(n_binned_features = (40 * 5)**3/2 * 500)
+(n_binned_features = (40 * 5)**3/2)
 (n_input = (40 * 5)**3/2 * 500)
 
 - Test n°1: Nested for loops vs safe_prune function with numba (max_depth = 2)
