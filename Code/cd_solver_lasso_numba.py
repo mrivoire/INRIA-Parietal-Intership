@@ -364,7 +364,7 @@ def sparse_cd(
     """
 
     n_features = len(X_indptr) - 1
-    n_samples = max(X_indices) + 1
+    n_samples = len(X_indices) + 1
     beta = np.zeros(n_features)
     theta = np.zeros(n_samples)
 
@@ -389,7 +389,7 @@ def sparse_cd(
     L = np.zeros(n_features)
 
     for j in range(n_features):
-        start, end = X_indptr[j : j + 2]
+        start, end = X_indptr[j: j + 2]
         for ind in range(start, end):
             L[j] += X_data[ind] ** 2
 

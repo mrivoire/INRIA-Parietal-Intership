@@ -261,7 +261,7 @@ def main():
 
     for name, (X, y) in raw_data.items():
         print('\nBefore encoding: % 20s: n=%i, d=%i'
-            % (name, X.shape[0], X.shape[1]))
+               % (name, X.shape[0], X.shape[1]))
         if hasattr(X, 'columns'):
             print(list(X.columns))
             X = X.copy()
