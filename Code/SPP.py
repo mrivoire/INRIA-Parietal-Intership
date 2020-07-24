@@ -549,7 +549,7 @@ def safe_prune(X_binned_data, X_binned_indices, X_binned_indptr,
     safe_set_ind = safe_set_ind[1:]
     safe_set_key = safe_set_key[1:]
 
-    # conversion of the safe sets to the sparse format 
+    # conversion of the safe sets to the sparse format
     safe_set_indptr = []
     flatten_safe_set_data = []
     flatten_safe_set_ind = []
@@ -561,7 +561,7 @@ def safe_prune(X_binned_data, X_binned_indices, X_binned_indptr,
             flatten_safe_set_ind.append(item)
 
     return (
-        safe_set_data, safe_set_ind, safe_set_key, flatten_safe_set_data, 
+        safe_set_data, safe_set_ind, safe_set_key, flatten_safe_set_data,
         flatten_safe_set_ind, safe_set_indptr)
 
 
@@ -752,7 +752,7 @@ def SPP(X_binned, X_binned_data, X_binned_indices, X_binned_indptr, y,
 
     beta_hat_t = np.zeros(n_features)
 
-    lmbdas_grid = np.logspace(start=0, stop=lambda_max, num=n_val_gs, 
+    lmbdas_grid = np.logspace(start=0, stop=lambda_max, num=n_val_gs,
                               endpoint=True, base=10.0, dtype=None, axis=0)
 
     active_set = []
@@ -766,7 +766,7 @@ def SPP(X_binned, X_binned_data, X_binned_indices, X_binned_indptr, y,
         # better optimization of beta since it is closer to the optimum then
         # the screening is better from the beginning
 
-        X_active_set = np.zeros(n_samples, len(active_set))
+        X_active_set = np.zeros((n_samples, len(active_set)))
         X_active_set_data = []
         X_active_set_ind = []
         X_active_set_indptr = []
@@ -883,7 +883,7 @@ def SPP(X_binned, X_binned_data, X_binned_indices, X_binned_indptr, y,
 def main():
 
     rng = check_random_state(0)
-    n_samples, n_features = 100, 20
+    n_samples, n_features = 500, 40
     beta = rng.randn(n_features)
     lmbda = 1.
     f = 10
@@ -896,6 +896,7 @@ def main():
     lmbdas_grid = [0.1, 0.3, 0.5, 0.7, 1, 2]
     n_bins = 3
     max_depth = 2
+    n_val_gs = 10
 
     X, y = simu(beta, n_samples=n_samples, corr=0.5, for_logreg=False,
                 random_state=rng)
@@ -910,7 +911,7 @@ def main():
 
     n_features = len(X_binned_indptr) - 1
     n_samples = max(X_binned_indices) + 1
-    
+
     ######################################################
     #             Test for max val function
     ######################################################
@@ -1003,7 +1004,7 @@ def main():
     # With recursive function
 
     start_sp = time.time()
-    (safe_set_data, safe_set_ind, safe_set_key, flatten_safe_set_data, 
+    (safe_set_data, safe_set_ind, safe_set_key, flatten_safe_set_data,
         flatten_safe_set_ind, safe_set_indptr) = safe_prune(
         X_binned_data=X_binned_data, X_binned_indices=X_binned_indices,
         X_binned_indptr=X_binned_indptr, safe_sphere_center=safe_sphere_center,
@@ -1029,7 +1030,7 @@ def main():
         for it in item:
             new_item.append(it)
         flat_safe_set_key.append(tuple(new_item))
-        
+
     # print("flat safe set key = ", flat_safe_set_key)
 
     # With nested loop
@@ -1099,7 +1100,7 @@ def main():
     print("length safe set key test = ", len(safe_set_key_test))
 
     #####################################################################
-    #                  Matrix of interaction features 
+    #                  Matrix of interaction features
     #####################################################################
     inter_feat_list = []
     for j in range(n_features):
@@ -1109,20 +1110,31 @@ def main():
 
     flatten_inter_feat_list = []
     for item in inter_feat_list:
-        for ind in item:   
+        for ind in item:
             flatten_inter_feat_list.append(ind)
 
-    inter_matrix = np.zeros((n_samples, len(inter_feat_list)))
+    inter_feat_X = np.zeros((n_samples, len(inter_feat_list)))
 
     for k in range(len(flatten_inter_feat_list)):
         ind_col = 0
-        ind_row = k % n_samples 
-        inter_matrix[ind_row, ind_col] = flatten_inter_feat_list[k]
+        ind_row = k % n_samples
+        inter_feat_X[ind_row, ind_col] = flatten_inter_feat_list[k]
         if ind_row == 0:
             ind_col += 1
 
-    print("inter_matrix = ", inter_matrix)
-    
+    print("matrix of interactions = ", inter_feat_X)
+
+    #######################################################################
+    #              Lasso on the matrix of interaction features
+    #######################################################################
+
+    inter_feat_lasso_sklearn = sklearn_Lasso(
+        alpha=1e-2, fit_intercept=False, normalize=False, max_iter=n_epochs,
+        tol=1e-14).fit(inter_feat_X, y)
+
+    print("slopes = ", inter_feat_lasso_sklearn.coef_)
+    print("nb of non zero coeffs = ", np.count_nonzero(inter_feat_lasso_sklearn.coef_))
+
     ##########################################################
     #       Test for compute interactions function
     ##########################################################
@@ -1152,21 +1164,11 @@ def main():
     #################################################################
     #                   Test for SPP function
     #################################################################
-    # (beta_hat_t,
-    #  safe_set_data,
-    #  safe_set_ind,
-    #  safe_set_key) = SPP(X_binned=X_binned, X_binned_data=X_binned_data,
-    #                      X_binned_indices=X_binned_indices,
-    #                      X_binned_indptr=X_binned_indptr,
-    #                      y=y,
-    #                      residuals=residuals,
-    #                      max_depth=max_depth,
-    #                      lmbdas_grid=lmbdas_grid,
-    #                      epsilon=epsilon,
-    #                      f=f,
-    #                      n_epochs=n_epochs,
-    #                      screening=True,
-    #                      store_history=True)
+    # beta_hat_t, safe_set_data, safe_set_ind, safe_set_key = SPP(
+    #     X_binned=X_binned, X_binned_data=X_binned_data, 
+    #     X_binned_indices=X_binned_indices, X_binned_indptr=X_binned_indptr, y=y,
+    #     n_val_gs=n_val_gs, max_depth=max_depth, epsilon=epsilon, f=f, 
+    #     n_epochs=n_epochs, screening=screening, store_history=store_history)
 
 
 if __name__ == "__main__":
