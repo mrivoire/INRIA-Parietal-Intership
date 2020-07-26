@@ -1,1 +1,7 @@
 *.pyc
+/Code/cache
+/Code/__pycache__
+*.csv
+*.ipynb
+*.xlsx
+/Datasets
