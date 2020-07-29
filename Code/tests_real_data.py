@@ -89,13 +89,13 @@ def read_datasets():
 #################################################
 
 
-def numeric_features(dataset):
-    numeric_feats = dataset.dtypes[~((dataset.dtypes == "object") 
-                                     | (dataset.dtypes == "category"))].index
-    # numeric_feats = dataset.dtypes[((dataset.dtypes == int) 
-    #                                 | (dataset.dtypes == float))].index
+def numeric_features(X):
+    numeric_feats = X.dtypes[~((X.dtypes == "object") 
+                                | (X.dtypes == "category"))].index
+    
+    X[numeric_feats] = X[numeric_feats].astype(np.float64)
 
-    return numeric_feats
+    return X, numeric_feats
 
 
 ##################################################
@@ -103,12 +103,13 @@ def numeric_features(dataset):
 ##################################################
 
 
-def categorical_features(dataset):
-    categorical_feats = dataset.dtypes[((dataset.dtypes == "object") 
-                                       | (dataset.dtypes == "category"))].index
-    # categorical_feats = dataset.dtypes[~((dataset.dtypes == int) 
-    #                                      | (dataset.dtypes == float))].index
-    return categorical_feats
+def categorical_features(X):
+    categorical_feats = X.dtypes[((X.dtypes == "object") 
+                                  | (X.dtypes == "category"))].index
+
+    X[categorical_feats] = X[categorical_feats].astype('category')
+    
+    return X, categorical_feats
 
 
 ###################################################
@@ -118,14 +119,12 @@ def categorical_features(dataset):
 
 def time_features_lacrimes(X):
     if hasattr(X, 'columns'):
-        print(list(X.columns))
         X = X.copy()
     columns_kept_time = []
     for col, dtype in zip(X.columns, X.dtypes):
-        if (col == 'Date_Reported') | (col == 'Date_Occurred'):
+        if ((col == 'Date_Reported') | (col == 'Date_Occurred')):
             X[col] = pd.to_datetime(X[col])
             columns_kept_time.append(col)
-
     return X, columns_kept_time
 
 
@@ -136,7 +135,6 @@ def time_features_lacrimes(X):
 
 def time_features_NYCTaxi(X):
     if hasattr(X, 'columns'):
-        print(list(X.columns))
         X = X.copy()
     columns_kept_time = []
     for col, dtype in zip(X.columns, X.dtypes):
@@ -192,7 +190,6 @@ def age_map(X):
     }
 
     if hasattr(X, 'columns'):
-        print(list(X.columns))
         X = X.copy()
         columns_kept_age = []
         if 'Age' in X.columns:
@@ -269,192 +266,6 @@ def preprocessed_dataset(X, columns_kept_list):
     X = X[flatten_columns_kept_list]
     return X
 
-
-######################################################
-#           Preprocess Auto Prices Dataset
-######################################################
-
-
-def preprocess_auto_prices():
-    faulthandler.enable()
-    mem = joblib.Memory(location='cache')
-    
-    openml_id_auto_prices = {
-        # https://www.openml.org/d/1189 BNG(auto_price)
-        # No high-cardinality categories
-        'BNG(auto_price)': 1189
-        }
-
-    raw_data = dict()
-    for name, openml_id in openml_id_auto_prices.items():
-        X, y = mem.cache(datasets.fetch_openml)(
-                                data_id=openml_id, return_X_y=True,
-                                as_frame=True)
-
-        raw_data['BNG(auto_price)'] = X, y
-        X = X.copy()
-
-    auto_price_rawdata = raw_data['BNG(auto_price)']
-
-    X_auto_raw = auto_price_rawdata[0]
-    y_auto_raw = auto_price_rawdata[1]
-
-    columns_kept = []
-    num_feats = numeric_features(X_auto_raw)
-    cat_feats = categorical_features(X_auto_raw)
-    columns_kept.append(num_feats)
-    columns_kept.append(cat_feats)
-    flatten_columns_kept = []
-    for L in columns_kept:
-        for item in L:
-            flatten_columns_kept.append(item)
-
-    X = X[flatten_columns_kept]
-
-    return X, y_auto_raw
-
-
-######################################################
-#             Preprocess Crimes Dataset 
-######################################################
-
-
-def preprocess_lacrimes():
-    faulthandler.enable()
-    mem = joblib.Memory(location='cache')
-
-    raw_data = dict()
-
-    openml_id_lacrimes = {
-        # https://www.openml.org/d/42160
-        # A few high-cardinality strings and some dates
-        'la_crimes': 42160
-    }
-
-    for name, openml_id in openml_id_lacrimes.items():
-        X, y = mem.cache(datasets.fetch_openml)(
-                                    data_id=openml_id, return_X_y=True,
-                                    as_frame=True)
-        raw_data[name] = X, y
-        X = X.copy()
-
-    crimes_rawdata = raw_data['la_crimes']
-
-    X_crimes_raw = crimes_rawdata[0]
-    y_crimes_raw = crimes_rawdata[1]
-
-    columns_kept = []
-    num_feats = numeric_features(X_crimes_raw)
-    cat_feats = categorical_features(X_crimes_raw)
-    # cat_feats = preprocess_category_feats(X_crimes_raw)
-    # obj_feats = preprocess_object_feats(X_crimes_raw)
-    X_time, time_feats = time_features_lacrimes(X_crimes_raw)
-    X_age, age_feat = age_map(X_crimes_raw)
-    columns_kept.append(num_feats)
-    columns_kept.append(cat_feats)
-    # columns_kept.append(obj_feats)
-    # columns_kept.append(time_feats)
-    # columns_kept.append(age_feat)
-
-    flatten_columns_kept = []
-    for L in columns_kept:
-        for item in L:
-            flatten_columns_kept.append(item)
-
-    X = pd.concat([X[flatten_columns_kept], X_time, X_age])
-    X['Date_Reported'] = pd.to_datetime(X['Date_Reported'])
-    X['Date_Occurred'] = pd.to_datetime(X['Date_Occurred'])
-
-    return X, y_crimes_raw
-
-
-######################################################
-#          Preprocess Black Friday Dataset
-######################################################
-
-
-def preprocess_black_friday():
-    faulthandler.enable()
-    mem = joblib.Memory(location='cache')
-
-    raw_data = dict()
-
-    openml_id_black_friday = {
-        # https://www.openml.org/d/41540
-        'black_friday': 41540
-    }
-
-    for name, openml_id in openml_id_black_friday.items():
-        X, y = mem.cache(datasets.fetch_openml)(
-                                    data_id=openml_id, return_X_y=True,
-                                    as_frame=True)
-        raw_data[name] = X, y
-        X = X.copy()
-    
-    black_friday_rawdata = raw_data['black_friday']
-
-    X_black_friday_raw = black_friday_rawdata[0]
-    y_black_friday_raw = black_friday_rawdata[1]
-
-    columns_kept = []
-    num_feats = numeric_features(X_black_friday_raw)
-    cat_feats = categorical_features(X_black_friday_raw)
-    columns_kept.append(num_feats)
-    columns_kept.append(cat_feats)
-
-    flatten_columns_kept = []
-    for L in columns_kept:
-        for item in L:
-            flatten_columns_kept.append(item)
-
-    X = X[flatten_columns_kept]
-
-    return X, y_black_friday_raw
-
-
-def preprocess_NYCtaxi():
-
-    faulthandler.enable()
-    mem = joblib.Memory(location='cache')
-
-    raw_data = dict()
-
-    openml_id_nyc_taxi = {
-        # https://www.openml.org/d/42208 nyc-taxi-green-dec-2016
-        # No high cardinality strings, a few datetimes
-        # Skipping because I cannot get it to encode right
-        'nyc-taxi-green-dec-2016': 42208
-        }
-
-    for name, openml_id in openml_id_nyc_taxi.items():
-        X, y = mem.cache(datasets.fetch_openml)(
-                                    data_id=openml_id, return_X_y=True,
-                                    as_frame=True)
-        raw_data[name] = X, y
-        X = X.copy()
-
-    nyc_taxi_rawdata = raw_data['nyc-taxi-green-dec-2016']
-
-    X_NYCTaxi_raw = nyc_taxi_rawdata[0]
-    y_NYCTaxi_raw = nyc_taxi_rawdata[1]
-
-    columns_kept = []
-    num_feats = numeric_features(X_NYCTaxi_raw)
-    cat_feats = categorical_features(X_NYCTaxi_raw)
-    X_NYCTaxi, time_feats = time_features_NYCTaxi(X_NYCTaxi_raw)
-    columns_kept.append(num_feats)
-    columns_kept.append(cat_feats)
-
-    flatten_columns_kept = []
-    for L in columns_kept:
-        for item in L:
-            flatten_columns_kept.append(item)
-
-    X = pd.concat([X[flatten_columns_kept], X_NYCTaxi])
-    X['lpep_pickup_datetime'] = pd.to_datetime(X['lpep_pickup_datetime'])
-    X['lpep_dropoff_datetime'] = pd.to_datetime(X['lpep_dropoff_datetime'])
-
-    return X, y_NYCTaxi_raw
 
 ##########################################################
 #     One-hot encoding of the categorical features
