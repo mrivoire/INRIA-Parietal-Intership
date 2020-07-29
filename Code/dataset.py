@@ -4,6 +4,27 @@ import joblib
 import faulthandler
 
 
+def read_csv(filePath):
+    data = pd.read_csv(filePath + ".csv")
+    return data
+
+
+def load_housing_prices():
+    # data_dir = "./Datasets"
+    data_dir = "/home/mrivoire/Documents/M2DS_Polytechnique/INRIA-Parietal-Intership/Datasets"
+    fname_train = data_dir + "/housing_prices_train"
+    X_train = read_csv(fname_train)
+    X = X_train  # keep only train data
+    y = X['SalePrice']
+    X = X.drop('SalePrice', axis=1)
+
+    for col in X.columns:
+        if X[col].dtype == 'object':
+            X[col] = X[col].astype('category')
+
+    return X, y
+
+
 def load_auto_prices():
     """Load Auto Prices Dataset
 
@@ -86,6 +107,10 @@ def load_nyc_taxi():
 
 
 def main():
+    # Load Housing Prices Dataset
+    X_housing_prices, y_housing_prices = load_housing_prices()
+    print("X = ", X_housing_prices)
+
     # Load Auto Prices Dataset
     X_auto_prices, y_auto_prices = load_auto_prices()
     print("X = ", X_auto_prices.dtypes)
