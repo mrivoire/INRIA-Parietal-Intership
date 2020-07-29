@@ -155,6 +155,7 @@ def onehot_encoding(dataset):
 def get_models(X, **kwargs):
     # Pipeline
 
+    X, time_feats = time_convert(X)
     time_transformer = FunctionTransformer(time_convert)
     time_transformer.transform(X)
 
@@ -176,7 +177,8 @@ def get_models(X, **kwargs):
 
     preprocessor = ColumnTransformer(transformers=[
         ('num', numeric_transformer, numeric_feats),
-        ('cat', categorical_transformer, categorical_feats)])
+        ('cat', categorical_transformer, categorical_feats),
+        ('time', time_transformer, time_feats)])
 
     rf_preprocessor = ColumnTransformer(transformers=[
         ('num', rf_numeric_transformer, numeric_feats),
@@ -351,18 +353,18 @@ def main():
     print("X = ", X.dtypes)
 
     params, models = models, tuned_parameters = get_models(
-            X[:1000], 
+            X[:20], 
             lmbda=lmbda,
             epsilon=epsilon,
             f=f, n_epochs=n_epochs,
             screening=screening,
             store_history=store_history)
 
-    print("params = ", params)
-    print("models = ", models)
+    # print("params = ", params)
+    # print("models = ", models)
 
-    cv_scores = compute_cv(X=X[:1000], 
-                           y=y[:1000],
+    cv_scores = compute_cv(X=X[:20], 
+                           y=y[:20],
                            models=models, n_splits=n_splits, n_jobs=n_jobs)
 
     print("cv_scores = ", cv_scores)
@@ -379,8 +381,8 @@ def main():
     print("cv_scores without tuning params = ", list_cv_scores)
 
     start2 = time.time()
-    gs_scores = compute_gs(X=X[:1000], 
-                           y=y[:1000],
+    gs_scores = compute_gs(X=X[:20], 
+                           y=y[:20],
                            models=models, n_splits=n_splits,
                            tuned_parameters=tuned_parameters, n_jobs=n_jobs)
 
