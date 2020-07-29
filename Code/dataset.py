@@ -4,6 +4,7 @@ from sklearn import datasets
 import joblib
 import faulthandler
 import time
+import datetime
 
 import matplotlib.pyplot as plt
 
@@ -82,11 +83,13 @@ def read_datasets():
 #################################################
 
 
-def numeric_features(dataset):
-    numeric_feats = dataset.dtypes[~((dataset.dtypes == "object") 
-                                     | (dataset.dtypes == "category"))].index
+def numeric_features(X):
+    numeric_feats = X.dtypes[~((X.dtypes == "object") 
+                                | (X.dtypes == "category"))].index
+    
+    X[numeric_feats] = X[numeric_feats].astype(np.float64)
 
-    return numeric_feats
+    return X, numeric_feats
 
 
 ##################################################
@@ -94,11 +97,13 @@ def numeric_features(dataset):
 ##################################################
 
 
-def categorical_features(dataset):
-    categorical_feats = dataset.dtypes[((dataset.dtypes == "object") 
-                                       | (dataset.dtypes == "category"))].index
+def categorical_features(X):
+    categorical_feats = X.dtypes[((X.dtypes == "object") 
+                                  | (X.dtypes == "category"))].index
+
+    X[categorical_feats] = X[categorical_feats].astype('category')
     
-    return categorical_feats
+    return X, categorical_feats
 
 
 ###################################################
@@ -108,14 +113,12 @@ def categorical_features(dataset):
 
 def time_features_lacrimes(X):
     if hasattr(X, 'columns'):
-        print(list(X.columns))
         X = X.copy()
     columns_kept_time = []
     for col, dtype in zip(X.columns, X.dtypes):
-        if (col == 'Date_Reported') | (col == 'Date_Occurred'):
+        if ((col == 'Date_Reported') | (col == 'Date_Occurred')):
             X[col] = pd.to_datetime(X[col])
             columns_kept_time.append(col)
-
     return X, columns_kept_time
 
 
@@ -126,7 +129,6 @@ def time_features_lacrimes(X):
 
 def time_features_NYCTaxi(X):
     if hasattr(X, 'columns'):
-        print(list(X.columns))
         X = X.copy()
     columns_kept_time = []
     for col, dtype in zip(X.columns, X.dtypes):
@@ -157,11 +159,11 @@ def age_map(X):
     }
 
     if hasattr(X, 'columns'):
-        print(list(X.columns))
         X = X.copy()
         columns_kept_age = []
         if 'Age' in X.columns:
             X['Age'] = X['Age'].replace(age_mapping)
+            # X = X['Age']
             columns_kept_age.append('Age')
 
     return X, columns_kept_age
@@ -196,17 +198,13 @@ def load_auto_prices():
     X_auto_raw = auto_price_rawdata[0]
     y_auto_raw = auto_price_rawdata[1]
 
-    columns_kept = []
-    num_feats = numeric_features(X_auto_raw)
-    cat_feats = categorical_features(X_auto_raw)
-    columns_kept.append(num_feats)
-    columns_kept.append(cat_feats)
-    flatten_columns_kept = []
-    for L in columns_kept:
-        for item in L:
-            flatten_columns_kept.append(item)
-
-    X = X[flatten_columns_kept]
+    X_auto_prices_num, num_feats = numeric_features(X_auto_raw)
+    X_auto_prices_num = X_auto_prices_num.select_dtypes(exclude=['category'])
+    X_auto_prices_cat, cat_feats = categorical_features(X_auto_raw)
+    X_auto_prices_cat = X_auto_prices_cat.select_dtypes(exclude=['float64'])
+    
+    X = pd.concat([X_auto_prices_cat, X_auto_prices_num], axis=1)
+    print("X = ", X.dtypes)
 
     return X, y_auto_raw
 
@@ -240,23 +238,20 @@ def load_lacrimes():
     X_crimes_raw = crimes_rawdata[0]
     y_crimes_raw = crimes_rawdata[1]
 
-    columns_kept = []
-    num_feats = numeric_features(X_crimes_raw)
-    cat_feats = categorical_features(X_crimes_raw)
-    X_time, time_feats = time_features_lacrimes(X_crimes_raw)
-    print(X_time.dtypes)
-    X_age, age_feat = age_map(X_crimes_raw)
-    columns_kept.append(num_feats)
-    columns_kept.append(cat_feats)
+    X_lacrimes_num, num_feats = numeric_features(X_crimes_raw)
+    X_lacrimes_num = X_lacrimes_num.select_dtypes(exclude=['category', 
+                                                           'object'])
+    
+    X_lacrimes, time_feats = time_features_lacrimes(X_crimes_raw)
+    X_lacrimes_time = X_lacrimes.select_dtypes(exclude=['category', 
+                                                        'object', 
+                                                        'float64'])
+    
+    X_lacrimes_cat, cat_feats = categorical_features(X_lacrimes)
+    X_lacrimes_cat = X_lacrimes_cat.select_dtypes(exclude=['float64', 
+                                                           'datetime64[ns]'])
 
-    flatten_columns_kept = []
-    for L in columns_kept:
-        for item in L:
-            flatten_columns_kept.append(item)
-
-    X = pd.concat([X[flatten_columns_kept], X_time, X_age])
-    # X['Date_Reported'] = pd.to_datetime(X['Date_Reported'])
-    # X['Date_Occurred'] = pd.to_datetime(X['Date_Occurred'])
+    X = pd.concat([X_lacrimes_num, X_lacrimes_cat, X_lacrimes_time], axis=1)
 
     return X, y_crimes_raw
 
@@ -289,18 +284,13 @@ def load_black_friday():
     X_black_friday_raw = black_friday_rawdata[0]
     y_black_friday_raw = black_friday_rawdata[1]
 
-    columns_kept = []
-    num_feats = numeric_features(X_black_friday_raw)
-    cat_feats = categorical_features(X_black_friday_raw)
-    columns_kept.append(num_feats)
-    columns_kept.append(cat_feats)
+    X_blf, age_feat = age_map(X_black_friday_raw)
+    X_blf_num, num_feats = numeric_features(X_blf)
+    X_blf_num = X_blf_num.select_dtypes(exclude=['category', 'object'])
+    X_blf_cat, cat_feats = categorical_features(X_blf)
+    X_blf_cat = X_blf_cat.select_dtypes(exclude=['float64'])
 
-    flatten_columns_kept = []
-    for L in columns_kept:
-        for item in L:
-            flatten_columns_kept.append(item)
-
-    X = X[flatten_columns_kept]
+    X = pd.concat([X_blf_num, X_blf_cat])
 
     return X, y_black_friday_raw
 
@@ -335,19 +325,17 @@ def load_NYCtaxi():
     X_NYCTaxi_raw = nyc_taxi_rawdata[0]
     y_NYCTaxi_raw = nyc_taxi_rawdata[1]
 
-    columns_kept = []
-    num_feats = numeric_features(X_NYCTaxi_raw)
-    cat_feats = categorical_features(X_NYCTaxi_raw)
+    X_NYCTaxi_num, num_feats = numeric_features(X_NYCTaxi_raw)
+    X_NYCTaxi_num = X_NYCTaxi_num.select_dtypes(exclude=['category', 'object'])
     X_NYCTaxi, time_feats = time_features_NYCTaxi(X_NYCTaxi_raw)
-    columns_kept.append(num_feats)
-    columns_kept.append(cat_feats)
-
-    flatten_columns_kept = []
-    for L in columns_kept:
-        for item in L:
-            flatten_columns_kept.append(item)
-
-    X = pd.concat([X[flatten_columns_kept], X_NYCTaxi])
+    X_NYCTaxi_time = X_NYCTaxi.select_dtypes(exclude=['category', 
+                                                      'object', 
+                                                      'float64'])
+    X_NYCTaxi_cat, cat_feats = categorical_features(X_NYCTaxi)
+    X_NYCTaxi_cat = X_NYCTaxi_cat.select_dtypes(exclude=['float64', 
+                                                         'datetime64[ns]'])
+    X = pd.concat([X_NYCTaxi_cat, X_NYCTaxi_num, X_NYCTaxi_time])
+    X, cat_feats = categorical_features(X)
 
     return X, y_NYCTaxi_raw
 
@@ -363,33 +351,52 @@ def main():
         auto_price_rawdata, crimes_rawdata, nyc_taxi_rawdata, 
         black_friday_rawdata) = read_datasets()
 
+    #############################################################
+    #              Preprocess Numeric Features 
+    #############################################################
+
+    X, num_feats = numeric_features(X_auto_raw)
+
+    #############################################################
+    #              Preprocess Numeric Features 
+    #############################################################
+
+    X, cat_feats = categorical_features(X_crimes_raw)
+    # print("X = ", X.dtypes)
+
+    #############################################################
+    #              Preprocess Age Feature
+    #############################################################
+
+    # X, columns_kept_age = age_map(X_black_friday_raw)
+    # print("X = ", X.dtypes)
+
     ########################################################
     #               Load Auto Prices Dataset
     ########################################################
 
     X_auto_prices, y_auto_prices_raw = load_auto_prices()
-    print("X_auto_prices Types = ", X_auto_prices.dtypes)
 
     ########################################################
     #               Load LA Crimes Dataset
     ########################################################
 
     X_lacrimes, y_lacrimes_raw = load_lacrimes()
-    print("X_lacrimes Types = ", X_lacrimes.dtypes)
+    # print("X = ", X_lacrimes.dtypes)
 
     #########################################################
     #           Load Black Friday Dataset
     #########################################################
 
-    X_black_friday, y_black_friday_raw = load_black_friday()
-    print("X_black_friday Types = ", X_black_friday.dtypes)
+    # X_black_friday, y_black_friday_raw = load_black_friday()
+    # print("X_black_friday = ", X_black_friday.dtypes)
 
     ###########################################################
     #               Load NYC Taxi Dataset
     ###########################################################
 
     X_NYCTaxi, y_NYCTaxi_raw = load_NYCtaxi()
-    print("X_NYCTaxi Types = ", X_NYCTaxi.dtypes)
+    # print("X_NYCTaxi Types = ", X_NYCTaxi.dtypes)
 
 if __name__ == "__main__":
     main()

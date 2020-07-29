@@ -24,13 +24,16 @@ from sklearn.pipeline import Pipeline
 from sklearn.impute import SimpleImputer
 from sklearn.preprocessing import StandardScaler, OneHotEncoder
 from sklearn.model_selection import GridSearchCV
+from sklearn.preprocessing import FunctionTransformer
 # from sklearn.model_selection import train_test_split, GridSearchCV
 
 from cd_solver_lasso_numba import Lasso
 
+
 #################################################
 #               Read Datasets
 #################################################
+
 
 def read_datasets():
     faulthandler.enable()
@@ -88,7 +91,7 @@ def read_datasets():
 
 def numeric_features(dataset):
     numeric_feats = dataset.dtypes[~((dataset.dtypes == "object") 
-                                    | (dataset.dtypes == "category"))].index
+                                     | (dataset.dtypes == "category"))].index
     # numeric_feats = dataset.dtypes[((dataset.dtypes == int) 
     #                                 | (dataset.dtypes == float))].index
 
@@ -120,18 +123,8 @@ def time_features_lacrimes(X):
     columns_kept_time = []
     for col, dtype in zip(X.columns, X.dtypes):
         if (col == 'Date_Reported') | (col == 'Date_Occurred'):
-            # Only useful for NYC taxi
-            col_name = col + "_"
-            # print("col_name = ", col_name)
-            datetime = pd.to_datetime(X[col])
-            X[col_name + 'year'] = datetime.dt.year
-            X[col_name + 'weekday'] = datetime.dt.dayofweek
-            X[col_name + 'yearday'] = datetime.dt.dayofyear
-            X[col_name + 'time'] = datetime.dt.time
-            columns_kept_time.extend([col_name + 'year',
-                                      col_name + 'weekday',
-                                      col_name + 'yearday',
-                                      col_name + 'time'])
+            X[col] = pd.to_datetime(X[col])
+            columns_kept_time.append(col)
 
     return X, columns_kept_time
 
@@ -150,18 +143,36 @@ def time_features_NYCTaxi(X):
         if col.endswith('datetime'):
             # Only useful for NYC taxi
             col_name = col[:-8]
+            X[col] = pd.to_datetime(X[col])
+            columns_kept_time.append(col_name)
+            
+    return X, columns_kept_time
+
+
+#######################################################
+#                   Time Conversion
+#######################################################
+
+
+def time_convert(X):
+    if hasattr(X, 'columns'):
+        X = X.copy()
+    columns_kept_time = []
+    for col, dtype in zip(X.columns, X.dtypes):
+        if X[col].dtypes == "datetime64[ns]":
+            col_name = str(col)
             datetime = pd.to_datetime(X[col])
             X[col_name + 'year'] = datetime.dt.year
             X[col_name + 'weekday'] = datetime.dt.dayofweek
             X[col_name + 'yearday'] = datetime.dt.dayofyear
-            X[col_name + 'time'] = datetime.dt.time
+            X[col_name + 'time'] = datetime.dt.minute
             columns_kept_time.extend([col_name + 'year',
                                       col_name + 'weekday',
                                       col_name + 'yearday',
                                       col_name + 'time'])
+            X = X.drop([col_name], axis=1)
 
     return X, columns_kept_time
-
 
 ######################################################
 #               Preprocess Age Feature
@@ -351,6 +362,8 @@ def preprocess_lacrimes():
             flatten_columns_kept.append(item)
 
     X = pd.concat([X[flatten_columns_kept], X_time, X_age])
+    X['Date_Reported'] = pd.to_datetime(X['Date_Reported'])
+    X['Date_Occurred'] = pd.to_datetime(X['Date_Occurred'])
 
     return X, y_crimes_raw
 
@@ -438,85 +451,10 @@ def preprocess_NYCtaxi():
             flatten_columns_kept.append(item)
 
     X = pd.concat([X[flatten_columns_kept], X_NYCTaxi])
+    X['lpep_pickup_datetime'] = pd.to_datetime(X['lpep_pickup_datetime'])
+    X['lpep_dropoff_datetime'] = pd.to_datetime(X['lpep_dropoff_datetime'])
 
     return X, y_NYCTaxi_raw
-
-
-######################################################
-#                   Clean Dataset
-######################################################
-
-
-def clean_dataset(raw_dataset):
-
-    age_mapping = {
-        '0-17': 15,
-        '18-25': 22,
-        '26-35': 30,
-        '36-45': 40,
-        '46-50': 48,
-        '51-55': 53,
-        '55+': 60
-    }
-
-    clean_data = dict()
-
-    for name, (X, y) in raw_dataset.items():
-        print('\nBefore encoding: % 20s: n=%i, d=%i'
-               % (name, X.shape[0], X.shape[1]))
-        if hasattr(X, 'columns'):
-            print(list(X.columns))
-            X = X.copy()
-            if 'Age' in X.columns:
-                X['Age'] = X['Age'].replace(age_mapping)
-            columns_kept = []
-            for col, dtype in zip(X.columns, X.dtypes):
-                if col.endswith('datetime'):
-                    # Only useful for NYC taxi
-                    col_name = col[:-8]
-                    datetime = pd.to_datetime(X[col])
-                    X[col_name + 'year'] = datetime.dt.year
-                    X[col_name + 'weekday'] = datetime.dt.dayofweek
-                    X[col_name + 'yearday'] = datetime.dt.dayofyear
-                    X[col_name + 'time'] = datetime.dt.time
-                    columns_kept.extend([col_name + 'year',
-                                        col_name + 'weekday',
-                                        col_name + 'yearday',
-                                        col_name + 'time'])
-                elif dtype.kind in 'if':
-                    columns_kept.append(col)
-                elif hasattr(dtype, 'categories'):
-                    if len(dtype.categories) < 30:
-                        columns_kept.append(col)
-                elif dtype.kind == 'O':
-                    if X[col].nunique() < 30:
-                        columns_kept.append(col)
-            X = X[columns_kept]
-
-            X_array = pd.get_dummies(X).values
-        else:
-            X_array = X
-        clean_data[name] = X_array, y
-        print('After encoding: % 20s: n=%i, d=%i'
-            % (name, X_array.shape[0], X_array.shape[1]))
-
-    print("clean data = ", clean_data)
-
-    if raw_dataset == "auto_price_rawdata":
-        data = clean_data['BNG(auto_price)']
-        X = data[0]
-        y = data[1]
-    elif raw_dataset == "crimes_rawdata":
-        data = clean_data['la_crimes']
-        X = data[0]
-        y = data[1]
-    elif raw_dataset == "black_friday_rawdata":
-        data = clean_data['black_friday']
-        X = data[0]
-        y = data[1]
-
-    return data, X, y
-
 
 ##########################################################
 #     One-hot encoding of the categorical features
@@ -536,6 +474,12 @@ def onehot_encoding(dataset):
 
 def get_models(X, **kwargs):
     # Pipeline
+
+    X, datetime_feats_lacrimes = time_features_lacrimes(X)
+    X, datetime_feats_NYCTaxi = time_features_NYCTaxi(X)
+    time_transformer = FunctionTransformer(time_convert)
+    time_transformer.transform(X)
+
     numeric_feats = numeric_features(X)
     numeric_transformer = Pipeline(steps=[
         ('imputer', SimpleImputer(strategy='median')),
@@ -551,19 +495,6 @@ def get_models(X, **kwargs):
     categorical_transformer = Pipeline(steps=[
         ('imputer', SimpleImputer(strategy='constant', fill_value='missing')),
         ('onehot', OneHotEncoder(handle_unknown='ignore'))])
-
-    X_lacrimes, time_feats_lacrimes = time_features_lacrimes(X)
-    X_NYCTaxi, time_feats_NYCTaxi = time_features_NYCTaxi(X)
-    time_transformer = Pipeline(steps=[
-        ('imputer', SimpleImputer(strategy='median')),
-        ('scaler', StandardScaler()),
-        ('binning', KBinsDiscretizer(n_bins=3, encode='onehot',
-                                     strategy='quantile'))])
-
-    # preprocessor = ColumnTransformer(transformers=[
-    #     ('num', numeric_transformer, numeric_feats),
-    #     ('cat', categorical_transformer, categorical_feats),
-    #     ('time', time_transformer, [time_feats_lacrimes, time_feats_NYCTaxi])])
 
     preprocessor = ColumnTransformer(transformers=[
         ('num', numeric_transformer, numeric_feats),
@@ -738,263 +669,249 @@ def main():
     # print("y_crimes_raw = ", y_crimes_raw)
     # print("X_black_friday_raw = ", X_black_friday_raw)
     # print("y_black_friday_raw = ", y_black_friday_raw)
-    print(X_nyc_taxi_raw.dtypes)
+    # print(X_nyc_taxi_raw.dtypes)
 
     ########################################################################
-    #                       Tests Preprocess
+    #                       Tests Load Datasets
     ########################################################################
 
-    cat_feats = categorical_features(X_black_friday_raw)
-    num_feats = numeric_features(X_black_friday_raw)
-    print("num_feats = ", num_feats)
-    print("cat_feats = ", cat_feats)
+    X_lacrimes, columns_kept = time_features_lacrimes(X_crimes_raw)
+    X_lacrimes2, list_time_features = time_convert(X_lacrimes)
+    print('dtypes = ', X_lacrimes2.dtypes)
+    print('columns_kept = ', columns_kept)
 
-    X_lacrimes = columns_kept_time = time_features_lacrimes(X_crimes_raw)
-    # print("columns_kept_time = ", columns_kept_time)
-    columns_kept_age = age_map(X_black_friday_raw)
-    # print("columns_kept_age = ", columns_kept_age)
-    columns_kept_object = preprocess_object_feats(X_crimes_raw)
-    # print("columns_kept_object = ", columns_kept_object)
-    columns_kept_category = preprocess_category_feats(X_crimes_raw)
-    # print("columns_kept_category = ", columns_kept_category)
-    # Pbm entre object et category : presque les mêmes listes mais ne 
-    # correspondent pas exactement aux dtypes du dataset
-    columns_kept_int_float = preprocess_int_float(X_crimes_raw)
-    # print("columns_kept_int_float = ", columns_kept_int_float)
-    X_NYCTaxi, columns_kept_time_NYCTaxi = time_features_NYCTaxi(X_nyc_taxi_raw)
-    # print("columns_kept_tipe_NYCTaxi = ", columns_kept_time_NYCTaxi)
-    # print("X_NYCTaxi = ", X)
+    X_NYCTaxi, columns_kept = time_features_NYCTaxi(X_nyc_taxi_raw)
+    # print('dtypes = ', X_NYCTaxi.dtypes)
+    # print('columns_kept = ', columns_kept)
 
-    X = X_crimes_raw.copy()
-    columns_kept_list = [columns_kept_object, columns_kept_int_float]
-    # find a solution to add Age and time features to the matrix 
-    X = preprocessed_dataset(X_crimes_raw, columns_kept_list)
-    # print("X = ", X)
-
+    X_NYCTaxi2, list_time_features = time_convert(X_NYCTaxi)
+    # print('X_NYCTaxi = ', X_NYCTaxi2)
+    # print('dtypes = ', X_NYCTaxi2.dtypes)
+    X_NYCTaxi, y_NYCTaxi = preprocess_NYCtaxi()
     #########################################################################
     #                       Auto Prices Dataset
     #########################################################################
 
-    start_auto_prices1 = time.time()
+    # start_auto_prices1 = time.time()
 
-    X_auto_prices, y_auto_prices_raw = preprocess_auto_prices()
+    # X_auto_prices, y_auto_prices_raw = preprocess_auto_prices()
 
-    params, models = models, tuned_parameters = get_models(
-            X_auto_prices[:1000], 
-            lmbda=lmbda,
-            epsilon=epsilon,
-            f=f, n_epochs=n_epochs,
-            screening=screening,
-            store_history=store_history)
+    # params, models = models, tuned_parameters = get_models(
+    #         X_auto_prices[:1000], 
+    #         lmbda=lmbda,
+    #         epsilon=epsilon,
+    #         f=f, n_epochs=n_epochs,
+    #         screening=screening,
+    #         store_history=store_history)
 
-    cv_scores = compute_cv(X=X_auto_prices[:1000], 
-                           y=y_auto_prices_raw[:1000],
-                           models=models, n_splits=n_splits, n_jobs=n_jobs)
+    # cv_scores = compute_cv(X=X_auto_prices[:1000], 
+    #                        y=y_auto_prices_raw[:1000],
+    #                        models=models, n_splits=n_splits, n_jobs=n_jobs)
 
-    end_auto_prices1 = time.time()
-    delay_auto_prices1 = end_auto_prices1 - start_auto_prices1
+    # end_auto_prices1 = time.time()
+    # delay_auto_prices1 = end_auto_prices1 - start_auto_prices1
 
-    list_cv_scores_auto = []
+    # list_cv_scores_auto = []
 
-    for k, v in cv_scores.items():
-        print(f'{k}: {v}')
-        list_cv_scores_auto.append(v)
+    # for k, v in cv_scores.items():
+    #     print(f'{k}: {v}')
+    #     list_cv_scores_auto.append(v)
 
-    print("cv_scores without tuning params = ", list_cv_scores_auto)
+    # print("cv_scores without tuning params = ", list_cv_scores_auto)
 
-    start_auto_prices2 = time.time()
-    gs_scores = compute_gs(X=X_auto_prices[:1000], 
-                           y=y_auto_prices_raw[:1000],
-                           models=models, n_splits=n_splits,
-                           tuned_parameters=tuned_parameters, n_jobs=n_jobs)
+    # start_auto_prices2 = time.time()
+    # gs_scores = compute_gs(X=X_auto_prices[:1000], 
+    #                        y=y_auto_prices_raw[:1000],
+    #                        models=models, n_splits=n_splits,
+    #                        tuned_parameters=tuned_parameters, n_jobs=n_jobs)
 
-    end_auto_prices2 = time.time()
-    delay_auto_prices2 = end_auto_prices2 - start_auto_prices2
-    delay_auto_prices = delay_auto_prices1 + delay_auto_prices2
-    list_gs_scores_auto = []
-    for k, v in gs_scores.items():
-        print(f'{k} -- best params = {v.best_params_}')
-        print(f'{k} -- cv scores = {v.best_score_}')
-        list_gs_scores_auto.append(v.best_score_)
+    # end_auto_prices2 = time.time()
+    # delay_auto_prices2 = end_auto_prices2 - start_auto_prices2
+    # delay_auto_prices = delay_auto_prices1 + delay_auto_prices2
+    # list_gs_scores_auto = []
+    # for k, v in gs_scores.items():
+    #     print(f'{k} -- best params = {v.best_params_}')
+    #     print(f'{k} -- cv scores = {v.best_score_}')
+    #     list_gs_scores_auto.append(v.best_score_)
 
-    print("cv_score with tuning params = ", list_gs_scores_auto)
+    # print("cv_score with tuning params = ", list_gs_scores_auto)
     
-    print("delay_auto_prices = ", delay_auto_prices)
+    # print("delay_auto_prices = ", delay_auto_prices)
 
     #######################################################################
     #                     Bar Plots Auto Prices Dataset
     #######################################################################
 
-    labels = ['Lasso', 'Lasso_cv', 'Ridge_cv', 'XGB', 'RF']
+    # labels = ['Lasso', 'Lasso_cv', 'Ridge_cv', 'XGB', 'RF']
 
-    x = np.arange(len(labels))  # the label locations
-    width = 0.35  # the width of the bars
+    # x = np.arange(len(labels))  # the label locations
+    # width = 0.35  # the width of the bars
 
-    fig, ax = plt.subplots()
-    rects1 = ax.bar(x, list_gs_scores_auto, width)
-    # Add some text for labels, title and custom x-axis tick labels, etc.
-    ax.set_ylabel('CV Scores')
-    ax.set_title('Crossval Scores By Predictive Model With Tuning For 1000 Samples')
-    ax.set_xticks(x)
-    ax.set_xticklabels(labels)
-    ax.legend()
+    # fig, ax = plt.subplots()
+    # rects1 = ax.bar(x, list_gs_scores_auto, width)
+    # # Add some text for labels, title and custom x-axis tick labels, etc.
+    # ax.set_ylabel('CV Scores')
+    # ax.set_title('Crossval Scores By Predictive Model With Tuning For 1000 Samples')
+    # ax.set_xticks(x)
+    # ax.set_xticklabels(labels)
+    # ax.legend()
 
-    autolabel(rects1, 1000)
+    # autolabel(rects1, 1000)
 
-    fig.tight_layout()
+    # fig.tight_layout()
 
-    plt.show()
+    # plt.show()
 
     #########################################################################
     #                           LA Crimes Dataset
     #########################################################################
-    start_lacrimes1 = time.time()
+    # start_lacrimes1 = time.time()
 
-    X_lacrimes, y_crimes_raw = preprocess_lacrimes()
+    # X_lacrimes, y_crimes_raw = preprocess_lacrimes()
 
-    params, models = models, tuned_parameters = get_models(
-            X_lacrimes[:1000], 
-            lmbda=lmbda,
-            epsilon=epsilon,
-            f=f, n_epochs=n_epochs,
-            screening=screening,
-            store_history=store_history)
+    # params, models = models, tuned_parameters = get_models(
+    #         X_lacrimes[:1000], 
+    #         lmbda=lmbda,
+    #         epsilon=epsilon,
+    #         f=f, n_epochs=n_epochs,
+    #         screening=screening,
+    #         store_history=store_history)
 
-    cv_scores = compute_cv(X=X_lacrimes[:1000], 
-                           y=y_crimes_raw[:1000],
-                           models=models, n_splits=n_splits, n_jobs=n_jobs)
+    # cv_scores = compute_cv(X=X_lacrimes[:1000], 
+    #                        y=y_crimes_raw[:1000],
+    #                        models=models, n_splits=n_splits, n_jobs=n_jobs)
 
-    end_lacrimes1 = time.time()
-    delay_lacrimes1 = end_lacrimes1 - start_lacrimes1
+    # end_lacrimes1 = time.time()
+    # delay_lacrimes1 = end_lacrimes1 - start_lacrimes1
 
-    list_cv_scores_lacrimes = []
+    # list_cv_scores_lacrimes = []
 
-    for k, v in cv_scores.items():
-        print(f'{k}: {v}')
-        list_cv_scores_lacrimes.append(v)
+    # for k, v in cv_scores.items():
+    #     print(f'{k}: {v}')
+    #     list_cv_scores_lacrimes.append(v)
 
-    print("cv_scores without tuning params = ", list_cv_scores_lacrimes)
+    # print("cv_scores without tuning params = ", list_cv_scores_lacrimes)
 
-    start_lacrimes2 = time.time()
-    gs_scores = compute_gs(X=X_lacrimes[:1000], 
-                           y=y_crimes_raw[:1000],
-                           models=models, n_splits=n_splits,
-                           tuned_parameters=tuned_parameters, n_jobs=n_jobs)
+    # start_lacrimes2 = time.time()
+    # gs_scores = compute_gs(X=X_lacrimes[:1000], 
+    #                        y=y_crimes_raw[:1000],
+    #                        models=models, n_splits=n_splits,
+    #                        tuned_parameters=tuned_parameters, n_jobs=n_jobs)
 
-    end_lacrimes2 = time.time()
-    delay_lacrimes2 = end_lacrimes2 - start_lacrimes2
+    # end_lacrimes2 = time.time()
+    # delay_lacrimes2 = end_lacrimes2 - start_lacrimes2
 
-    delay_lacrimes = delay_lacrimes1 + delay_lacrimes2
+    # delay_lacrimes = delay_lacrimes1 + delay_lacrimes2
 
-    list_gs_scores_lacrimes = []
-    for k, v in gs_scores.items():
-        print(f'{k} -- best params = {v.best_params_}')
-        print(f'{k} -- cv scores = {v.best_score_}')
-        list_gs_scores_lacrimes.append(v.best_score_)
+    # list_gs_scores_lacrimes = []
+    # for k, v in gs_scores.items():
+    #     print(f'{k} -- best params = {v.best_params_}')
+    #     print(f'{k} -- cv scores = {v.best_score_}')
+    #     list_gs_scores_lacrimes.append(v.best_score_)
 
-    print("cv_score with tuning params = ", list_gs_scores_lacrimes)
+    # print("cv_score with tuning params = ", list_gs_scores_lacrimes)
 
-    print("delay_lacrimes = ", delay_lacrimes)
+    # print("delay_lacrimes = ", delay_lacrimes)
 
     #########################################################################
     #                     Bar Plots LA Crimes Dataset
     #########################################################################
 
-    labels = ['Lasso', 'Lasso_cv', 'Ridge_cv', 'XGB', 'RF']
+    # labels = ['Lasso', 'Lasso_cv', 'Ridge_cv', 'XGB', 'RF']
 
-    x = np.arange(len(labels))  # the label locations
-    width = 0.35  # the width of the bars
+    # x = np.arange(len(labels))  # the label locations
+    # width = 0.35  # the width of the bars
 
-    fig, ax = plt.subplots()
-    rects1 = ax.bar(x, list_gs_scores_lacrimes, width)
-    # Add some text for labels, title and custom x-axis tick labels, etc.
-    ax.set_ylabel('CV Scores')
-    ax.set_title('Crossval Scores By Predictive Model With Tuning For 1000 Samples')
-    ax.set_xticks(x)
-    ax.set_xticklabels(labels)
-    ax.legend()
+    # fig, ax = plt.subplots()
+    # rects1 = ax.bar(x, list_gs_scores_lacrimes, width)
+    # # Add some text for labels, title and custom x-axis tick labels, etc.
+    # ax.set_ylabel('CV Scores')
+    # ax.set_title('Crossval Scores By Predictive Model With Tuning For 1000 Samples')
+    # ax.set_xticks(x)
+    # ax.set_xticklabels(labels)
+    # ax.legend()
 
-    autolabel(rects1, 1000)
+    # autolabel(rects1, 1000)
 
-    fig.tight_layout()
+    # fig.tight_layout()
 
-    plt.show()
+    # plt.show()
 
     #########################################################################
     #                       Black Friday Dataset
     #########################################################################
 
-    start_black_friday1 = time.time()
+    # start_black_friday1 = time.time()
 
-    X_black_friday, y_black_friday_raw = preprocess_black_friday() 
+    # X_black_friday, y_black_friday_raw = preprocess_black_friday() 
 
-    params, models = models, tuned_parameters = get_models(
-            X_black_friday[:1000], 
-            lmbda=lmbda,
-            epsilon=epsilon,
-            f=f, n_epochs=n_epochs,
-            screening=screening,
-            store_history=store_history)
+    # params, models = models, tuned_parameters = get_models(
+    #         X_black_friday[:1000], 
+    #         lmbda=lmbda,
+    #         epsilon=epsilon,
+    #         f=f, n_epochs=n_epochs,
+    #         screening=screening,
+    #         store_history=store_history)
 
-    cv_scores = compute_cv(X=X_black_friday[:1000], 
-                           y=y_black_friday_raw[:1000],
-                           models=models, n_splits=n_splits, n_jobs=n_jobs)
+    # cv_scores = compute_cv(X=X_black_friday[:1000], 
+    #                        y=y_black_friday_raw[:1000],
+    #                        models=models, n_splits=n_splits, n_jobs=n_jobs)
 
-    end_black_friday1 = time.time()
-    delay_black_friday1 = end_black_friday1 - start_black_friday1
+    # end_black_friday1 = time.time()
+    # delay_black_friday1 = end_black_friday1 - start_black_friday1
 
-    list_cv_scores_black_friday = []
+    # list_cv_scores_black_friday = []
 
-    for k, v in cv_scores.items():
-        print(f'{k}: {v}')
-        list_cv_scores_black_friday.append(v)
+    # for k, v in cv_scores.items():
+    #     print(f'{k}: {v}')
+    #     list_cv_scores_black_friday.append(v)
 
-    print("cv_scores without tuning params = ", list_cv_scores_black_friday)
+    # print("cv_scores without tuning params = ", list_cv_scores_black_friday)
 
-    start_black_friday2 = time.time()
+    # start_black_friday2 = time.time()
 
-    gs_scores = compute_gs(X=X_black_friday[:1000], 
-                           y=y_black_friday_raw[:1000],
-                           models=models, n_splits=n_splits,
-                           tuned_parameters=tuned_parameters, n_jobs=n_jobs)
+    # gs_scores = compute_gs(X=X_black_friday[:1000], 
+    #                        y=y_black_friday_raw[:1000],
+    #                        models=models, n_splits=n_splits,
+    #                        tuned_parameters=tuned_parameters, n_jobs=n_jobs)
 
-    end_black_friday2 = time.time()
-    delay_black_friday2 = end_black_friday2 - start_black_friday2
-    delay_black_friday = delay_black_friday1 + delay_black_friday2
+    # end_black_friday2 = time.time()
+    # delay_black_friday2 = end_black_friday2 - start_black_friday2
+    # delay_black_friday = delay_black_friday1 + delay_black_friday2
 
-    list_gs_scores_black_friday = []
-    for k, v in gs_scores.items():
-        print(f'{k} -- best params = {v.best_params_}')
-        print(f'{k} -- cv scores = {v.best_score_}')
-        list_gs_scores_black_friday.append(v.best_score_)
+    # list_gs_scores_black_friday = []
+    # for k, v in gs_scores.items():
+    #     print(f'{k} -- best params = {v.best_params_}')
+    #     print(f'{k} -- cv scores = {v.best_score_}')
+    #     list_gs_scores_black_friday.append(v.best_score_)
 
-    print("cv_score with tuning params = ", list_gs_scores_black_friday)
+    # print("cv_score with tuning params = ", list_gs_scores_black_friday)
 
-    print("delay_black_friday = ", delay_black_friday)
+    # print("delay_black_friday = ", delay_black_friday)
 
     ######################################################################
     #                   Bar Plots Black Friday Dataset
     ######################################################################
 
-    labels = ['Lasso', 'Lasso_cv', 'Ridge_cv', 'XGB', 'RF']
+    # labels = ['Lasso', 'Lasso_cv', 'Ridge_cv', 'XGB', 'RF']
 
-    x = np.arange(len(labels))  # the label locations
-    width = 0.35  # the width of the bars
+    # x = np.arange(len(labels))  # the label locations
+    # width = 0.35  # the width of the bars
 
-    fig, ax = plt.subplots()
-    rects1 = ax.bar(x, list_gs_scores_black_friday, width)
-    # Add some text for labels, title and custom x-axis tick labels, etc.
-    ax.set_ylabel('CV Scores')
-    ax.set_title('Crossval Scores By Predictive Model With Tuning For 1000 Samples')
-    ax.set_xticks(x)
-    ax.set_xticklabels(labels)
-    ax.legend()
+    # fig, ax = plt.subplots()
+    # rects1 = ax.bar(x, list_gs_scores_black_friday, width)
+    # # Add some text for labels, title and custom x-axis tick labels, etc.
+    # ax.set_ylabel('CV Scores')
+    # ax.set_title('Crossval Scores By Predictive Model With Tuning For 1000 Samples')
+    # ax.set_xticks(x)
+    # ax.set_xticklabels(labels)
+    # ax.legend()
 
-    autolabel(rects1, 1000)
+    # autolabel(rects1, 1000)
 
-    fig.tight_layout()
+    # fig.tight_layout()
 
-    plt.show()
+    # plt.show()
 
     #########################################################################
     #                       NYC Taxi Dataset
@@ -1051,25 +968,25 @@ def main():
     #                     Bar Plots NYC Taxi Dataset
     #########################################################################
 
-    labels = ['Lasso', 'Lasso_cv', 'Ridge_cv', 'XGB', 'RF']
+    # labels = ['Lasso', 'Lasso_cv', 'Ridge_cv', 'XGB', 'RF']
 
-    x = np.arange(len(labels))  # the label locations
-    width = 0.35  # the width of the bars
+    # x = np.arange(len(labels))  # the label locations
+    # width = 0.35  # the width of the bars
 
-    fig, ax = plt.subplots()
-    rects1 = ax.bar(x, list_gs_scores_NYCTaxi, width)
-    # Add some text for labels, title and custom x-axis tick labels, etc.
-    ax.set_ylabel('CV Scores')
-    ax.set_title('Crossval Scores By Predictive Model With Tuning For 1000 Samples')
-    ax.set_xticks(x)
-    ax.set_xticklabels(labels)
-    ax.legend()
+    # fig, ax = plt.subplots()
+    # rects1 = ax.bar(x, list_gs_scores_NYCTaxi, width)
+    # # Add some text for labels, title and custom x-axis tick labels, etc.
+    # ax.set_ylabel('CV Scores')
+    # ax.set_title('Crossval Scores By Predictive Model With Tuning For 1000 Samples')
+    # ax.set_xticks(x)
+    # ax.set_xticklabels(labels)
+    # ax.legend()
 
-    autolabel(rects1, 1000)
+    # autolabel(rects1, 1000)
 
-    fig.tight_layout()
+    # fig.tight_layout()
 
-    plt.show()
+    # plt.show()
 
     
 if __name__ == "__main__":
