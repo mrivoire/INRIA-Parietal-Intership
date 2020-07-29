@@ -24,7 +24,8 @@ from sklearn.model_selection import GridSearchCV
 from sklearn.preprocessing import FunctionTransformer
 from cd_solver_lasso_numba import Lasso
 from dataset import (
-    load_auto_prices, load_lacrimes, load_black_friday, load_nyc_taxi)
+    load_auto_prices, load_lacrimes, load_black_friday, load_nyc_taxi, 
+    load_housing_prices)
 
 
 #################################################
@@ -313,6 +314,7 @@ def main():
     ######################################################################
     #                  Auto Label Function For Bar Plots
     ######################################################################
+
     def autolabel(rects, scale):
         """Attach a text label above each bar in *rects*, displaying its
         height.
@@ -339,75 +341,85 @@ def main():
     #                       Auto Prices Dataset
     #########################################################################
 
-    start_auto_prices1 = time.time()
+    start1 = time.time()
 
-    X_auto_prices, y_auto_prices_raw = load_auto_prices()
+    # X, y = load_auto_prices()
+    # X, y = load_lacrimes()
+    # X, y = load_black_friday()
+    X, y = load_housing_prices()
+    # X, y = load_nyc_taxi()
+    print("X = ", X.dtypes)
 
     params, models = models, tuned_parameters = get_models(
-            X_auto_prices[:1000], 
+            X[:1000], 
             lmbda=lmbda,
             epsilon=epsilon,
             f=f, n_epochs=n_epochs,
             screening=screening,
             store_history=store_history)
 
-    cv_scores = compute_cv(X=X_auto_prices[:1000], 
-                           y=y_auto_prices_raw[:1000],
+    print("params = ", params)
+    print("models = ", models)
+
+    cv_scores = compute_cv(X=X[:1000], 
+                           y=y[:1000],
                            models=models, n_splits=n_splits, n_jobs=n_jobs)
 
-    end_auto_prices1 = time.time()
-    delay_auto_prices1 = end_auto_prices1 - start_auto_prices1
+    print("cv_scores = ", cv_scores)
 
-    list_cv_scores_auto = []
+    end1 = time.time()
+    delay1 = end1 - start1
+
+    list_cv_scores = []
 
     for k, v in cv_scores.items():
         print(f'{k}: {v}')
-        list_cv_scores_auto.append(v)
+        list_cv_scores.append(v)
 
-    print("cv_scores without tuning params = ", list_cv_scores_auto)
+    print("cv_scores without tuning params = ", list_cv_scores)
 
-    start_auto_prices2 = time.time()
-    gs_scores = compute_gs(X=X_auto_prices[:1000], 
-                           y=y_auto_prices_raw[:1000],
+    start2 = time.time()
+    gs_scores = compute_gs(X=X[:1000], 
+                           y=y[:1000],
                            models=models, n_splits=n_splits,
                            tuned_parameters=tuned_parameters, n_jobs=n_jobs)
 
-    end_auto_prices2 = time.time()
-    delay_auto_prices2 = end_auto_prices2 - start_auto_prices2
-    delay_auto_prices = delay_auto_prices1 + delay_auto_prices2
-    list_gs_scores_auto = []
+    end2 = time.time()
+    delay2 = end2 - start2
+    delay = delay1 + delay2
+    list_gs_scores = []
     for k, v in gs_scores.items():
         print(f'{k} -- best params = {v.best_params_}')
         print(f'{k} -- cv scores = {v.best_score_}')
-        list_gs_scores_auto.append(v.best_score_)
+        list_gs_scores.append(v.best_score_)
 
-    print("cv_score with tuning params = ", list_gs_scores_auto)
+    print("cv_score with tuning params = ", list_gs_scores)
     
-    print("delay_auto_prices = ", delay_auto_prices)
+    print("delay_auto_prices = ", delay)
 
     #######################################################################
     #                     Bar Plots Auto Prices Dataset
     #######################################################################
 
-    # labels = ['Lasso', 'Lasso_cv', 'Ridge_cv', 'XGB', 'RF']
+    labels = ['Lasso', 'Lasso_cv', 'Ridge_cv', 'XGB', 'RF']
 
-    # x = np.arange(len(labels))  # the label locations
-    # width = 0.35  # the width of the bars
+    x = np.arange(len(labels))  # the label locations
+    width = 0.35  # the width of the bars
 
-    # fig, ax = plt.subplots()
-    # rects1 = ax.bar(x, list_gs_scores_auto, width)
-    # # Add some text for labels, title and custom x-axis tick labels, etc.
-    # ax.set_ylabel('CV Scores')
-    # ax.set_title('Crossval Scores By Predictive Model With Tuning For 1000 Samples')
-    # ax.set_xticks(x)
-    # ax.set_xticklabels(labels)
-    # ax.legend()
+    fig, ax = plt.subplots()
+    rects1 = ax.bar(x, list_gs_scores, width)
+    # Add some text for labels, title and custom x-axis tick labels, etc.
+    ax.set_ylabel('CV Scores')
+    ax.set_title('Crossval Scores By Predictive Model With Tuning For 1000 Samples')
+    ax.set_xticks(x)
+    ax.set_xticklabels(labels)
+    ax.legend()
 
-    # autolabel(rects1, 1000)
+    autolabel(rects1, 1000)
 
-    # fig.tight_layout()
+    fig.tight_layout()
 
-    # plt.show()
+    plt.show()
 
     
 if __name__ == "__main__":
