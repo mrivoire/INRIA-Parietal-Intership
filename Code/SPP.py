@@ -560,9 +560,8 @@ def safe_prune(X_binned_data, X_binned_indices, X_binned_indptr,
         for item in safe_set_ind[i]:
             flatten_safe_set_ind.append(item)
 
-    return (
-        safe_set_data, safe_set_ind, safe_set_key, flatten_safe_set_data,
-        flatten_safe_set_ind, safe_set_indptr)
+    return (safe_set_data, safe_set_ind, safe_set_key, flatten_safe_set_data,
+            flatten_safe_set_ind, safe_set_indptr)
 
 
 @njit
@@ -719,6 +718,7 @@ def safe_prune_rec(X_binned_data, X_binned_indices, X_binned_indptr,
     current_key.pop()
 
 
+# @njit
 def SPP(X_binned, X_binned_data, X_binned_indices, X_binned_indptr, y,
         n_val_gs, max_depth, epsilon, f, n_epochs, screening=True,
         store_history=True):
@@ -749,13 +749,16 @@ def SPP(X_binned, X_binned_data, X_binned_indices, X_binned_indptr, y,
                                   X_binned_indices=X_binned_indices,
                                   X_binned_indptr=X_binned_indptr,
                                   residuals=y, max_depth=max_depth)
+    print("lmbda_max = ", lambda_max)
+    print("max_key = ", max_key)
 
     beta_hat_t = np.zeros(n_features)
 
     lmbdas_grid = np.logspace(start=0, stop=lambda_max, num=n_val_gs,
                               endpoint=True, base=10.0, dtype=None, axis=0)
-
-    active_set = []
+    print("lmbda_grid = ", lmbdas_grid)
+    # find a bettter initialization
+    active_set = [1, 2, 3]
 
     for lmbda_t in lmbdas_grid:
         # Pre-solve : solve the optimization problem with the new lambda on
@@ -766,23 +769,30 @@ def SPP(X_binned, X_binned_data, X_binned_indices, X_binned_indptr, y,
         # better optimization of beta since it is closer to the optimum then
         # the screening is better from the beginning
 
+        print("lmbda_t = ", lmbda_t)
         X_active_set = np.zeros((n_samples, len(active_set)))
+        print("active_set = ", type(active_set))
         X_active_set_data = []
         X_active_set_ind = []
         X_active_set_indptr = []
         for i in range(n_samples):
             for j in range(len(active_set)):
                 X_active_set[i, j] = X_binned[i, j]
+
+                print("X_active_set = ", X_active_set[i, j])
                 if X_binned[i, j] != 0:
                     X_active_set_data.append(X_binned[i, j])
                     X_active_set_ind.append(i)
                     if (i * j) % n_samples == 0:
                         X_active_set_indptr.append(j)
-
+        print("X_active_set_data = ", X_active_set_data)
+        print("X_active_set_ind = ", X_active_set_ind)
+        print("X_active_set_indptr = ", X_active_set_indptr)
         sparse_lasso = Lasso(lmbda=lmbda_t, epsilon=epsilon, f=f,
                              n_epochs=n_epochs,
                              screening=False,
                              store_history=False).fit(X_active_set, y)
+        print("sparse_lasso = ", sparse_lasso)
         # ajouter un point fit sur les features actives données par
         # safe_set_membership
         # Pas besoin d'avoir un epsilon très grand ni de screening
@@ -792,9 +802,9 @@ def SPP(X_binned, X_binned_data, X_binned_indices, X_binned_indptr, y,
         # actives grâce au safeset membership
 
         beta_hat_t = sparse_lasso.slopes
-
+        print("beta_hat_t = ", beta_hat_t)
         residuals = y - X_active_set.dot(beta_hat_t)
-
+        print("residuals = ", residuals)
         # between pre-solve and safe prune
         # compute the dual gap (compute the primal and the dual)
         # compute of a feasible dual solution
@@ -807,17 +817,21 @@ def SPP(X_binned, X_binned_data, X_binned_indices, X_binned_indptr, y,
                                           X_binned_indptr=X_active_set_indptr,
                                           residuals=residuals,
                                           max_depth=max_depth)
-
+        print("max_inner_prod = ", max_inner_prod)
         theta = residuals / max(max_inner_prod, lmbda_t)
-
+        print("theta = ", theta)
         P_lmbda = 0.5 * residuals.dot(residuals)
         P_lmbda += lmbda_t * np.linalg.norm(beta_hat_t, 1)
+        print("P_lmbda = ", P_lmbda)
 
         D_lmbda = 0.5 * np.linalg.norm(y, ord=2) ** 2
         D_lmbda -= (((lmbda_t ** 2) / 2)
                     * np.linalg.norm(theta - y / lmbda_t, ord=2) ** 2)
 
+        print("D_lmbda = ", D_lmbda)
+
         G_lmbda = P_lmbda - D_lmbda
+        print("G_lmbda = ", G_lmbda)
 
         safe_sphere_radius = np.sqrt(2 * G_lmbda)/lmbda_t
         safe_sphere_center = theta
@@ -847,12 +861,13 @@ def SPP(X_binned, X_binned_data, X_binned_indices, X_binned_indptr, y,
 
         # launch the already implemented solver on the safe set
 
-        safe_set_data, safe_set_ind, safe_set_key = safe_prune(
+        (safe_set_data, safe_set_ind, safe_set_key, flatten_safe_set_data, 
+         flatten_safe_set_ind, safe_set_indptr) = safe_prune(
             X_binned_data=X_active_set_data, X_binned_indices=X_active_set_ind,
             X_binned_indptr=X_active_set_indptr,
             safe_sphere_center=safe_sphere_center,
             safe_sphere_radius=safe_sphere_radius, max_depth=max_depth)
-
+        print("safe_set_data = ", safe_set_data)
         # Les safe sets retournent des listes de listes numba
         # convertir les listes de listes numba en une matrice sparse
         # pour pouvoir les donner en entrée au sparse_cd
@@ -871,19 +886,19 @@ def SPP(X_binned, X_binned_data, X_binned_indices, X_binned_indptr, y,
             X_indptr=safe_set_key, y=y, lmbda=lmbda_t, epsilon=epsilon, f=f,
             n_epochs=n_epochs, screening=screening,
             store_history=store_history)
-
+        print("beta_hat_t = ", beta_hat_t)
         active_set = []
         for elmt in safeset_membership:
             if elmt is True:
                 active_set.append(elmt)
-
+    print("active_set = ", active_set)
     return beta_hat_t, safe_set_data, safe_set_ind, safe_set_key
 
 
 def main():
 
     rng = check_random_state(0)
-    n_samples, n_features = 500, 40
+    n_samples, n_features = 100, 40
     beta = rng.randn(n_features)
     lmbda = 1.
     f = 10
@@ -905,9 +920,13 @@ def main():
     enc = KBinsDiscretizer(n_bins=3, encode=encode, strategy=strategy)
     X_binned = enc.fit_transform(X)
     X_binned = X_binned.tocsc()
+    print("X_binned = ",  X_binned)
     X_binned_data = X_binned.data
+    print("X_binned_data = ", X_binned_data)
     X_binned_indices = X_binned.indices
+    print("X_binned_indices = ", X_binned_indices)
     X_binned_indptr = X_binned.indptr
+    print("X_binned_indptr = ", X_binned_indptr)
 
     n_features = len(X_binned_indptr) - 1
     n_samples = max(X_binned_indices) + 1
@@ -1164,12 +1183,15 @@ def main():
     #################################################################
     #                   Test for SPP function
     #################################################################
-    # beta_hat_t, safe_set_data, safe_set_ind, safe_set_key = SPP(
-    #     X_binned=X_binned, X_binned_data=X_binned_data, 
-    #     X_binned_indices=X_binned_indices, X_binned_indptr=X_binned_indptr, y=y,
-    #     n_val_gs=n_val_gs, max_depth=max_depth, epsilon=epsilon, f=f, 
-    #     n_epochs=n_epochs, screening=screening, store_history=store_history)
+    beta_hat_t, safe_set_data, safe_set_ind, safe_set_key = SPP(
+        X_binned=X_binned, X_binned_data=X_binned_data, 
+        X_binned_indices=X_binned_indices, X_binned_indptr=X_binned_indptr, 
+        y=y,
+        n_val_gs=n_val_gs, max_depth=max_depth, epsilon=epsilon, f=f, 
+        n_epochs=n_epochs, screening=screening, store_history=store_history)
+    
+    print("beta_hat_t =", beta_hat_t)
 
-
+    
 if __name__ == "__main__":
     main()
