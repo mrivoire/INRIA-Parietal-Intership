@@ -34,12 +34,9 @@ from pandas_profiling import ProfileReport
 
 
 def numeric_features(X):
-
-    numeric_feats = X.dtypes[~((X.dtypes == "object")
-                                | (X.dtypes == "category"))].index
-
-    # X[numeric_feats] = X[numeric_feats].astype(np.float64)
-
+    numeric_feats = X.dtypes[
+        (dtype.kind in 'if' for dtype in X.dtypes)
+    ].index
     return numeric_feats
 
 
@@ -49,12 +46,8 @@ def numeric_features(X):
 
 
 def categorical_features(X):
-
     categorical_feats = X.dtypes[((X.dtypes == "object")
                                   | (X.dtypes == "category"))].index
-
-    # X[categorical_feats] = X[categorical_feats].astype('category')
-
     return categorical_feats
 
 
@@ -64,10 +57,7 @@ def categorical_features(X):
 
 
 def time_features(X):
-
     time_feats = X.dtypes[(X.dtypes == "datetime64[ns]")].index
-    # X[time_feats] = X[time_feats].astype('datetime64[ns]')
-
     return time_feats
 
 
@@ -77,35 +67,17 @@ def time_features(X):
 
 
 def time_convert(X):
-    if hasattr(X, 'columns'):
-        X = X.copy()
-    # columns_kept_time = []
+    X = X.copy()
+
     for col, dtype in zip(X.columns, X.dtypes):
-        if X[col].dtypes == "datetime64[ns]":
-            col_name = str(col)
-            # datetime = pd.to_datetime(X[col])
-            X[col_name + 'year'] = X[col].dt.year
-            X[col_name + 'weekday'] = X[col].dt.dayofweek
-            X[col_name + 'yearday'] = X[col].dt.dayofyear
-            X[col_name + 'time'] = X[col].dt.minute
-            # columns_kept_time.extend([col_name + 'year',
-            #                           col_name + 'weekday',
-            #                           col_name + 'yearday',
-            #                           col_name + 'time'])
-            X = X.drop([col_name], axis=1)
+        col_name = str(col) + '_'
+        X[col_name + 'year'] = X[col].dt.year
+        X[col_name + 'weekday'] = X[col].dt.dayofweek
+        X[col_name + 'yearday'] = X[col].dt.dayofyear
+        X[col_name + 'time'] = X[col].dt.minute
+        X = X.drop([col_name], axis=1)
 
     return X
-
-
-##########################################################
-#     One-hot encoding of the categorical features
-##########################################################
-
-
-def onehot_encoding(dataset):
-    onehot_data = pd.get_dummies(dataset)
-
-    return onehot_data
 
 
 ################################################################
@@ -119,7 +91,6 @@ def get_models(X, **kwargs):
     time_feats = time_features(X)
     print("time_feats = ", time_feats)
     time_transformer = FunctionTransformer(time_convert)
-    time_transformer.transform(X)
 
     numeric_feats = numeric_features(X)
     print("numeric_feats = ", numeric_feats)
@@ -146,13 +117,16 @@ def get_models(X, **kwargs):
     preprocessor = ColumnTransformer(transformers=[
         ('num', numeric_transformer, numeric_feats),
         ('cat', categorical_transformer, categorical_feats),
-        ('time', time_transformer, time_feats)])
+        ('time', time_transformer, time_feats)]
+    )
 
     print("preprocessor = ", preprocessor)
 
     rf_preprocessor = ColumnTransformer(transformers=[
         ('num', rf_numeric_transformer, numeric_feats),
-        ('cat', categorical_transformer, categorical_feats)])
+        ('cat', categorical_transformer, categorical_feats),
+        ('time', time_transformer, time_feats)]
+    )
 
     print("rf_preprocessor = ", rf_preprocessor)
     models = {}
@@ -232,7 +206,7 @@ def compute_cv(X, y, models, n_splits, n_jobs=1):
 
     for name, model in models.items():
         print("name = ", name)
-        print("model = ", model)
+        # print("model = ", model)
         cv_scores[name] = \
             cross_val_score(model, X, y, cv=n_splits, n_jobs=n_jobs).mean()
         print("cv = ", cv_scores[name])
