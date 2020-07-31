@@ -65,12 +65,13 @@ def time_convert(X):
     X = X.copy()
 
     for col, dtype in zip(X.columns, X.dtypes):
-        col_name = str(col) + '_'
-        X[col_name + 'year'] = X[col].dt.year
-        X[col_name + 'weekday'] = X[col].dt.dayofweek
-        X[col_name + 'yearday'] = X[col].dt.dayofyear
-        X[col_name + 'time'] = X[col].dt.minute
-        X = X.drop([col_name], axis=1)
+        if X[col].dtypes == "datetime64[ns]":
+            col_name = str(col) + '_'
+            X[col_name + 'year'] = X[col].dt.year
+            X[col_name + 'weekday'] = X[col].dt.dayofweek
+            X[col_name + 'yearday'] = X[col].dt.dayofyear
+            X[col_name + 'time'] = X[col].dt.minute
+            X = X.drop(columns=[col], axis=1)
 
     return X
 
@@ -184,7 +185,7 @@ def compute_cv(X, y, models, n_splits, n_jobs=1):
     models : dict
         dict of models
 
-    n_splits: int
+    n_splits: intprint("X before = ", X)
         number of folds
 
     n_jobs: int
@@ -287,29 +288,23 @@ def main():
 
     start1 = time.time()
 
-    X, y = load_auto_prices()
-    # print("X = ", X.dtypes)
-    # profile = ProfileReport(X, title='Pandas Profiling Report')
-    # profile.to_file(output_file='output_black_friday.html')
-
-    # X, y = load_lacrimes()
+    # X, y = load_auto_prices()
+    X, y = load_lacrimes()
     # X, y = load_black_friday()
     # X, y = load_housing_prices()
     # X, y = load_nyc_taxi()
     # X, columns_kept_time = time_convert(X)
 
-    # print("X = ", type(X))  # pandas class
-
     models, tuned_parameters = get_models(
-            X[:20],
+            X[:1000],
             lmbda=lmbda,
             epsilon=epsilon,
             f=f, n_epochs=n_epochs,
             screening=screening,
             store_history=store_history)
 
-    cv_scores = compute_cv(X=X[:20],
-                           y=y[:20],
+    cv_scores = compute_cv(X=X[:1000],
+                           y=y[:1000],
                            models=models, n_splits=n_splits, n_jobs=n_jobs)
 
     print("cv_scores = ", cv_scores)
@@ -326,8 +321,8 @@ def main():
     print("cv_scores without tuning params = ", list_cv_scores)
 
     start2 = time.time()
-    gs_scores = compute_gs(X=X[:20],
-                           y=y[:20],
+    gs_scores = compute_gs(X=X[:1000],
+                           y=y[:1000],
                            models=models, n_splits=n_splits,
                            tuned_parameters=tuned_parameters, n_jobs=n_jobs)
 
