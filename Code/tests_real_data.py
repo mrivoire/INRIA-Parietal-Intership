@@ -34,12 +34,13 @@ from pandas_profiling import ProfileReport
 
 
 def numeric_features(X):
+
     numeric_feats = X.dtypes[~((X.dtypes == "object")
                                 | (X.dtypes == "category"))].index
 
     X[numeric_feats] = X[numeric_feats].astype(np.float64)
 
-    return X, numeric_feats
+    return numeric_feats
 
 
 ##################################################
@@ -48,12 +49,26 @@ def numeric_features(X):
 
 
 def categorical_features(X):
+
     categorical_feats = X.dtypes[((X.dtypes == "object")
                                   | (X.dtypes == "category"))].index
 
     X[categorical_feats] = X[categorical_feats].astype('category')
 
-    return X, categorical_feats
+    return categorical_feats
+
+
+##################################################
+#          Preprocess Time Features
+##################################################
+
+
+def time_features(X):
+
+    time_feats = X.dtypes[(X.dtypes == "datetime64[ns]")].index
+    X[time_feats] = X[time_feats].astype('datetime64[ns]')
+
+    return time_feats
 
 
 #######################################################
@@ -64,22 +79,22 @@ def categorical_features(X):
 def time_convert(X):
     if hasattr(X, 'columns'):
         X = X.copy()
-    columns_kept_time = []
+    # columns_kept_time = []
     for col, dtype in zip(X.columns, X.dtypes):
         if X[col].dtypes == "datetime64[ns]":
             col_name = str(col)
-            datetime = pd.to_datetime(X[col])
-            X[col_name + 'year'] = datetime.dt.year
-            X[col_name + 'weekday'] = datetime.dt.dayofweek
-            X[col_name + 'yearday'] = datetime.dt.dayofyear
-            X[col_name + 'time'] = datetime.dt.minute
-            columns_kept_time.extend([col_name + 'year',
-                                      col_name + 'weekday',
-                                      col_name + 'yearday',
-                                      col_name + 'time'])
+            # datetime = pd.to_datetime(X[col])
+            X[col_name + 'year'] = X[col].dt.year
+            X[col_name + 'weekday'] = X[col].dt.dayofweek
+            X[col_name + 'yearday'] = X[col].dt.dayofyear
+            X[col_name + 'time'] = X[col].dt.minute
+            # columns_kept_time.extend([col_name + 'year',
+            #                           col_name + 'weekday',
+            #                           col_name + 'yearday',
+            #                           col_name + 'time'])
             X = X.drop([col_name], axis=1)
 
-    return X, columns_kept_time
+    return X
 
 
 ##########################################################
@@ -101,7 +116,7 @@ def onehot_encoding(dataset):
 def get_models(X, **kwargs):
     # Pipeline
 
-    X, time_feats = time_convert(X)
+    time_feats = time_features(X)
     print("time_feats = ", time_feats)
     time_transformer = FunctionTransformer(time_convert)
     time_transformer.transform(X)
@@ -304,7 +319,7 @@ def main():
     start1 = time.time()
 
     X, y = load_auto_prices()
-    print("X = ", X.dtypes)
+    # print("X = ", X.dtypes)
     # profile = ProfileReport(X, title='Pandas Profiling Report')
     # profile.to_file(output_file='output_black_friday.html')
    
@@ -312,6 +327,8 @@ def main():
     # X, y = load_black_friday()
     # X, y = load_housing_prices()
     # X, y = load_nyc_taxi()
+    # X, columns_kept_time = time_convert(X)
+    
     # print("X = ", type(X))  # pandas class
 
     models, tuned_parameters = get_models(
@@ -321,13 +338,6 @@ def main():
             f=f, n_epochs=n_epochs,
             screening=screening,
             store_history=store_history)
-
-    print("params = ", params)
-    print("models = ", models)
-    X = X.to_numpy()
-    print("X = ", X)
-    print("X = ", type(X))  # numpy ndarray
-    X = np.array(X.rename_axis('ID'))
 
     cv_scores = compute_cv(X=X[:20].values,
                            y=y[:20],
@@ -369,25 +379,25 @@ def main():
     #                     Bar Plots Auto Prices Dataset
     #######################################################################
 
-    labels = ['Lasso', 'Lasso_cv', 'Ridge_cv', 'XGB', 'RF']
+    # labels = ['Lasso', 'Lasso_cv', 'Ridge_cv', 'XGB', 'RF']
 
-    x = np.arange(len(labels))  # the label locations
-    width = 0.35  # the width of the bars
+    # x = np.arange(len(labels))  # the label locations
+    # width = 0.35  # the width of the bars
 
-    fig, ax = plt.subplots()
-    rects1 = ax.bar(x, list_gs_scores, width)
-    # Add some text for labels, title and custom x-axis tick labels, etc.
-    ax.set_ylabel('CV Scores')
-    ax.set_title('Crossval Scores By Predictive Model With Tuning For 1000 Samples')
-    ax.set_xticks(x)
-    ax.set_xticklabels(labels)
-    ax.legend()
+    # fig, ax = plt.subplots()
+    # rects1 = ax.bar(x, list_gs_scores, width)
+    # # Add some text for labels, title and custom x-axis tick labels, etc.
+    # ax.set_ylabel('CV Scores')
+    # ax.set_title('Crossval Scores By Predictive Model With Tuning For 1000 Samples')
+    # ax.set_xticks(x)
+    # ax.set_xticklabels(labels)
+    # ax.legend()
 
-    autolabel(rects1, 1000)
+    # autolabel(rects1, 1000)
 
-    fig.tight_layout()
+    # fig.tight_layout()
 
-    plt.show()
+    # plt.show()
 
 
 if __name__ == "__main__":
