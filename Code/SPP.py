@@ -718,7 +718,7 @@ def safe_prune_rec(X_binned_data, X_binned_indices, X_binned_indptr,
     current_key.pop()
 
 
-# @njit
+@njit
 def SPP(X_binned, X_binned_data, X_binned_indices, X_binned_indptr, y,
         n_val_gs, max_depth, epsilon, f, n_epochs, screening=True,
         store_history=True):
@@ -758,7 +758,7 @@ def SPP(X_binned, X_binned_data, X_binned_indices, X_binned_indptr, y,
                               endpoint=True, base=10.0, dtype=None, axis=0)
     print("lmbda_grid = ", lmbdas_grid)
     # find a bettter initialization
-    active_set = [1, 2, 3]
+    active_set = safe_set_ind = List([List([0])])
 
     for lmbda_t in lmbdas_grid:
         # Pre-solve : solve the optimization problem with the new lambda on
@@ -772,19 +772,22 @@ def SPP(X_binned, X_binned_data, X_binned_indices, X_binned_indptr, y,
         print("lmbda_t = ", lmbda_t)
         X_active_set = np.zeros((n_samples, len(active_set)))
         print("active_set = ", type(active_set))
-        X_active_set_data = []
-        X_active_set_ind = []
-        X_active_set_indptr = []
+        # X_active_set_data = []
+        # X_active_set_ind = []
+        # X_active_set_indptr = []
+        X_active_set_data = List([int(x) for x in range(0)])
+        X_active_set_ind = List([int(x) for x in range(0)])
+        X_active_set_indptr = List([int(x) for x in range(0)])
         for i in range(n_samples):
             for j in range(len(active_set)):
                 X_active_set[i, j] = X_binned[i, j]
 
                 print("X_active_set = ", X_active_set[i, j])
                 if X_binned[i, j] != 0:
-                    X_active_set_data.append(X_binned[i, j])
-                    X_active_set_ind.append(i)
+                    X_active_set_data.extend(X_binned[i, j])
+                    X_active_set_ind.extend(i)
                     if (i * j) % n_samples == 0:
-                        X_active_set_indptr.append(j)
+                        X_active_set_indptr.extend(j)
         print("X_active_set_data = ", X_active_set_data)
         print("X_active_set_ind = ", X_active_set_ind)
         print("X_active_set_indptr = ", X_active_set_indptr)

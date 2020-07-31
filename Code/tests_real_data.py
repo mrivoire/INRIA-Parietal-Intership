@@ -24,63 +24,9 @@ from sklearn.model_selection import GridSearchCV
 from sklearn.preprocessing import FunctionTransformer
 from cd_solver_lasso_numba import Lasso
 from dataset import (
-    load_auto_prices, load_lacrimes, load_black_friday, load_nyc_taxi, 
+    load_auto_prices, load_lacrimes, load_black_friday, load_nyc_taxi,
     load_housing_prices)
-
-
-#################################################
-#               Read Datasets
-#################################################
-
-
-def read_datasets():
-    faulthandler.enable()
-    mem = joblib.Memory(location='cache')
-
-    raw_data = dict()
-
-    openml_ids = {
-    # https://www.openml.org/d/1189 BNG(auto_price)
-    # No high-cardinality categories
-    'BNG(auto_price)': 1189,
-    ## https://www.openml.org/d/42160
-    ## A few high-cardinality strings and some dates
-    'la_crimes': 42160,
-    # https://www.openml.org/d/42208 nyc-taxi-green-dec-2016
-    # No high cardinality strings, a few datetimes
-    # Skipping because I cannot get it to encode right
-    'nyc-taxi-green-dec-2016': 42208,
-    # No high-cardinality categories
-    # https://www.openml.org/d/41540
-    'black_friday': 41540,
-    }
-
-    for name, openml_id in openml_ids.items():
-        X, y = mem.cache(datasets.fetch_openml)(
-                                    data_id=openml_id, return_X_y=True,
-                                    as_frame=True)
-        raw_data[name] = X, y
-
-    auto_price_rawdata = raw_data['BNG(auto_price)']
-    crimes_rawdata = raw_data['la_crimes']
-    nyc_taxi_rawdata = raw_data['nyc-taxi-green-dec-2016']
-    black_friday_rawdata = raw_data['black_friday']
-
-    X_auto_raw = auto_price_rawdata[0]
-    y_auto_raw = auto_price_rawdata[1]
-    X_crimes_raw = crimes_rawdata[0]
-    y_crimes_raw = crimes_rawdata[1]
-    X_nyc_taxi_raw = nyc_taxi_rawdata[0]
-    y_nyc_taxi_raw = nyc_taxi_rawdata[1]
-    X_black_friday_raw = black_friday_rawdata[0]
-    y_black_friday_raw = black_friday_rawdata[1]
-
-    return (
-        X_auto_raw, y_auto_raw, X_crimes_raw, y_crimes_raw, X_nyc_taxi_raw,
-        y_nyc_taxi_raw, X_black_friday_raw, y_black_friday_raw, 
-        auto_price_rawdata, crimes_rawdata, nyc_taxi_rawdata, 
-        black_friday_rawdata)
-
+from pandas_profiling import ProfileReport
 
 #################################################
 #          Preprocess Numeric Features
@@ -88,9 +34,9 @@ def read_datasets():
 
 
 def numeric_features(X):
-    numeric_feats = X.dtypes[~((X.dtypes == "object") 
+    numeric_feats = X.dtypes[~((X.dtypes == "object")
                                 | (X.dtypes == "category"))].index
-    
+
     X[numeric_feats] = X[numeric_feats].astype(np.float64)
 
     return X, numeric_feats
@@ -102,11 +48,11 @@ def numeric_features(X):
 
 
 def categorical_features(X):
-    categorical_feats = X.dtypes[((X.dtypes == "object") 
+    categorical_feats = X.dtypes[((X.dtypes == "object")
                                   | (X.dtypes == "category"))].index
 
     X[categorical_feats] = X[categorical_feats].astype('category')
-    
+
     return X, categorical_feats
 
 
@@ -156,34 +102,44 @@ def get_models(X, **kwargs):
     # Pipeline
 
     X, time_feats = time_convert(X)
+    print("time_feats = ", time_feats)
     time_transformer = FunctionTransformer(time_convert)
     time_transformer.transform(X)
 
     numeric_feats = numeric_features(X)
+    print("numeric_feats = ", numeric_feats)
     numeric_transformer = Pipeline(steps=[
         ('imputer', SimpleImputer(strategy='median')),
         ('scaler', StandardScaler()),
         ('binning', KBinsDiscretizer(n_bins=3, encode='onehot',
                                      strategy='quantile'))])
 
+    print("numeric_transformer = ", numeric_transformer)
+
     rf_numeric_transformer = Pipeline(steps=[
         ('imputer', SimpleImputer(strategy='median')),
         ('scaler', StandardScaler())])
+    print("rf_numeric_transformer = ", rf_numeric_transformer)
 
     categorical_feats = categorical_features(X)
+    print("categorical_feats = ", categorical_feats)
     categorical_transformer = Pipeline(steps=[
         ('imputer', SimpleImputer(strategy='constant', fill_value='missing')),
         ('onehot', OneHotEncoder(handle_unknown='ignore'))])
+    print("categorical_transformer = ", categorical_transformer)
 
     preprocessor = ColumnTransformer(transformers=[
         ('num', numeric_transformer, numeric_feats),
         ('cat', categorical_transformer, categorical_feats),
         ('time', time_transformer, time_feats)])
 
+    print("preprocessor = ", preprocessor)
+
     rf_preprocessor = ColumnTransformer(transformers=[
         ('num', rf_numeric_transformer, numeric_feats),
         ('cat', categorical_transformer, categorical_feats)])
 
+    print("rf_preprocessor = ", rf_preprocessor)
     models = {}
     tuned_parameters = {}
 
@@ -194,17 +150,20 @@ def get_models(X, **kwargs):
     lmbdas = np.logspace(-4, -0.5, 3)
     tuned_parameters['lasso'] = \
         {'regressor__lmbda': lmbdas, 'preprocessor__num__binning__n_bins': [2, 3, 5, 7, 10, 12, 15, 20]}
-
+    print("lasso = ", models['lasso'])
+    print("tuned_params_lasso = ", tuned_parameters['lasso'])
     # LassoCV
     models['lasso_cv'] = Pipeline(steps=[('preprocessor', preprocessor),
                                          ('regressor', linear_model.LassoCV())])
     tuned_parameters['lasso_cv'] = {'preprocessor__num__binning__n_bins': [2, 3, 5, 7, 10, 12, 15, 20]}
-
+    print("lasso_cv = ", models['lasso_cv'])
+    print("tuned_parameters_lasso_cv = ", tuned_parameters['lasso_cv'])
     # RidgeCV
     models['ridge_cv'] = Pipeline(steps=[('preprocessor', preprocessor),
                                          ('regressor', linear_model.RidgeCV())])
     tuned_parameters['ridge_cv'] = {'preprocessor__num__binning__n_bins': [2, 3, 5, 7, 10, 12, 15, 20]}
-
+    print("models_ridge_cv = ", models['ridge_cv'])
+    print("tuned_params_ridge_cv = ", tuned_parameters['ridge_cv'])
     # XGBoost
     xgb = XGBRegressor()
     models['xgb'] = Pipeline(steps=[('preprocessor', rf_preprocessor),
@@ -214,12 +173,16 @@ def get_models(X, **kwargs):
                                'regressor__n_estimators': [30, 100]}
 
     # tuned_parameters['xgb'] = {'regressor__n_estimators': [30, 100]}
-
+    print("models_xgb = ", models['xgb'])
+    print("tuned_params_xgb = ", tuned_parameters['xgb'])
     # Random Forest
     rf = RandomForestRegressor()
     models['rf'] = Pipeline(steps=[('preprocessor', rf_preprocessor),
                                    ('regressor', rf)])
     tuned_parameters['rf'] = {'regressor__max_depth': [3, 5]}
+
+    print("models_rf = ", type(models['rf']))
+    print("tuned_params_rf = ", type(tuned_parameters['rf']))
 
     return models, tuned_parameters
 
@@ -248,13 +211,16 @@ def compute_cv(X, y, models, n_splits, n_jobs=1):
     cv_scores: dict
         cross validation scores for different models
     """
+    # X = np.array(X.rename_axis('ID'))
     y = y.to_numpy().astype('float')
     cv_scores = {}
 
     for name, model in models.items():
+        print("name = ", name)
+        print("model = ", model)
         cv_scores[name] = \
             cross_val_score(model, X, y, cv=n_splits, n_jobs=n_jobs).mean()
-
+        print("cv = ", cv_scores[name])
     return cv_scores
 
 
@@ -285,6 +251,7 @@ def compute_gs(X, y, models, tuned_parameters, n_splits, n_jobs=1):
     cv_scores: dict
         cross validation scores for different models
     """
+    # X = np.array(X.rename_axis('ID'))
     y = y.to_numpy().astype('float')
     gs_models = {}
 
@@ -330,40 +297,39 @@ def main():
                         textcoords="offset points",
                         ha='center', va='bottom')
 
-    ######################################################################
-    #                           Read CSV
-    ######################################################################
-
-    (X_auto_raw, y_auto_raw, X_crimes_raw, y_crimes_raw, X_nyc_taxi_raw,
-        y_nyc_taxi_raw, X_black_friday_raw, y_black_friday_raw, 
-        auto_price_rawdata, crimes_rawdata, nyc_taxi_rawdata, 
-        black_friday_rawdata) = read_datasets()
-
     #########################################################################
     #                       Auto Prices Dataset
     #########################################################################
 
     start1 = time.time()
 
-    # X, y = load_auto_prices()
+    X, y = load_auto_prices()
+    print("X = ", X.dtypes)
+    # profile = ProfileReport(X, title='Pandas Profiling Report')
+    # profile.to_file(output_file='output_black_friday.html')
+   
     # X, y = load_lacrimes()
     # X, y = load_black_friday()
-    X, y = load_housing_prices()
+    # X, y = load_housing_prices()
     # X, y = load_nyc_taxi()
-    print("X = ", X.dtypes)
+    # print("X = ", type(X))  # pandas class
 
-    params, models = models, tuned_parameters = get_models(
-            X[:20], 
+    models, tuned_parameters = get_models(
+            X[:20],
             lmbda=lmbda,
             epsilon=epsilon,
             f=f, n_epochs=n_epochs,
             screening=screening,
             store_history=store_history)
 
-    # print("params = ", params)
-    # print("models = ", models)
+    print("params = ", params)
+    print("models = ", models)
+    X = X.to_numpy()
+    print("X = ", X)
+    print("X = ", type(X))  # numpy ndarray
+    X = np.array(X.rename_axis('ID'))
 
-    cv_scores = compute_cv(X=X[:20], 
+    cv_scores = compute_cv(X=X[:20].values,
                            y=y[:20],
                            models=models, n_splits=n_splits, n_jobs=n_jobs)
 
@@ -381,7 +347,7 @@ def main():
     print("cv_scores without tuning params = ", list_cv_scores)
 
     start2 = time.time()
-    gs_scores = compute_gs(X=X[:20], 
+    gs_scores = compute_gs(X=X[:20],
                            y=y[:20],
                            models=models, n_splits=n_splits,
                            tuned_parameters=tuned_parameters, n_jobs=n_jobs)
@@ -396,7 +362,7 @@ def main():
         list_gs_scores.append(v.best_score_)
 
     print("cv_score with tuning params = ", list_gs_scores)
-    
+
     print("delay_auto_prices = ", delay)
 
     #######################################################################
@@ -423,6 +389,6 @@ def main():
 
     plt.show()
 
-    
+
 if __name__ == "__main__":
     main()
