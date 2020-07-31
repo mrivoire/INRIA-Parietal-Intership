@@ -3,16 +3,11 @@ Experiments on real data with categorical variables
 
 """
 import numpy as np
-import pandas as pd
-from sklearn import datasets
-import joblib
-import faulthandler
 import time
 import matplotlib.pyplot as plt
 
 from xgboost import XGBRegressor
 from sklearn.ensemble import RandomForestRegressor
-from scipy.stats import skew
 from sklearn.preprocessing import KBinsDiscretizer
 from sklearn.model_selection import cross_val_score
 from sklearn import linear_model
@@ -26,7 +21,7 @@ from cd_solver_lasso_numba import Lasso
 from dataset import (
     load_auto_prices, load_lacrimes, load_black_friday, load_nyc_taxi,
     load_housing_prices)
-from pandas_profiling import ProfileReport
+# from pandas_profiling import ProfileReport
 
 #################################################
 #          Preprocess Numeric Features
@@ -296,13 +291,13 @@ def main():
     # print("X = ", X.dtypes)
     # profile = ProfileReport(X, title='Pandas Profiling Report')
     # profile.to_file(output_file='output_black_friday.html')
-   
+
     # X, y = load_lacrimes()
     # X, y = load_black_friday()
     # X, y = load_housing_prices()
     # X, y = load_nyc_taxi()
     # X, columns_kept_time = time_convert(X)
-    
+
     # print("X = ", type(X))  # pandas class
 
     models, tuned_parameters = get_models(
