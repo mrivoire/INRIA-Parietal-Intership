@@ -38,7 +38,7 @@ def numeric_features(X):
     numeric_feats = X.dtypes[~((X.dtypes == "object")
                                 | (X.dtypes == "category"))].index
 
-    X[numeric_feats] = X[numeric_feats].astype(np.float64)
+    # X[numeric_feats] = X[numeric_feats].astype(np.float64)
 
     return numeric_feats
 
@@ -53,7 +53,7 @@ def categorical_features(X):
     categorical_feats = X.dtypes[((X.dtypes == "object")
                                   | (X.dtypes == "category"))].index
 
-    X[categorical_feats] = X[categorical_feats].astype('category')
+    # X[categorical_feats] = X[categorical_feats].astype('category')
 
     return categorical_feats
 
@@ -66,7 +66,7 @@ def categorical_features(X):
 def time_features(X):
 
     time_feats = X.dtypes[(X.dtypes == "datetime64[ns]")].index
-    X[time_feats] = X[time_feats].astype('datetime64[ns]')
+    # X[time_feats] = X[time_feats].astype('datetime64[ns]')
 
     return time_feats
 
@@ -339,7 +339,7 @@ def main():
             screening=screening,
             store_history=store_history)
 
-    cv_scores = compute_cv(X=X[:20].values,
+    cv_scores = compute_cv(X=X[:20],
                            y=y[:20],
                            models=models, n_splits=n_splits, n_jobs=n_jobs)
 
@@ -379,25 +379,25 @@ def main():
     #                     Bar Plots Auto Prices Dataset
     #######################################################################
 
-    # labels = ['Lasso', 'Lasso_cv', 'Ridge_cv', 'XGB', 'RF']
+    labels = ['Lasso', 'Lasso_cv', 'Ridge_cv', 'XGB', 'RF']
 
-    # x = np.arange(len(labels))  # the label locations
-    # width = 0.35  # the width of the bars
+    x = np.arange(len(labels))  # the label locations
+    width = 0.35  # the width of the bars
 
-    # fig, ax = plt.subplots()
-    # rects1 = ax.bar(x, list_gs_scores, width)
-    # # Add some text for labels, title and custom x-axis tick labels, etc.
-    # ax.set_ylabel('CV Scores')
-    # ax.set_title('Crossval Scores By Predictive Model With Tuning For 1000 Samples')
-    # ax.set_xticks(x)
-    # ax.set_xticklabels(labels)
-    # ax.legend()
+    fig, ax = plt.subplots()
+    rects1 = ax.bar(x, list_gs_scores, width)
+    # Add some text for labels, title and custom x-axis tick labels, etc.
+    ax.set_ylabel('CV Scores')
+    ax.set_title('Crossval Scores By Predictive Model With Tuning For 1000 Samples')
+    ax.set_xticks(x)
+    ax.set_xticklabels(labels)
+    ax.legend()
 
-    # autolabel(rects1, 1000)
+    autolabel(rects1, 1000)
 
-    # fig.tight_layout()
+    fig.tight_layout()
 
-    # plt.show()
+    plt.show()
 
 
 if __name__ == "__main__":
