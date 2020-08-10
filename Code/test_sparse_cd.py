@@ -380,7 +380,8 @@ def main():
     lmbda = 1.
     f = 10.
     epsilon = 1e-15
-    n_epochs = 100000
+    n_epochs = 100
+    # n_epochs = 100000
     screening = True
     store_history = True
     encode = "onehot"
@@ -395,7 +396,8 @@ def main():
     X_binned_data = X_binned.data
     X_binned_indices = X_binned.indices
     X_binned_indptr = X_binned.indptr
-    X_binned_data = List([int(x) for x in range(0)])
+    X_binned_data = List(X_binned.data)
+    # X_binned_data = List([int(x) for x in range(0)])
     # X_binned_indices = List([int(x) for x in range(0)])
     # X_binned_indptr = List([int(x) for x in range(0)])
 
