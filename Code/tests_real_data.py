@@ -85,38 +85,29 @@ def get_models(X, **kwargs):
     # Pipeline
 
     time_feats = time_features(X)
-    print("time_feats = ", time_feats)
     time_transformer = FunctionTransformer(time_convert)
 
     numeric_feats = numeric_features(X)
-    print("numeric_feats = ", numeric_feats)
     numeric_transformer = Pipeline(steps=[
         ('imputer', SimpleImputer(strategy='median')),
         ('scaler', StandardScaler()),
         ('binning', KBinsDiscretizer(n_bins=3, encode='onehot',
                                      strategy='quantile'))])
 
-    print("numeric_transformer = ", numeric_transformer)
-
     rf_numeric_transformer = Pipeline(steps=[
         ('imputer', SimpleImputer(strategy='median')),
         ('scaler', StandardScaler())])
-    print("rf_numeric_transformer = ", rf_numeric_transformer)
 
     categorical_feats = categorical_features(X)
-    print("categorical_feats = ", categorical_feats)
     categorical_transformer = Pipeline(steps=[
         ('imputer', SimpleImputer(strategy='constant', fill_value='missing')),
         ('onehot', OneHotEncoder(handle_unknown='ignore'))])
-    print("categorical_transformer = ", categorical_transformer)
-
+    
     preprocessor = ColumnTransformer(transformers=[
         ('num', numeric_transformer, numeric_feats),
         ('cat', categorical_transformer, categorical_feats),
         ('time', time_transformer, time_feats)]
     )
-
-    print("preprocessor = ", preprocessor)
 
     rf_preprocessor = ColumnTransformer(transformers=[
         ('num', rf_numeric_transformer, numeric_feats),
@@ -124,7 +115,6 @@ def get_models(X, **kwargs):
         ('time', time_transformer, time_feats)]
     )
 
-    print("rf_preprocessor = ", rf_preprocessor)
     models = {}
     tuned_parameters = {}
 
@@ -135,20 +125,17 @@ def get_models(X, **kwargs):
     lmbdas = np.logspace(-4, -0.5, 3)
     tuned_parameters['lasso'] = \
         {'regressor__lmbda': lmbdas, 'preprocessor__num__binning__n_bins': [2, 3, 5, 7, 10, 12, 15, 20]}
-    print("lasso = ", models['lasso'])
-    print("tuned_params_lasso = ", tuned_parameters['lasso'])
+
     # LassoCV
     models['lasso_cv'] = Pipeline(steps=[('preprocessor', preprocessor),
                                          ('regressor', linear_model.LassoCV())])
     tuned_parameters['lasso_cv'] = {'preprocessor__num__binning__n_bins': [2, 3, 5, 7, 10, 12, 15, 20]}
-    print("lasso_cv = ", models['lasso_cv'])
-    print("tuned_parameters_lasso_cv = ", tuned_parameters['lasso_cv'])
+
     # RidgeCV
     models['ridge_cv'] = Pipeline(steps=[('preprocessor', preprocessor),
                                          ('regressor', linear_model.RidgeCV())])
     tuned_parameters['ridge_cv'] = {'preprocessor__num__binning__n_bins': [2, 3, 5, 7, 10, 12, 15, 20]}
-    print("models_ridge_cv = ", models['ridge_cv'])
-    print("tuned_params_ridge_cv = ", tuned_parameters['ridge_cv'])
+
     # XGBoost
     xgb = XGBRegressor()
     models['xgb'] = Pipeline(steps=[('preprocessor', rf_preprocessor),
@@ -158,16 +145,12 @@ def get_models(X, **kwargs):
                                'regressor__n_estimators': [30, 100]}
 
     # tuned_parameters['xgb'] = {'regressor__n_estimators': [30, 100]}
-    print("models_xgb = ", models['xgb'])
-    print("tuned_params_xgb = ", tuned_parameters['xgb'])
+    
     # Random Forest
     rf = RandomForestRegressor()
     models['rf'] = Pipeline(steps=[('preprocessor', rf_preprocessor),
                                    ('regressor', rf)])
     tuned_parameters['rf'] = {'regressor__max_depth': [3, 5]}
-
-    print("models_rf = ", type(models['rf']))
-    print("tuned_params_rf = ", type(tuned_parameters['rf']))
 
     return models, tuned_parameters
 
@@ -201,11 +184,8 @@ def compute_cv(X, y, models, n_splits, n_jobs=1):
     cv_scores = {}
 
     for name, model in models.items():
-        print("name = ", name)
-        # print("model = ", model)
         cv_scores[name] = \
             cross_val_score(model, X, y, cv=n_splits, n_jobs=n_jobs).mean()
-        print("cv = ", cv_scores[name])
     return cv_scores
 
 

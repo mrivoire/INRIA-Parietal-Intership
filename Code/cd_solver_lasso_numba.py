@@ -4,7 +4,7 @@ import pandas as pd
 import ipdb
 import time
 import matplotlib
-import matplotlib.pyplot as plt
+import matplotlib.pyplot as plt    
 
 from numpy.random import randn
 from scipy.linalg import toeplitz
@@ -30,6 +30,8 @@ from sklearn.pipeline import Pipeline
 from sklearn.impute import SimpleImputer
 from sklearn.preprocessing import StandardScaler, OneHotEncoder
 from sklearn.model_selection import GridSearchCV
+from numba.typed import List
+from numba import typeof
 
 ######################################################################
 #     Iterative Solver With Gap Safe Rules
@@ -387,9 +389,15 @@ def sparse_cd(
     safeset_membership = np.ones(n_features)
 
     L = np.zeros(n_features)
-
+    # L = List([int(x) for x in range(0)])
+    # L = [0] * (n_features)
     for j in range(n_features):
         start, end = X_indptr[j: j + 2]
+        start = np.int64(start)
+        end = np.int64(end)
+        # print("type start = ", type(start))
+        # print("type end = ", type(end))
+
         for ind in range(start, end):
             L[j] += X_data[ind] ** 2
 
@@ -404,7 +412,7 @@ def sparse_cd(
             old_beta_j = beta[j]
 
             # Matrix product between the features matrix X and the residuals
-            start, end = X_indptr[j : j + 2]
+            start, end = X_indptr[j: j + 2]
             grad = 0.0
             for ind in range(start, end):
                 grad += X_data[ind] * residuals[X_indices[ind]]
@@ -1237,7 +1245,6 @@ def main():
 
     fig.tight_layout()
     plt.show()
-
 
 
 if __name__ == "__main__":
