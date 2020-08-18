@@ -1,28 +1,30 @@
 import numpy as np
-import matplotlib.pyplot as plt
-import pandas as pd
-import ipdb
+# import matplotlib.pyplot as plt
+# import pandas as pd
+# import ipdb
 import time
-import matplotlib
-import matplotlib.pyplot as plt
+# import matplotlib
+# import matplotlib.pyplot as plt
 
-from numpy.random import randn
+# from numpy.random import randn
 from scipy.linalg import toeplitz
 
-from numba import njit, objmode
-from numba import jit
+from numba import njit
+# from numba import objmode
+# from numba import jit
 from numba.typed import List
-from sklearn.linear_model import LinearRegression
+# from sklearn.linear_model import LinearRegression
 from sklearn.preprocessing import KBinsDiscretizer
-from sklearn.tree import DecisionTreeRegressor
-from sklearn.decomposition import PCA
-from sklearn.model_selection import cross_val_score
+# from sklearn.tree import DecisionTreeRegressor
+# from sklearn.decomposition import PCA
+# from sklearn.model_selection import cross_val_score
 from sklearn.linear_model import Lasso as sklearn_Lasso
 from sklearn.utils import check_random_state
-from scipy.sparse import csc_matrix
-from scipy.sparse import issparse
+# from scipy.sparse import csc_matrix
+# from scipy.sparse import issparse
 
-from cd_solver_lasso_numba import Lasso, cyclic_coordinate_descent, sparse_cd
+from cd_solver_lasso_numba import Lasso, sparse_cd
+# from cd_solver_lasso_numba import Lasso, cyclic_coordinate_descent, sparse_cd
 
 
 #######################################################################
@@ -405,7 +407,7 @@ def max_val_rec(X_binned_data, X_binned_indices, X_binned_indptr,
 
     n_features = len(X_binned_indptr) - 1
 
-    start, end = X_binned_indptr[j:j+2]
+    start, end = X_binned_indptr[j:j + 2]
     X_j_indices = X_binned_indices[start:end]
     X_j_data = X_binned_data[start:end]
 
@@ -452,7 +454,7 @@ def max_val_rec(X_binned_data, X_binned_indices, X_binned_indptr,
             # start from 0 to max_depth
             # recursive call of the function on the following stage
             # print("criterion satisfied and depth < max depth")
-            for k in range(j+1, n_features):
+            for k in range(j + 1, n_features):
                 current_max_val, current_max_key = max_val_rec(
                     X_binned_data, X_binned_indices, X_binned_indptr,
                     inter_feat_data, inter_feat_ind, current_max_val,
@@ -659,7 +661,7 @@ def safe_prune_rec(X_binned_data, X_binned_indices, X_binned_indptr,
     # make tests with nested for loops and compare the safe sets by making
     # an interaction function
 
-    start, end = X_binned_indptr[j:j+2]
+    start, end = X_binned_indptr[j:j + 2]
     X_j_indices = X_binned_indices[start:end]
     X_j_data = X_binned_data[start:end]
 
@@ -707,13 +709,13 @@ def safe_prune_rec(X_binned_data, X_binned_indices, X_binned_indptr,
             safe_set_key.append(key)
 
         if depth < max_depth:
-            for k in range(j+1, n_features):
+            for k in range(j + 1, n_features):
                 safe_prune_rec(X_binned_data, X_binned_indices,
                                X_binned_indptr,
                                inter_feat_data, inter_feat_ind, current_key,
                                safe_set_data, safe_set_ind,
                                safe_set_key, k, safe_sphere_center,
-                               safe_sphere_radius, max_depth, depth+1)
+                               safe_sphere_radius, max_depth, depth + 1)
 
     current_key.pop()
 
@@ -837,35 +839,35 @@ def SPP(X_binned, X_binned_data, X_binned_indices, X_binned_indptr, y,
         G_lmbda = P_lmbda - D_lmbda
         print("G_lmbda = ", G_lmbda)
 
-        safe_sphere_radius = np.sqrt(2 * G_lmbda)/lmbda_t
+        safe_sphere_radius = np.sqrt(2 * G_lmbda) / lmbda_t
         safe_sphere_center = theta
 
         # Safe Prune after pre-solve:
-            # epoch == 0 => first perform spp then launch the solver with
-            # screening
-            # then SPP: we obtain a safe set
-            # launch the solver taking as input the safe set
-            # the solver will screen even more the features in the safe set
-            # safe set vector which contains all the nodes which have not
-            # been
-            # screened
-            # safe set contains both the sparse features and an id
-            # (corresponding to the ancestors of the features)
-            # representation of the id of the features
-            # 2 vectors of same size : 1 with the sparse features
-            # (vector of vectors = sparse matrix) and
-            # 1 with the id (vector of tuples)
-            # can be directly given as input to the solver
-            # then remove the ids outside from the solver with regards to the
-            # 0 coeffs of beta
-            # or implement a class "node" with attribute key (id = tuple)
-            # and the sparse
-            # vector which represents the feature
-            # then make a vector of node
+        # epoch == 0 => first perform spp then launch the solver with
+        # screening
+        # then SPP: we obtain a safe set
+        # launch the solver taking as input the safe set
+        # the solver will screen even more the features in the safe set
+        # safe set vector which contains all the nodes which have not
+        # been
+        # screened
+        # safe set contains both the sparse features and an id
+        # (corresponding to the ancestors of the features)
+        # representation of the id of the features
+        # 2 vectors of same size : 1 with the sparse features
+        # (vector of vectors = sparse matrix) and
+        # 1 with the id (vector of tuples)
+        # can be directly given as input to the solver
+        # then remove the ids outside from the solver with regards to the
+        # 0 coeffs of beta
+        # or implement a class "node" with attribute key (id = tuple)
+        # and the sparse
+        # vector which represents the feature
+        # then make a vector of node
 
         # launch the already implemented solver on the safe set
 
-        (safe_set_data, safe_set_ind, safe_set_key, flatten_safe_set_data, 
+        (safe_set_data, safe_set_ind, safe_set_key, flatten_safe_set_data,
          flatten_safe_set_ind, safe_set_indptr) = safe_prune(
             X_binned_data=X_active_set_data, X_binned_indices=X_active_set_ind,
             X_binned_indptr=X_active_set_indptr,
@@ -912,7 +914,7 @@ def main():
     store_history = True
     encode = 'onehot'
     strategy = 'quantile'
-    lmbdas_grid = [0.1, 0.3, 0.5, 0.7, 1, 2]
+    # lmbdas_grid = [0.1, 0.3, 0.5, 0.7, 1, 2]
     n_bins = 3
     max_depth = 2
     n_val_gs = 10
@@ -921,10 +923,10 @@ def main():
                 random_state=rng)
 
     # Discretization by binning strategy
-    enc = KBinsDiscretizer(n_bins=3, encode=encode, strategy=strategy)
+    enc = KBinsDiscretizer(n_bins=n_bins, encode=encode, strategy=strategy)
     X_binned = enc.fit_transform(X)
     X_binned = X_binned.tocsc()
-    print("X_binned = ",  X_binned)
+    print("X_binned = ", X_binned)
     X_binned_data = X_binned.data
     print("X_binned_data = ", X_binned_data)
     X_binned_indices = X_binned.indices
@@ -987,15 +989,15 @@ def main():
     residuals = y - X_binned.dot(beta_star)
     XTR_absmax = 0
     for j in range(n_features - 1):
-        start, end = X_binned_indptr[j:j+2]
+        start, end = X_binned_indptr[j:j + 2]
         X_j_indices = X_binned_indices[start:end]
         X_j_data = X_binned_data[start:end]
 
         (inner_prod,
-        inner_prod_pos,
-        inner_prod_neg) = compute_inner_prod(X_j_data,
-                                             X_j_indices,
-                                             residuals)
+         inner_prod_pos,
+         inner_prod_neg) = compute_inner_prod(X_j_data,
+                                              X_j_indices,
+                                              residuals)
 
         XTR_absmax = max(abs(inner_prod), XTR_absmax)
 
@@ -1016,7 +1018,7 @@ def main():
 
     # Computation of the dual gap
     G_lmbda = P_lmbda - D_lmbda
-    safe_sphere_radius = np.sqrt(2 * G_lmbda)/lmbda
+    safe_sphere_radius = np.sqrt(2 * G_lmbda) / lmbda
     safe_sphere_radius = 1
     safe_sphere_center = theta
 
@@ -1183,19 +1185,18 @@ def main():
     #  inner_prod_neg,
     #  inner_prod_pos) = compute_inner_prod(data1, ind1, residuals)
 
-
     #################################################################
     #                   Test for SPP function
     #################################################################
     beta_hat_t, safe_set_data, safe_set_ind, safe_set_key = SPP(
-        X_binned=X_binned, X_binned_data=X_binned_data, 
-        X_binned_indices=X_binned_indices, X_binned_indptr=X_binned_indptr, 
+        X_binned=X_binned, X_binned_data=X_binned_data,
+        X_binned_indices=X_binned_indices, X_binned_indptr=X_binned_indptr,
         y=y,
-        n_val_gs=n_val_gs, max_depth=max_depth, epsilon=epsilon, f=f, 
+        n_val_gs=n_val_gs, max_depth=max_depth, epsilon=epsilon, f=f,
         n_epochs=n_epochs, screening=screening, store_history=store_history)
-    
+
     print("beta_hat_t =", beta_hat_t)
 
-    
+
 if __name__ == "__main__":
     main()
