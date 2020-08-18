@@ -389,6 +389,7 @@ def sparse_cd(
     safeset_membership = np.ones(n_features)
 
     L = np.zeros(n_features)
+    # L = List(L)
     # L = List([int(x) for x in range(0)])
     # L = [0] * (n_features)
     for j in range(n_features):
@@ -400,7 +401,6 @@ def sparse_cd(
 
         for ind in range(start, end):
             L[j] += X_data[ind] ** 2
-
     for k in range(n_epochs):
         for j in range(n_features):
             if L[j] == 0.0:

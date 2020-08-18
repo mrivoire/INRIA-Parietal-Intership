@@ -941,39 +941,39 @@ def main():
     #             Test for max val function
     ######################################################
 
-    # residuals = rng.randn(n_samples)
-    # # With nested loop
-    # max_val_test = 0
-    # X_binned = X_binned.toarray()
-    # start1 = time.time()
-    # for j in range(n_features):
-    #     for k in range(j, n_features):
-    #         inter_feat = (X_binned[:, j]
-    #                       * X_binned[:, k])
+    residuals = rng.randn(n_samples)
+    # With nested loop
+    max_val_test = 0
+    X_binned = X_binned.toarray()
+    start1 = time.time()
+    for j in range(n_features):
+        for k in range(j, n_features):
+            inter_feat = (X_binned[:, j]
+                          * X_binned[:, k])
 
-    #         inner_prod = inter_feat.dot(residuals)
-    #         if abs(inner_prod) > max_val_test:
-    #             max_val_test = abs(inner_prod)
-    #             print("key = ", j, k)
+            inner_prod = inter_feat.dot(residuals)
+            if abs(inner_prod) > max_val_test:
+                max_val_test = abs(inner_prod)
+                print("key = ", j, k)
 
-    # end1 = time.time()
-    # delay1 = end1 - start1
-    # print("delay 1 = ", delay1)
-    # print("max val test = ", max_val_test)
+    end1 = time.time()
+    delay1 = end1 - start1
+    print("delay 1 = ", delay1)
+    print("max val test = ", max_val_test)
 
-    # # With recursive function
-    # start2 = time.time()
-    # max_inner_prod, max_key = max_val(X_binned_data=X_binned_data,
-    #                                   X_binned_indices=X_binned_indices,
-    #                                   X_binned_indptr=X_binned_indptr,
-    #                                   residuals=residuals,
-    #                                   max_depth=max_depth)
+    # With recursive function
+    start2 = time.time()
+    max_inner_prod, max_key = max_val(X_binned_data=X_binned_data,
+                                      X_binned_indices=X_binned_indices,
+                                      X_binned_indptr=X_binned_indptr,
+                                      residuals=residuals,
+                                      max_depth=max_depth)
 
-    # end2 = time.time()
-    # delay2 = end2 - start2
-    # print("delay 2 = ", delay2)
-    # print("max inner prod = ", max_inner_prod)
-    # print("max key= ", max_key)
+    end2 = time.time()
+    delay2 = end2 - start2
+    print("delay 2 = ", delay2)
+    print("max inner prod = ", max_inner_prod)
+    print("max key= ", max_key)
 
     ################################################################
     #                           Lasso
@@ -1059,7 +1059,7 @@ def main():
     # print("flat safe set key = ", flat_safe_set_key)
 
     # With nested loop
-    X_binned = X_binned.toarray()
+    # X_binned = X_binned.toarray()
     safe_set_key_test = []
     safe_set_data_test = []
     safe_set_data_card_test = []
@@ -1153,12 +1153,12 @@ def main():
     #              Lasso on the matrix of interaction features
     #######################################################################
 
-    inter_feat_lasso_sklearn = sklearn_Lasso(
-        alpha=1e-2, fit_intercept=False, normalize=False, max_iter=n_epochs,
-        tol=1e-14).fit(inter_feat_X, y)
+    # inter_feat_lasso_sklearn = sklearn_Lasso(
+    #     alpha=1e-2, fit_intercept=False, normalize=False, max_iter=n_epochs,
+    #     tol=1e-14).fit(inter_feat_X, y)
 
-    print("slopes = ", inter_feat_lasso_sklearn.coef_)
-    print("nb of non zero coeffs = ", np.count_nonzero(inter_feat_lasso_sklearn.coef_))
+    # print("slopes = ", inter_feat_lasso_sklearn.coef_)
+    # print("nb of non zero coeffs = ", np.count_nonzero(inter_feat_lasso_sklearn.coef_))
 
     ##########################################################
     #       Test for compute interactions function

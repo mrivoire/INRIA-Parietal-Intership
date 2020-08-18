@@ -254,7 +254,7 @@ def sparse_cd(
 
     safeset_membership = np.ones(n_features)
 
-    L = np.zeros(n_features)
+    L = List(np.zeros(n_features))
     # L = List([int(x) for x in range(0)])
     # L = [0] * (n_features)
     for j in range(n_features):
@@ -336,7 +336,7 @@ def sparse_cd(
                 # Computation of the active set
                 for j in range(n_features):
                     if safeset_membership[j] == 1:
-                        start, end = X_indptr[j : j + 2]
+                        start, end = X_indptr[j: j + 2]
                         dot = 0.0
                         norm = 0.0
 
@@ -397,9 +397,7 @@ def main():
     X_binned_indices = X_binned.indices
     X_binned_indptr = X_binned.indptr
     X_binned_data = List(X_binned.data)
-    # X_binned_data = List([int(x) for x in range(0)])
-    # X_binned_indices = List([int(x) for x in range(0)])
-    # X_binned_indptr = List([int(x) for x in range(0)])
+    print("type of X_binned_data = ", type(X_binned_data))
 
     (beta, 
      primal_hist, 
@@ -414,6 +412,7 @@ def main():
                    lmbda=lmbda, epsilon=epsilon, f=f, n_epochs=n_epochs, 
                    screening=screening, store_history=store_history)
 
+# <class 'numba.typed.typedlist.List'>
 
 if __name__ == "__main__":
     main()

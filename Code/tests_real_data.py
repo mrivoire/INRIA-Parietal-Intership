@@ -1,6 +1,5 @@
 """
 Experiments on real data with categorical variables
-
 """
 import numpy as np
 import time
@@ -268,23 +267,24 @@ def main():
 
     start1 = time.time()
 
-    # X, y = load_auto_prices()
-    X, y = load_lacrimes()
+    X, y = load_auto_prices()
+    print("Auto Prices Dataset")
+    # X, y = load_lacrimes()
     # X, y = load_black_friday()
     # X, y = load_housing_prices()
     # X, y = load_nyc_taxi()
     # X, columns_kept_time = time_convert(X)
 
     models, tuned_parameters = get_models(
-            X[:1000],
+            X,
             lmbda=lmbda,
             epsilon=epsilon,
             f=f, n_epochs=n_epochs,
             screening=screening,
             store_history=store_history)
 
-    cv_scores = compute_cv(X=X[:1000],
-                           y=y[:1000],
+    cv_scores = compute_cv(X=X,
+                           y=y,
                            models=models, n_splits=n_splits, n_jobs=n_jobs)
 
     print("cv_scores = ", cv_scores)
@@ -301,8 +301,8 @@ def main():
     print("cv_scores without tuning params = ", list_cv_scores)
 
     start2 = time.time()
-    gs_scores = compute_gs(X=X[:1000],
-                           y=y[:1000],
+    gs_scores = compute_gs(X=X,
+                           y=y,
                            models=models, n_splits=n_splits,
                            tuned_parameters=tuned_parameters, n_jobs=n_jobs)
 
