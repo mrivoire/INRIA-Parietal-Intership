@@ -1,21 +1,20 @@
 import numpy as np
 import time
+import pytest
 
-from scipy.linalg import toeplitz
-from numba import njit
-from numba.typed import List
+
 from sklearn.preprocessing import KBinsDiscretizer
-from sklearn.linear_model import Lasso as sklearn_Lasso
 from sklearn.utils import check_random_state
-from cd_solver_lasso_numba import Lasso, sparse_cd
 from SPP import simu, max_val
 
 
-def test_max_val():
+@pytest.mark.parametrize("seed,expected_key_order",
+                         [(0, 1), (2, 2)])
+def test_max_val(seed, expected_key_order):
 
     # Parameters definition
-    rng = check_random_state(0)
-    n_samples, n_features = 100, 40
+    rng = check_random_state(seed)
+    n_samples, n_features = 10, 5
     beta = rng.randn(n_features)
     encode = 'onehot'
     strategy = 'quantile'
@@ -78,7 +77,6 @@ def test_max_val():
     print("max key= ", max_key)
 
     np.testing.assert_allclose(max_val_test, max_inner_prod, rtol=1e-14)
-    if key[0] == key[1] and key[0] == key[2]:
-        assert key[0] == max_key[0]
-    else:
-        assert key == max_key
+    assert set(key) == set(max_key)
+    assert len(set(key)) == expected_key_order
+    print(set(key))
