@@ -756,8 +756,13 @@ def SPP(X_binned, X_binned_data, X_binned_indices, X_binned_indptr, y,
 
     beta_hat_t = np.zeros(n_features)
 
-    lmbdas_grid = np.logspace(start=0, stop=lambda_max, num=n_val_gs,
-                              endpoint=True, base=10.0, dtype=None, axis=0)
+    # lmbdas_grid = np.logspace(start=0, stop=lambda_max, num=n_val_gs,
+    #                           endpoint=True, base=10.0, dtype=None, axis=0)
+
+    # test on only one value of lambda which is lower than lambda_max 
+    # if lambda is greater than lambda max then all the nodes of the features
+    # tree are pruned out and the active set is empty.
+    lmbdas_grid = [lambda_max/2]  
     print("lmbda_grid = ", lmbdas_grid)
     # find a bettter initialization
     # active_set = List([List([0])])
@@ -904,7 +909,8 @@ def SPP(X_binned, X_binned_data, X_binned_indices, X_binned_indptr, y,
 def main():
 
     rng = check_random_state(0)
-    n_samples, n_features = 100, 40
+    # n_samples, n_features = 100, 40
+    n_samples, n_features = 20, 2
     beta = rng.randn(n_features)
     lmbda = 1.
     f = 10
