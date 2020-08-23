@@ -34,8 +34,10 @@ def active_set_matrix(X_binned, active_set_keys):
     X_active_set = np.zeros((n_samples, n_active_features))
 
     count = 0
-    for j in range(n_active_features):
-        X_active_set[:, count] = X_binned[:, j]  
+    for key in active_set_keys:
+    # for j in range(n_active_features):
+        # X_active_set[:, count] = X_binned[:, j]
+        X_active_set[:, count] = X_binned[:, key]  
         count += 1
 
     return X_active_set
@@ -49,7 +51,7 @@ def main():
                 [0, 0, 0, 1, 0],
                 [0, 0, 0, 0, 1]])
 
-    active_set_keys = [1, 3, 4]
+    active_set_keys = [[1, 1], [2, 3], [1, 4]]
 
     X_active_set = active_set_matrix(X_binned=X_binned, 
                                      active_set_keys=active_set_keys)
