@@ -122,13 +122,11 @@ def test_safe_prune(intersect):
         for k in range(j, n_features):
             # for i in range(k, n_features):
             print('shapes =', (X_binned[:, j].shape, X_binned[:, k].shape))
-            inter_feat = (X_binned[:, j]
-                          * X_binned[:, k])
-            card = np.count_nonzero(inter_feat)
+            inter_feat = X_binned[:, j].multiply(X_binned[:, k])
+            card = inter_feat.nnz
             safe_set_data_card_test.append(card)
-            u_t = inter_feat.dot(safe_sphere_center)
-            v_t = 0
-            v_t = (inter_feat**2).sum()
+            u_t = inter_feat.T @ safe_sphere_center
+            v_t = (inter_feat.data ** 2).sum()
             sppc_t = abs(u_t) + safe_sphere_radius * np.sqrt(v_t)
 
             if sppc_t >= 1:
