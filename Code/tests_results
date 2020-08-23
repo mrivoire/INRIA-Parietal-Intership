@@ -138,6 +138,20 @@ delay =  829.8814358711243
 	- For a subset of 2000 samples
 
 
+lasso -- best params = {'preprocessor__num__binning__n_bins': 2, 'regressor__lmbda': 0.31622776601683794}
+lasso -- cv scores = -0.9172107823185465
+lasso_cv -- best params = {'preprocessor__num__binning__n_bins': 20}
+lasso_cv -- cv scores = 0.16513348225740576
+ridge_cv -- best params = {'preprocessor__num__binning__n_bins': 20}
+ridge_cv -- cv scores = 0.15809848239072838
+xgb -- best params = {'regressor__alpha': 0.1, 'regressor__n_estimators': 30}
+xgb -- cv scores = 0.1446037111918129
+rf -- best params = {'regressor__max_depth': 5}
+rf -- cv scores = 0.14580547073615333
+LA crimes Dataset with 2000 samples
+cv_score with tuning params =  [-0.9172107823185465, 0.16513348225740576, 0.15809848239072838, 0.1446037111918129, 0.14580547073615333]
+delay =  1220.2228655815125
+
 
 	- For a subset of 5000 samples
 
@@ -178,4 +192,88 @@ delay =  16028.450288772583
 - Performances on the NYC_taxis dataset
 
 
-- Performances on the black_friday dataset
+- Performances on the black_friday dataset (shape =  (166821, 9))
+
+	- For a subset of 1000 samples
+
+lasso -- best params = {'preprocessor__num__binning__n_bins': 20, 'regressor__lmbda': 0.31622776601683794}
+lasso -- cv scores = 0.35885779182797306
+lasso_cv -- best params = {'preprocessor__num__binning__n_bins': 20}
+lasso_cv -- cv scores = 0.36647033087423014
+ridge_cv -- best params = {'preprocessor__num__binning__n_bins': 20}
+ridge_cv -- cv scores = 0.36021097371914934
+xgb -- best params = {'regressor__alpha': 0.2, 'regressor__n_estimators': 30}
+xgb -- cv scores = 0.2925387853749214
+rf -- best params = {'regressor__max_depth': 5}
+rf -- cv scores = 0.3959084825156299
+Black Friday Dataset with 1000 samples
+cv_score with tuning params =  [0.35885779182797306, 0.36647033087423014, 0.36021097371914934, 0.2925387853749214, 0.3959084825156299]
+delay =  75.42879605293274
+
+	- For a subset of 2000 samples
+
+lasso -- best params = {'preprocessor__num__binning__n_bins': 20, 'regressor__lmbda': 0.31622776601683794}
+lasso -- cv scores = 0.3718893369861341
+lasso_cv -- best params = {'preprocessor__num__binning__n_bins': 20}
+lasso_cv -- cv scores = 0.38246007879424415
+ridge_cv -- best params = {'preprocessor__num__binning__n_bins': 20}
+ridge_cv -- cv scores = 0.3723623310553259
+xgb -- best params = {'regressor__alpha': 0.3, 'regressor__n_estimators': 30}
+xgb -- cv scores = 0.3884051804097967
+rf -- best params = {'regressor__max_depth': 5}
+rf -- cv scores = 0.4501489920065181
+Black Friday Dataset with 2000 samples
+cv_score with tuning params =  [0.3718893369861341, 0.38246007879424415, 0.3723623310553259, 0.3884051804097967, 0.4501489920065181]
+delay =  96.75897264480591
+
+	- For a subset of 5000 samples
+
+lasso -- best params = {'preprocessor__num__binning__n_bins': 15, 'regressor__lmbda': 0.31622776601683794}
+lasso -- cv scores = 0.392699365771163
+lasso_cv -- best params = {'preprocessor__num__binning__n_bins': 15}
+lasso_cv -- cv scores = 0.39343651067881946
+ridge_cv -- best params = {'preprocessor__num__binning__n_bins': 15}
+ridge_cv -- cv scores = 0.3927889775696012
+xgb -- best params = {'regressor__alpha': 0.3, 'regressor__n_estimators': 30}
+xgb -- cv scores = 0.4201741567136764
+rf -- best params = {'regressor__max_depth': 5}
+rf -- cv scores = 0.46015882059792307
+Black Friday Dataset with 5000 samples
+cv_score with tuning params =  [0.392699365771163, 0.39343651067881946, 0.3927889775696012, 0.4201741567136764, 0.46015882059792307]
+delay =  225.98305583000183
+
+	- For a subset of 10000 samples
+
+lasso -- best params = {'preprocessor__num__binning__n_bins': 15, 'regressor__lmbda': 0.31622776601683794}
+lasso -- cv scores = 0.41385511776942935
+lasso_cv -- best params = {'preprocessor__num__binning__n_bins': 15}
+lasso_cv -- cv scores = 0.4138418490746824
+ridge_cv -- best params = {'preprocessor__num__binning__n_bins': 15}
+ridge_cv -- cv scores = 0.41387183865576666
+xgb -- best params = {'regressor__alpha': 0.3, 'regressor__n_estimators': 30}
+xgb -- cv scores = 0.46374320279517506
+rf -- best params = {'regressor__max_depth': 5}
+rf -- cv scores = 0.47095597281977086
+Black Friday Dataset with 10000 samples
+cv_score with tuning params =  [0.41385511776942935, 0.4138418490746824, 0.41387183865576666, 0.46374320279517506, 0.47095597281977086]
+delay =  463.6259922981262
+
+	- For a subset of 50000 samples
+
+lasso -- best params = {'preprocessor__num__binning__n_bins': 15, 'regressor__lmbda': 0.31622776601683794}
+lasso -- cv scores = 0.42750136187354676
+lasso_cv -- best params = {'preprocessor__num__binning__n_bins': 15}
+lasso_cv -- cv scores = 0.4274838209698085
+ridge_cv -- best params = {'preprocessor__num__binning__n_bins': 15}
+ridge_cv -- cv scores = 0.42750180713076497
+xgb -- best params = {'regressor__alpha': 0.3, 'regressor__n_estimators': 30}
+xgb -- cv scores = 0.5194152280050875
+rf -- best params = {'regressor__max_depth': 5}
+rf -- cv scores = 0.4840003208701257
+Black Friday Dataset with 50000 samples
+cv_score with tuning params =  [0.42750136187354676, 0.4274838209698085, 0.42750180713076497, 0.5194152280050875, 0.4840003208701257]
+delay =  4021.6633756160736
+
+	- For a subset of 100000 samples
+
+
