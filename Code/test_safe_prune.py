@@ -8,8 +8,7 @@ from sklearn.utils import check_random_state
 from SPP import simu, safe_prune
 
 
-@pytest.mark.parametrize("intersect", [True])
-def test_safe_prune(intersect):
+def test_safe_prune():
 
     # Parameters definition
     rng = check_random_state(0)
@@ -70,7 +69,7 @@ def test_safe_prune(intersect):
     delay_sp = end_sp - start_sp
     print("delay safe prune = ", delay_sp)
 
-    safe_set_key = list(map(tuple, map(sorted, list(map(set, safe_set_key)))))
+    safe_set_key = list(map(tuple, map(sorted, safe_set_key)))
 
     # Computation of the active set with nested loop
     safe_set_key_test = []
