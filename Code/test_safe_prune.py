@@ -17,7 +17,7 @@ def test_safe_prune(intersect):
 
     # Parameters definition
     rng = check_random_state(0)
-    n_samples, n_features = 100, 40
+    n_samples, n_features = 30, 4
     beta = rng.randn(n_features)
     encode = 'onehot'
     strategy = 'quantile'
@@ -52,23 +52,7 @@ def test_safe_prune(intersect):
 
     beta_star = sparse_lasso_sklearn.coef_
     residuals = y - X_binned.dot(beta_star)
-    XTR_absmax = 0
-    for j in range(n_features - 1):
-        start, end = X_binned_indptr[j:j + 2]
-        X_j_indices = X_binned_indices[start:end]
-        X_j_data = X_binned_data[start:end]
-
-        (inner_prod,
-         inner_prod_pos,
-         inner_prod_neg) = compute_inner_prod(X_j_data,
-                                              X_j_indices,
-                                              residuals)
-
-        XTR_absmax = max(abs(inner_prod), XTR_absmax)
-
-    XTR_absmax = 0
-    for j in range(n_features):
-        XTR_absmax = max(abs(X_binned[:, j].T.dot(residuals)), XTR_absmax)
+    XTR_absmax = np.max(np.abs(X_binned.T @ residuals))
 
     theta = residuals / max(XTR_absmax, lmbda)
 
@@ -132,7 +116,7 @@ def test_safe_prune(intersect):
             if sppc_t >= 1:
                 safe_set_data_test.append(inter_feat)
                 if j == k:
-                    safe_set_key_test.append([j, ])
+                    safe_set_key_test.append([j])
                 else:
                     safe_set_key_test.append([j, k])
                 # if j == k == i:
@@ -165,8 +149,8 @@ def test_safe_prune(intersect):
     assert safe_set_key_test == flat_safe_set_key
 
     if intersect:
-        intersect_key = [(ele1 for ele1 in flat_safe_set_key if ele1 in 
-                          safe_set_key_test)]
+        intersect_key = [ele1 for ele1 in flat_safe_set_key if ele1 in
+                         safe_set_key_test]
         # print("intersect_key = ", intersect_key)
 
         if len(intersect_key) == len(flat_safe_set_key):
