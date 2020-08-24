@@ -59,8 +59,7 @@ def test_safe_prune():
     X_binned_indices = X_binned.indices
     X_binned_indptr = X_binned.indptr
     start_sp = time.time()
-    (safe_set_data, safe_set_ind, safe_set_key, flatten_safe_set_data,
-        flatten_safe_set_ind, safe_set_indptr) = safe_prune(
+    safe_set_data, safe_set_ind, safe_set_key = safe_prune(
         X_binned_data=X_binned_data, X_binned_indices=X_binned_indices,
         X_binned_indptr=X_binned_indptr, safe_sphere_center=safe_sphere_center,
         safe_sphere_radius=safe_sphere_radius, max_depth=max_depth)

@@ -544,26 +544,11 @@ def safe_prune(X_binned_data, X_binned_indices, X_binned_indptr,
                        max_depth=max_depth,
                        depth=depth)
 
-    # safe_set_data.pop(0)
-    # safe_set_ind.pop(0)
-    # safe_set_key.pop(0)
     safe_set_data = safe_set_data[1:]
     safe_set_ind = safe_set_ind[1:]
     safe_set_key = safe_set_key[1:]
 
-    # conversion of the safe sets to the sparse format
-    safe_set_indptr = []
-    flatten_safe_set_data = []
-    flatten_safe_set_ind = []
-    for i in range(len(safe_set_ind)):
-        safe_set_indptr.append(n_samples * i)
-        for item in safe_set_data[i]:
-            flatten_safe_set_data.append(item)
-        for item in safe_set_ind[i]:
-            flatten_safe_set_ind.append(item)
-
-    return (safe_set_data, safe_set_ind, safe_set_key, flatten_safe_set_data,
-            flatten_safe_set_ind, safe_set_indptr)
+    return safe_set_data, safe_set_ind, safe_set_key
 
 
 @njit
