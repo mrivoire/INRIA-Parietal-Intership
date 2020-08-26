@@ -191,6 +191,23 @@ delay =  16028.450288772583
 
 - Performances on the NYC_taxis dataset
 
+	- For a subset of 50000 samples
+
+lasso -- best params = {'preprocessor__num__binning__n_bins': 20, 'regressor__lmbda': 0.31622776601683794}
+lasso -- cv scores = 0.22294528783160894
+lasso_cv -- best params = {'preprocessor__num__binning__n_bins': 20}
+lasso_cv -- cv scores = 0.3459767745628769
+ridge_cv -- best params = {'preprocessor__num__binning__n_bins': 20}
+ridge_cv -- cv scores = 0.28078828437846404
+xgb -- best params = {'regressor__alpha': 0.3, 'regressor__n_estimators': 30}
+xgb -- cv scores = 0.4427973966902726
+rf -- best params = {'regressor__max_depth': 5}
+rf -- cv scores = 0.34049198246798695
+Housing Prices Dataset with 50000 samples
+cv_score with tuning params =  [0.22294528783160894, 0.3459767745628769, 0.28078828437846404, 0.4427973966902726, 0.34049198246798695]
+delay =  7689.010633230209
+
+
 
 - Performances on the black_friday dataset (shape =  (166821, 9))
 

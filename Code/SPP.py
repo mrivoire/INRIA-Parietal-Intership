@@ -706,7 +706,7 @@ def safe_prune_rec(X_binned_data, X_binned_indices, X_binned_indptr,
 
 
 # @njit
-def SPP(X_binned, X_binned_data, X_binned_indices, X_binned_indptr, y,
+def SPP(X_binned_data, X_binned_indices, X_binned_indptr, y,
         n_val_gs, max_depth, epsilon, f, n_epochs, screening=True,
         store_history=True):
     """Safe Patterns Pruning Algorithm
@@ -751,7 +751,23 @@ def SPP(X_binned, X_binned_data, X_binned_indices, X_binned_indptr, y,
     print("lmbda_grid = ", lmbdas_grid)
     # find a bettter initialization
     # active_set = List([List([0])])
-    active_set = [0]
+    
+    # Initialization of the active set 
+    # (with the feature corresponding to max_key)
+    # Two possibilities : either modify the max_val function so that it 
+    # returns the feature of interactions corresponding to max_key
+    # or compute again the feature of interactions corresponding to max_key
+    # For this purpose : slice the X_binned_data vector to extract the binned 
+    # features corresponding to each ind in the key, then compute the 
+    # feature of interactions by making the inner product between the binned 
+    # features or by calling the function which aims at computing the 
+    # features of interactions 
+    active_set_data_csc = []
+    active_set_ind_csc = []
+    active_set_indptr_csc = [0]
+    active_set_keys = []
+
+    n_active_feats = len(active_set_indptr_csc) - 1
 
     for lmbda_t in lmbdas_grid:
         # Pre-solve : solve the optimization problem with the new lambda on
@@ -762,33 +778,24 @@ def SPP(X_binned, X_binned_data, X_binned_indices, X_binned_indptr, y,
         # better optimization of beta since it is closer to the optimum then
         # the screening is better from the beginning
 
-        print("lmbda_t = ", lmbda_t)
-        X_active_set = np.zeros((n_samples, len(active_set)))
-        print("active_set = ", type(active_set))
-        X_active_set_data = []
-        X_active_set_ind = []
-        X_active_set_indptr = []
-        # X_active_set_data = List([int(x) for x in range(0)])
-        # X_active_set_ind = List([int(x) for x in range(0)])
-        # X_active_set_indptr = List([int(x) for x in range(0)])
-        for i in range(n_samples):
-            for j in range(len(active_set)):
-                X_active_set[i, j] = X_binned[i, j]
 
-                print("X_active_set = ", X_active_set[i, j])
-                if X_binned[i, j] != 0:
-                    X_active_set_data.append(X_binned[i, j])
-                    X_active_set_ind.append(i)
-                    if (i * j) % n_samples == 0:
-                        X_active_set_indptr.append(j)
-        print("X_active_set_data = ", X_active_set_data)
-        print("X_active_set_ind = ", X_active_set_ind)
-        print("X_active_set_indptr = ", X_active_set_indptr)
-        sparse_lasso = Lasso(lmbda=lmbda_t, epsilon=epsilon, f=f,
-                             n_epochs=n_epochs,
-                             screening=False,
-                             store_history=False).fit(X_active_set, y)
-        print("sparse_lasso = ", sparse_lasso)
+        # instead of using the class Lasso, use the sparse_cd function to solve 
+        # the Lasso optimization problem with an input under 
+        # the csc attribut format
+        # sparse_lasso = Lasso(lmbda=lmbda_t, epsilon=epsilon, f=f,
+        #                      n_epochs=n_epochs,
+        #                      screening=False,
+        #                      store_history=False).fit(X_active_set, y)
+
+        (beta_hat_t, primal_hist_sparse, dual_hist_sparse, gap_hist_sparse,
+         r_list_sparse, n_active_features_true_sparse, 
+         theta_hat_cyclic_cd_sparse, P_lmbda_sparse, D_lmbda_sparse, 
+         G_lmbda_sparse, safe_set_sparse) = \
+         sparse_cd(X_data=active_set_data_csc, X_indices=active_set_ind_csc, 
+                   X_indptr=active_set_indptr_csc, y=y, lmbda=lmbda_t, 
+                   epsilon=epsilon, f=f, n_epochs=n_epochs, 
+                   screening=screening, store_history=store_history)
+
         # ajouter un point fit sur les features actives données par
         # safe_set_membership
         # Pas besoin d'avoir un epsilon très grand ni de screening
@@ -797,9 +804,23 @@ def SPP(X_binned, X_binned_data, X_binned_indices, X_binned_indptr, y,
         # ensuite après l'appel de safe prune updater l'ensemble des features
         # actives grâce au safeset membership
 
-        beta_hat_t = sparse_lasso.slopes
-        print("beta_hat_t = ", beta_hat_t)
-        residuals = y - X_active_set.dot(beta_hat_t)
+        # beta_hat_t = sparse_lasso.slopes
+        # print("beta_hat_t = ", beta_hat_t)
+
+        residuals = np.zeros(n_samples)
+        for i in range(n_samples):
+            for j in range(n_active_feats):
+                start, end = active_set_indptr_csc[j: j + 2]
+                start = np.int64(start)
+                end = np.int64(end)
+
+                dot_prod = 0
+                for ind in range(start, end):
+                    dot_prod += (active_set_data_csc[ind] 
+                                 * beta_hat_t[active_set_ind_csc[ind]])
+                    residuals[i] = y[i] - dot_prod
+
+        # residuals = y - X_active_set.dot(beta_hat_t)
         print("residuals = ", residuals)
         # between pre-solve and safe prune
         # compute the dual gap (compute the primal and the dual)
@@ -808,11 +829,12 @@ def SPP(X_binned, X_binned_data, X_binned_indices, X_binned_indptr, y,
         # compute feasible theta with the max_val
         # compute the radius of the safe sphere
 
-        max_inner_prod, max_key = max_val(X_binned_data=X_active_set_data,
-                                          X_binned_indices=X_active_set_ind,
-                                          X_binned_indptr=X_active_set_indptr,
+        max_inner_prod, max_key = max_val(X_binned_data=active_set_data_csc,
+                                          X_binned_indices=active_set_ind_csc,
+                                          X_binned_indptr=active_set_indptr_csc,
                                           residuals=residuals,
                                           max_depth=max_depth)
+
         print("max_inner_prod = ", max_inner_prod)
         theta = residuals / max(max_inner_prod, lmbda_t)
         print("theta = ", theta)
@@ -857,13 +879,31 @@ def SPP(X_binned, X_binned_data, X_binned_indices, X_binned_indptr, y,
 
         # launch the already implemented solver on the safe set
 
-        (safe_set_data, safe_set_ind, safe_set_key, flatten_safe_set_data,
-         flatten_safe_set_ind, safe_set_indptr) = safe_prune(
-            X_binned_data=X_active_set_data, X_binned_indices=X_active_set_ind,
-            X_binned_indptr=X_active_set_indptr,
+        (safe_set_data, safe_set_ind, safe_set_key) = safe_prune(
+            X_binned_data=X_binned_data, X_binned_indices=X_binned_indices,
+            X_binned_indptr=X_binned_indptr,
             safe_sphere_center=safe_sphere_center,
             safe_sphere_radius=safe_sphere_radius, max_depth=max_depth)
-        print("safe_set_data = ", type(safe_set_data))
+        
+        # Convert safe_set_data, safe_set_ind and safe_set_key which are list 
+        # of lists numba into csc attributs
+
+        # To convert safe_set_data which is a numba list of lists we just have 
+        # to flatten the numba list as follows 
+        safe_set_data_csc = []
+        safe_set_indptr_csc = [0]
+        indptr = 0
+        for feat in safe_set_data:
+            indptr += len(feat)  # points the beginning of each column
+            safe_set_indptr_csc.append(indptr)
+            for data in feat:
+                safe_set_data_csc.append(data)
+
+        safe_set_ind_csc = []
+        for ind_list in safe_set_ind:
+            for ind in ind_list:
+                safe_set_ind_csc.append(ind)     
+
         # Les safe sets retournent des listes de listes numba
         # convertir les listes de listes numba en une matrice sparse
         # pour pouvoir les donner en entrée au sparse_cd
@@ -878,17 +918,33 @@ def SPP(X_binned, X_binned_data, X_binned_indices, X_binned_indptr, y,
         (beta_hat_t, primal_hist, dual_hist, gap_hist, r_list,
          n_active_features, theta, P_lmbda, D_lmbda, G_lmbda,
          safeset_membership) = sparse_cd(
-            X_data=safe_set_data, X_indices=safe_set_ind,
-            X_indptr=safe_set_key, y=y, lmbda=lmbda_t, epsilon=epsilon, f=f,
+            X_data=safe_set_data_csc, X_indices=safe_set_ind_csc,
+            X_indptr=safe_set_indptr_csc, y=y, lmbda=lmbda_t, epsilon=epsilon, f=f,
             n_epochs=n_epochs, screening=screening,
             store_history=store_history)
-        print("beta_hat_t = ", beta_hat_t)
-        active_set = []
-        for elmt in safeset_membership:
-            if elmt is True:
-                active_set.append(elmt)
-    print("active_set = ", active_set)
-    return beta_hat_t, safe_set_data, safe_set_ind, safe_set_key
+       
+        active_set_data = []
+        active_set_ind = []
+
+        for idx in range(len(safeset_membership)):
+            if safeset_membership[idx] is True:
+                active_set_data.append(safe_set_data[idx])
+                active_set_ind.append(safe_set_ind[idx])
+                active_set_keys.append(safe_set_key[idx])
+
+        count = 0
+        for feat in active_set_data:
+            count += len(feat)
+            active_set_indptr_csc.append(count)
+            for data in feat:
+                active_set_data_csc.append(data)
+
+        for ind_list in active_set_ind:
+            for ind in ind_list:
+                active_set_ind_csc.append(ind)
+
+    return (active_set_data_csc, active_set_ind_csc, active_set_indptr_csc, 
+            active_set_keys)
 
 
 def main():
@@ -1020,8 +1076,7 @@ def main():
     # With recursive function
 
     start_sp = time.time()
-    (safe_set_data, safe_set_ind, safe_set_key, flatten_safe_set_data,
-        flatten_safe_set_ind, safe_set_indptr) = safe_prune(
+    (safe_set_data, safe_set_ind, safe_set_key) = safe_prune(
         X_binned_data=X_binned_data, X_binned_indices=X_binned_indices,
         X_binned_indptr=X_binned_indptr, safe_sphere_center=safe_sphere_center,
         safe_sphere_radius=safe_sphere_radius, max_depth=max_depth)
@@ -1029,11 +1084,9 @@ def main():
     end_sp = time.time()
     delay_sp = end_sp - start_sp
     print("delay safe prune = ", delay_sp)
-    # print("safe set ind = ", safe_set_ind)
-    # print("safe set data = ", safe_set_data)
-    # print("flatten safe set data = ", flatten_safe_set_data)
-    # print("flatten safe set ind = ", flatten_safe_set_ind)
-    # print("safe set indptr = ", safe_set_indptr)
+    print("safe set ind = ", safe_set_ind)
+    print("safe set data = ", safe_set_data)
+    print("safe set key = ", safe_set_key)
 
     safe_set_key = list(safe_set_key)
     for key in safe_set_key:
@@ -1102,7 +1155,8 @@ def main():
     #                  Test intersection of two lists
     ###################################################################
 
-    intersect_key = [ele1 for ele1 in flat_safe_set_key if ele1 in safe_set_key_test]
+    intersect_key = [ele1 for ele1 in flat_safe_set_key if ele1 in 
+                     safe_set_key_test]
     # print("intersect_key = ", intersect_key)
 
     if len(intersect_key) == len(flat_safe_set_key):
@@ -1180,13 +1234,12 @@ def main():
     #                   Test for SPP function
     #################################################################
     beta_hat_t, safe_set_data, safe_set_ind, safe_set_key = SPP(
-        X_binned=X_binned, X_binned_data=X_binned_data,
-        X_binned_indices=X_binned_indices, X_binned_indptr=X_binned_indptr,
-        y=y,
-        n_val_gs=n_val_gs, max_depth=max_depth, epsilon=epsilon, f=f,
-        n_epochs=n_epochs, screening=screening, store_history=store_history)
+        X_binned_data=X_binned_data, X_binned_indices=X_binned_indices, 
+        X_binned_indptr=X_binned_indptr, y=y, n_val_gs=n_val_gs, 
+        max_depth=max_depth, epsilon=epsilon, f=f, n_epochs=n_epochs, 
+        screening=screening, store_history=store_history)
 
-    print("beta_hat_t =", beta_hat_t)
+    # print("beta_hat_t =", beta_hat_t)
 
 
 if __name__ == "__main__":
