@@ -260,6 +260,7 @@ def cyclic_coordinate_descent(
 
     return (
         beta,
+        residuals,
         primal_hist,
         dual_hist,
         gap_hist,
@@ -495,7 +496,8 @@ def sparse_cd(
                     break
 
     return (
-        beta,
+        beta, 
+        residuals,
         primal_hist,
         dual_hist,
         gap_hist,
@@ -552,8 +554,9 @@ class Lasso(BaseEstimator, RegressorMixin):
             X_indices = X.indices
             X_indptr = X.indptr
 
-            (
+            (   
                 beta_hat_cyclic_cd_true,
+                residuals,
                 primal_hist,
                 dual_hist,
                 gap_hist,
@@ -579,6 +582,7 @@ class Lasso(BaseEstimator, RegressorMixin):
         else:
             (
                 beta_hat_cyclic_cd_true,
+                residuals,
                 primal_hist,
                 dual_hist,
                 gap_hist,
@@ -601,6 +605,7 @@ class Lasso(BaseEstimator, RegressorMixin):
             )
 
         self.slopes = beta_hat_cyclic_cd_true
+        self.residuals = residuals
         self.G_lmbda = G_lmbda
         self.P_lmbda = P_lmbda
         self.r_list = r_list
@@ -747,6 +752,7 @@ def main():
 
     
     (beta_hat_cyclic_cd_true_sparse,
+        residuals,
         primal_hist_sparse,
         dual_hist_sparse,
         gap_hist_sparse,
@@ -783,6 +789,7 @@ def main():
     X_binned = X_binned.toarray()
 
     (beta_hat_cyclic_cd_true,
+        residuals,
         primal_hist,
         dual_hist,
         gap_hist,

@@ -739,6 +739,19 @@ def SPP(X_binned_data, X_binned_indices, X_binned_indptr, y,
     print("lmbda_max = ", lambda_max)
     print("max_key = ", max_key)
 
+    # If we compute once again the feature of interactions corresponding to 
+    # max_key
+
+    max_feat_data = []
+    max_feat_ind = []
+    for idx in max_key:
+        start, end = X_binned_indptr[idx - 1, idx + 1]
+        start = np.int64(start)
+        end = np.int64(end)
+        for ind in range(start, end):
+            max_feat_data.append(X_binned_data[ind])
+            max_feat_ind.append(X_binned_indices[ind])
+            
     beta_hat_t = np.zeros(n_features)
 
     # lmbdas_grid = np.logspace(start=0, stop=lambda_max, num=n_val_gs,
@@ -787,8 +800,8 @@ def SPP(X_binned_data, X_binned_indices, X_binned_indptr, y,
         #                      screening=False,
         #                      store_history=False).fit(X_active_set, y)
 
-        (beta_hat_t, primal_hist_sparse, dual_hist_sparse, gap_hist_sparse,
-         r_list_sparse, n_active_features_true_sparse, 
+        (beta_hat_t, residuals, primal_hist_sparse, dual_hist_sparse, 
+         gap_hist_sparse, r_list_sparse, n_active_features_true_sparse, 
          theta_hat_cyclic_cd_sparse, P_lmbda_sparse, D_lmbda_sparse, 
          G_lmbda_sparse, safe_set_sparse) = \
          sparse_cd(X_data=active_set_data_csc, X_indices=active_set_ind_csc, 
@@ -804,24 +817,6 @@ def SPP(X_binned_data, X_binned_indices, X_binned_indptr, y,
         # ensuite après l'appel de safe prune updater l'ensemble des features
         # actives grâce au safeset membership
 
-        # beta_hat_t = sparse_lasso.slopes
-        # print("beta_hat_t = ", beta_hat_t)
-
-        residuals = np.zeros(n_samples)
-        for i in range(n_samples):
-            for j in range(n_active_feats):
-                start, end = active_set_indptr_csc[j: j + 2]
-                start = np.int64(start)
-                end = np.int64(end)
-
-                dot_prod = 0
-                for ind in range(start, end):
-                    dot_prod += (active_set_data_csc[ind] 
-                                 * beta_hat_t[active_set_ind_csc[ind]])
-                    residuals[i] = y[i] - dot_prod
-
-        # residuals = y - X_active_set.dot(beta_hat_t)
-        print("residuals = ", residuals)
         # between pre-solve and safe prune
         # compute the dual gap (compute the primal and the dual)
         # compute of a feasible dual solution
