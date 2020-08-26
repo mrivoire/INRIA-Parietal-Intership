@@ -14,17 +14,27 @@ def from_numbalists_tocsc(numbalist_data, numbalist_ind):
     """
     Parameters
     ----------
-    numbalist_data:
+    numbalist_data: List([int])
+        numba list of lists of integers containing the non-zero elements 
+        of each feature the sparse matrix
 
-    numbalist_ind:
+    numbalist_ind: list([int])
+        nubma list of lists of integers containing the row indices of the 
+        non-zero elements of each feature of the sparse matrix
 
     Returns
     -------
-    csc_data:
+    csc_data: list(int)
+        list of integers containing the non-zero elements of the sparse matrix
+        without separation between the features 
 
-    csc_ind:
+    csc_ind: list(int)
+        list of integers containing the row indices of the non-zero elements
+        of the sparse matrix without separation between the features
 
-    csc_indptr:
+    csc_indptr: list(int)
+        list of integers containing the indices of each first non-zero element
+        of each feature in the csc_data vector
 
     """
     csc_data = []
