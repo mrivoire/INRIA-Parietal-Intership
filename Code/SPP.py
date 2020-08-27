@@ -734,6 +734,7 @@ def from_numbalists_tocsc(numbalist_data, numbalist_ind):
 
     return csc_data, csc_ind, csc_indptr
 
+
 # @njit
 def from_key_to_interactions_feature(csc_data, csc_ind, csc_indptr, 
                                      key, n_samples, n_features):
@@ -780,15 +781,18 @@ def from_key_to_interactions_feature(csc_data, csc_ind, csc_indptr,
     csc_data = List(csc_data)
     csc_ind = List(csc_ind)
     csc_indptr = List(csc_indptr)
+
     for idx in key:
         start, end = csc_indptr[idx - 1: idx + 1]
         start = np.int64(start)
         end = np.int64(end)
+        data2 = csc_data[start: end]
+        ind2 = csc_ind[start: end]
         interfeat_data, interfeat_ind = \
             compute_interactions(data1=interfeat_data, 
                                  ind1=interfeat_ind, 
-                                 data2=csc_data[start: end], 
-                                 ind2=csc_ind[start: end])
+                                 data2=data2, 
+                                 ind2=ind2)
 
     return interfeat_data, interfeat_ind
 
