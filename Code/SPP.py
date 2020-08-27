@@ -776,18 +776,16 @@ def from_key_to_interactions_feature(csc_data, csc_ind, csc_indptr,
     n_features = len(csc_indptr) - 1
     n_samples = len(set(csc_ind)) 
 
-    interfeat_data = List(np.ones(n_samples))
-    interfeat_ind = List(np.arange(n_samples))
-    csc_data = List(csc_data)
-    csc_ind = List(csc_ind)
-    csc_indptr = List(csc_indptr)
+    interfeat_data = np.ones(n_samples)
+    interfeat_ind = np.arange(n_samples)
+    csc_data = csc_data
+    csc_ind = csc_ind
+    csc_indptr = csc_indptr
 
     for idx in key:
         start, end = csc_indptr[idx - 1: idx + 1]
-        start = np.int64(start)
-        end = np.int64(end)
-        data2 = csc_data[start: end]
-        ind2 = csc_ind[start: end]
+        data2 = List(csc_data[start: end])
+        ind2 = List(csc_ind[start: end])
         interfeat_data, interfeat_ind = \
             compute_interactions(data1=interfeat_data, 
                                  ind1=interfeat_ind, 
@@ -1239,44 +1237,44 @@ def main():
     #                  Test intersection of two lists
     ###################################################################
 
-    intersect_key = [ele1 for ele1 in flat_safe_set_key if ele1 in 
-                     safe_set_key_test]
-    # print("intersect_key = ", intersect_key)
+    # intersect_key = [ele1 for ele1 in flat_safe_set_key if ele1 in 
+    #                  safe_set_key_test]
+    # # print("intersect_key = ", intersect_key)
 
-    if len(intersect_key) == len(flat_safe_set_key):
-        print("The intersection list and the list of keys have the same length")
+    # if len(intersect_key) == len(flat_safe_set_key):
+    #     print("The intersection list and the list of keys have the same length")
 
-    # print("flat safe set key = ", flat_safe_set_key[:15])
-    # print("safe set key test = ", safe_set_key_test[:15])
+    # # print("flat safe set key = ", flat_safe_set_key[:15])
+    # # print("safe set key test = ", safe_set_key_test[:15])
 
-    print("length intersect_key = ", len(intersect_key))
-    print("length safe set key : ", len(flat_safe_set_key))
-    print("length safe set key test = ", len(safe_set_key_test))
+    # print("length intersect_key = ", len(intersect_key))
+    # print("length safe set key : ", len(flat_safe_set_key))
+    # print("length safe set key test = ", len(safe_set_key_test))
 
     #####################################################################
     #                  Matrix of interaction features
     #####################################################################
-    inter_feat_list = []
-    for j in range(n_features):
-        for k in range(j, n_features):
-            inter_feat = (X_binned[:, j] * X_binned[:, k])
-            inter_feat_list.append(inter_feat)
+    # inter_feat_list = []
+    # for j in range(n_features):
+    #     for k in range(j, n_features):
+    #         inter_feat = (X_binned[:, j] * X_binned[:, k])
+    #         inter_feat_list.append(inter_feat)
 
-    flatten_inter_feat_list = []
-    for item in inter_feat_list:
-        for ind in item:
-            flatten_inter_feat_list.append(ind)
+    # flatten_inter_feat_list = []
+    # for item in inter_feat_list:
+    #     for ind in item:
+    #         flatten_inter_feat_list.append(ind)
 
-    inter_feat_X = np.zeros((n_samples, len(inter_feat_list)))
+    # inter_feat_X = np.zeros((n_samples, len(inter_feat_list)))
 
-    for k in range(len(flatten_inter_feat_list)):
-        ind_col = 0
-        ind_row = k % n_samples
-        inter_feat_X[ind_row, ind_col] = flatten_inter_feat_list[k]
-        if ind_row == 0:
-            ind_col += 1
+    # for k in range(len(flatten_inter_feat_list)):
+    #     ind_col = 0
+    #     ind_row = k % n_samples
+    #     inter_feat_X[ind_row, ind_col] = flatten_inter_feat_list[k]
+    #     if ind_row == 0:
+    #         ind_col += 1
 
-    print("matrix of interactions = ", inter_feat_X)
+    # print("matrix of interactions = ", inter_feat_X)
 
     #######################################################################
     #              Lasso on the matrix of interaction features
@@ -1293,18 +1291,18 @@ def main():
     #       Test for compute interactions function
     ##########################################################
 
-    ind1 = List([0, 1, 2])
-    ind2 = List([0, 1, 2, 3])
-    data1 = List([1, 5, 3])
-    data2 = List([4, 7, 9, 8])
+    # ind1 = List([0, 1, 2])
+    # ind2 = List([0, 1, 2, 3])
+    # data1 = List([1, 5, 3])
+    # data2 = List([4, 7, 9, 8])
 
-    inter_feat_data, inter_feat_ind = compute_interactions(data1,
-                                                           ind1,
-                                                           data2,
-                                                           ind2)
+    # inter_feat_data, inter_feat_ind = compute_interactions(data1,
+    #                                                        ind1,
+    #                                                        data2,
+    #                                                        ind2)
 
-    print("inter feat data = ", inter_feat_data)
-    print("inter feat ind = ", inter_feat_ind)
+    # print("inter feat data = ", inter_feat_data)
+    # print("inter feat ind = ", inter_feat_ind)
 
     ##############################################################
     #             Test for compute inner product
@@ -1317,11 +1315,11 @@ def main():
     #################################################################
     #                   Test for SPP function
     #################################################################
-    # beta_hat_t, safe_set_data, safe_set_ind, safe_set_key = SPP(
-    #     X_binned_data=X_binned_data, X_binned_indices=X_binned_indices, 
-    #     X_binned_indptr=X_binned_indptr, y=y, n_val_gs=n_val_gs, 
-    #     max_depth=max_depth, epsilon=epsilon, f=f, n_epochs=n_epochs, 
-    #     screening=screening, store_history=store_history)
+    beta_hat_t, safe_set_data, safe_set_ind, safe_set_key = SPP(
+        X_binned_data=X_binned_data, X_binned_indices=X_binned_indices, 
+        X_binned_indptr=X_binned_indptr, y=y, n_val_gs=n_val_gs, 
+        max_depth=max_depth, epsilon=epsilon, f=f, n_epochs=n_epochs, 
+        screening=screening, store_history=store_history)
 
     # print("beta_hat_t =", beta_hat_t)
 
