@@ -1,30 +1,14 @@
 import numpy as np
-# import matplotlib.pyplot as plt
-# import pandas as pd
-# import ipdb
 import time
-# import matplotlib
-# import matplotlib.pyplot as plt
 
-# from numpy.random import randn
 from scipy.linalg import toeplitz
-
 from numba import njit
-# from numba import objmode
-# from numba import jit
 from numba.typed import List
-# from sklearn.linear_model import LinearRegression
 from sklearn.preprocessing import KBinsDiscretizer
-# from sklearn.tree import DecisionTreeRegressor
-# from sklearn.decomposition import PCA
-# from sklearn.model_selection import cross_val_score
 from sklearn.linear_model import Lasso as sklearn_Lasso
 from sklearn.utils import check_random_state
-# from scipy.sparse import csc_matrix
-# from scipy.sparse import issparse
-
+from scipy.sparse import csc_matrix
 from cd_solver_lasso_numba import Lasso, sparse_cd
-# from cd_solver_lasso_numba import Lasso, cyclic_coordinate_descent, sparse_cd
 
 
 #######################################################################
@@ -751,6 +735,57 @@ def from_numbalists_tocsc(numbalist_data, numbalist_ind):
     return csc_data, csc_ind, csc_indptr
 
 
+def from_key_to_interactions_feature(csc_data, csc_ind, csc_indptr, 
+                                     key, n_samples, n_features):
+    """
+    Parameters
+    ----------
+    key: list(int)
+        list of integers containing the indices of the binned features taking
+        part in the interaction
+
+    csc_data: list(int)
+        list of integers containing the non-zero elements of the sparse matrix
+
+    csc_ind: list(int)
+        list of integers containing the row indices of the non-zero elements
+        of the sparse matrix
+
+    csc_indptr: list(int)
+        list of integers containing the indices of each first non-zero elements
+        of each feature in the csc_data vector
+
+    Returns
+    -------
+    interfeat_data: list(int)
+        list of integers containing the non-zero elements of the 
+        feature of interactions
+    
+    interfeat_ind: list(int)
+        list of integers containing the row indices of the non-zero elements
+        of the feature of interactions
+
+    """
+    
+    X_csc = csc_matrix((csc_data, csc_ind, csc_indptr), 
+                       shape=(n_samples, n_features)).toarray()
+
+    interfeat = np.ones(np.shape(X_csc)[0])     
+    for idx in key:
+        interfeat = np.multiply(X_csc[:, idx], interfeat)
+
+    interfeat_data = []
+    interfeat_ind = []
+    ind = 0
+    for data in interfeat:
+        if data != 0:
+            interfeat_data.append(data)
+            interfeat_ind.append(ind)
+        ind += 1
+
+    return interfeat_data, interfeat_ind
+
+
 # @njit
 def SPP(X_binned_data, X_binned_indices, X_binned_indptr, y,
         n_val_gs, max_depth, epsilon, f, n_epochs, screening=True,
@@ -788,16 +823,13 @@ def SPP(X_binned_data, X_binned_indices, X_binned_indptr, y,
     # If we compute once again the feature of interactions corresponding to 
     # max_key
 
-    max_feat_data = []
-    max_feat_ind = []
-    for idx in max_key:
-        start, end = X_binned_indptr[idx - 1, idx + 1]
-        start = np.int64(start)
-        end = np.int64(end)
-        for ind in range(start, end):
-            max_feat_data.append(X_binned_data[ind])
-            max_feat_ind.append(X_binned_indices[ind])
-            
+    max_feat_data, max_feat_ind = \
+        from_key_to_interactions_feature(csc_data=X_binned_data, 
+                                         csc_ind=X_binned_indices, 
+                                         csc_indptr=X_binned_indptr, 
+                                         key=max_key, n_samples=n_samples, 
+                                         n_features=n_features)
+
     beta_hat_t = np.zeros(n_features)
 
     # lmbdas_grid = np.logspace(start=0, stop=lambda_max, num=n_val_gs,
@@ -822,9 +854,13 @@ def SPP(X_binned_data, X_binned_indices, X_binned_indptr, y,
     # features or by calling the function which aims at computing the 
     # features of interactions 
     active_set_data_csc = []
+    active_set_data_csc.append(max_feat_data)
     active_set_ind_csc = []
-    active_set_indptr_csc = [0]
+    active_set_ind_csc.append(max_feat_ind)
+    active_set_indptr_csc = []
+    active_set_indptr_csc.append(0)
     active_set_keys = []
+    active_set_keys.append(max_key)
 
     n_active_feats = len(active_set_indptr_csc) - 1
 
@@ -870,11 +906,12 @@ def SPP(X_binned_data, X_binned_indices, X_binned_indptr, y,
         # compute feasible theta with the max_val
         # compute the radius of the safe sphere
 
-        max_inner_prod, max_key = max_val(X_binned_data=active_set_data_csc,
-                                          X_binned_indices=active_set_ind_csc,
-                                          X_binned_indptr=active_set_indptr_csc,
-                                          residuals=residuals,
-                                          max_depth=max_depth)
+        max_inner_prod, max_key = \
+            max_val(X_binned_data=active_set_data_csc,
+                    X_binned_indices=active_set_ind_csc,
+                    X_binned_indptr=active_set_indptr_csc,
+                    residuals=residuals,
+                    max_depth=max_depth)
 
         print("max_inner_prod = ", max_inner_prod)
         theta = residuals / max(max_inner_prod, lmbda_t)
@@ -931,19 +968,9 @@ def SPP(X_binned_data, X_binned_indices, X_binned_indptr, y,
 
         # To convert safe_set_data which is a numba list of lists we just have 
         # to flatten the numba list as follows 
-        safe_set_data_csc = []
-        safe_set_indptr_csc = [0]
-        indptr = 0
-        for feat in safe_set_data:
-            indptr += len(feat)  # points the beginning of each column
-            safe_set_indptr_csc.append(indptr)
-            for data in feat:
-                safe_set_data_csc.append(data)
 
-        safe_set_ind_csc = []
-        for ind_list in safe_set_ind:
-            for ind in ind_list:
-                safe_set_ind_csc.append(ind)     
+        safe_set_data_csc, safe_set_ind_csc, safe_set_indptr_csc = \
+            from_numbalists_tocsc(safe_set_data, safe_set_ind)
 
         # Les safe sets retournent des listes de listes numba
         # convertir les listes de listes numba en une matrice sparse
@@ -973,16 +1000,24 @@ def SPP(X_binned_data, X_binned_indices, X_binned_indptr, y,
                 active_set_ind.append(safe_set_ind[idx])
                 active_set_keys.append(safe_set_key[idx])
 
-        count = 0
-        for feat in active_set_data:
-            count += len(feat)
-            active_set_indptr_csc.append(count)
-            for data in feat:
-                active_set_data_csc.append(data)
+        # Should we have to convert the numpy list into numba list ?
+        active_set_data = List(active_set_data)
+        active_set_ind = List(active_set_ind)
 
-        for ind_list in active_set_ind:
-            for ind in ind_list:
-                active_set_ind_csc.append(ind)
+        active_set_data_csc, active_set_ind_csc, active_set_indptr_csc = \
+            from_numbalists_tocsc(numbalist_data=active_set_data, 
+                                  numbalist_ind=active_set_ind)
+
+        # count = 0
+        # for feat in active_set_data:
+        #     count += len(feat)
+        #     active_set_indptr_csc.append(count)
+        #     for data in feat:
+        #         active_set_data_csc.append(data)
+
+        # for ind_list in active_set_ind:
+        #     for ind in ind_list:
+        #         active_set_ind_csc.append(ind)
 
     return (active_set_data_csc, active_set_ind_csc, active_set_indptr_csc, 
             active_set_keys)

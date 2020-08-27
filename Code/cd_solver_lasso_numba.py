@@ -401,6 +401,7 @@ def sparse_cd(
         # print("type end = ", type(end))
 
         for ind in range(start, end):
+
             L[j] += X_data[ind] ** 2
     for k in range(n_epochs):
         for j in range(n_features):
