@@ -271,7 +271,7 @@ def compute_inner_prod(data1, ind1, residuals):
 #     return inter_feat_data[0:counter], inter_feat_ind[0:counter]
 
 
-@njit
+# @njit
 def compute_interactions(data1, ind1, data2, ind2):
     """
     Parameters
@@ -305,10 +305,17 @@ def compute_interactions(data1, ind1, data2, ind2):
     count1 = 0
     count2 = 0
 
-    # inter_feat_ind = list()
-    # inter_feat_data = list()
-    inter_feat_data = List([float(x) for x in range(0)])
-    inter_feat_ind = List([int(x) for x in range(0)])
+    # if (type(data1) is List and type(ind1) is List and type(data2) is List and 
+    #     type(ind2) is List):
+    if (isinstance(data1, List) and isinstance(ind1, List) and 
+        isinstance(data2, List) and isinstance(ind2, List)):
+
+        inter_feat_data = List([float(x) for x in range(0)])
+        inter_feat_ind = List([int(x) for x in range(0)])
+
+    else:
+        inter_feat_ind = list()
+        inter_feat_data = list()
 
     # inter_feat_ind = tableau de booléens avec des 1 là où on veut
     # prendre les indices
@@ -784,8 +791,8 @@ def from_key_to_interactions_feature(csc_data, csc_ind, csc_indptr,
 
     for idx in key:
         start, end = csc_indptr[idx - 1: idx + 1]
-        data2 = List(csc_data[start: end])
-        ind2 = List(csc_ind[start: end])
+        data2 = csc_data[start: end]
+        ind2 = csc_ind[start: end]
         interfeat_data, interfeat_ind = \
             compute_interactions(data1=interfeat_data, 
                                  ind1=interfeat_ind, 

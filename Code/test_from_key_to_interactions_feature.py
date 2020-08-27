@@ -4,7 +4,7 @@ import pytest
 
 from SPP import simu, max_val
 from scipy.sparse import csc_matrix
-from SPP import from_key_to_interactions_feature
+from SPP import from_key_to_interactions_feature, compute_interactions
 from numba import njit
 from numba.typed import List
 
@@ -56,3 +56,11 @@ def test_from_key_to_interactions_feature():
 
     np.testing.assert_array_equal(interfeat_data, interfeat_test_data)
     np.testing.assert_array_equal(interfeat_ind, interfeat_test_ind)
+
+
+def main():
+    test_from_key_to_interactions_feature()
+
+
+if __name__ == "__main__":
+    main()
