@@ -734,7 +734,7 @@ def from_numbalists_tocsc(numbalist_data, numbalist_ind):
 
     return csc_data, csc_ind, csc_indptr
 
-
+# @njit
 def from_key_to_interactions_feature(csc_data, csc_ind, csc_indptr, 
                                      key, n_samples, n_features):
     """
@@ -767,21 +767,28 @@ def from_key_to_interactions_feature(csc_data, csc_ind, csc_indptr,
 
     """
     
-    X_csc = csc_matrix((csc_data, csc_ind, csc_indptr), 
-                       shape=(n_samples, n_features)).toarray()
+    # X_csc = csc_matrix((csc_data, csc_ind, csc_indptr), 
+    #                    shape=(n_samples, n_features)).toarray()
 
-    interfeat = np.ones(np.shape(X_csc)[0])     
+    # interfeat = np.ones(np.shape(X_csc)[0])    
+
+    n_features = len(csc_indptr) - 1
+    n_samples = len(set(csc_ind)) 
+
+    interfeat_data = List(np.ones(n_samples))
+    interfeat_ind = List(np.arange(n_samples))
+    csc_data = List(csc_data)
+    csc_ind = List(csc_ind)
+    csc_indptr = List(csc_indptr)
     for idx in key:
-        interfeat = np.multiply(X_csc[:, idx], interfeat)
-
-    interfeat_data = []
-    interfeat_ind = []
-    ind = 0
-    for data in interfeat:
-        if data != 0:
-            interfeat_data.append(data)
-            interfeat_ind.append(ind)
-        ind += 1
+        start, end = csc_indptr[idx - 1: idx + 1]
+        start = np.int64(start)
+        end = np.int64(end)
+        interfeat_data, interfeat_ind = \
+            compute_interactions(data1=interfeat_data, 
+                                 ind1=interfeat_ind, 
+                                 data2=csc_data[start: end], 
+                                 ind2=csc_ind[start: end])
 
     return interfeat_data, interfeat_ind
 
@@ -854,11 +861,11 @@ def SPP(X_binned_data, X_binned_indices, X_binned_indptr, y,
     # features or by calling the function which aims at computing the 
     # features of interactions 
     active_set_data_csc = []
-    active_set_data_csc.append(max_feat_data)
+    active_set_data_csc.extend(max_feat_data)
     active_set_ind_csc = []
-    active_set_ind_csc.append(max_feat_ind)
+    active_set_ind_csc.extend(max_feat_ind)
     active_set_indptr_csc = []
-    active_set_indptr_csc.append(0)
+    active_set_indptr_csc.extend(0)
     active_set_keys = []
     active_set_keys.append(max_key)
 
@@ -987,22 +994,19 @@ def SPP(X_binned_data, X_binned_indices, X_binned_indptr, y,
          n_active_features, theta, P_lmbda, D_lmbda, G_lmbda,
          safeset_membership) = sparse_cd(
             X_data=safe_set_data_csc, X_indices=safe_set_ind_csc,
-            X_indptr=safe_set_indptr_csc, y=y, lmbda=lmbda_t, epsilon=epsilon, f=f,
-            n_epochs=n_epochs, screening=screening,
+            X_indptr=safe_set_indptr_csc, y=y, lmbda=lmbda_t, epsilon=epsilon, 
+            f=f, n_epochs=n_epochs, screening=screening, 
             store_history=store_history)
        
-        active_set_data = []
-        active_set_ind = []
+        active_set_data = List([List([0.])])
+        active_set_ind = List([List([0])])
+        active_set_keys = List([List([0])])
 
-        for idx in range(len(safeset_membership)):
-            if safeset_membership[idx] is True:
+        for idx, membership in enumerate(safeset_membership):
+            if membership:
                 active_set_data.append(safe_set_data[idx])
                 active_set_ind.append(safe_set_ind[idx])
                 active_set_keys.append(safe_set_key[idx])
-
-        # Should we have to convert the numpy list into numba list ?
-        active_set_data = List(active_set_data)
-        active_set_ind = List(active_set_ind)
 
         active_set_data_csc, active_set_ind_csc, active_set_indptr_csc = \
             from_numbalists_tocsc(numbalist_data=active_set_data, 
@@ -1285,18 +1289,18 @@ def main():
     #       Test for compute interactions function
     ##########################################################
 
-    # ind1 = [0, 1, 2]
-    # ind2 = [0, 1, 2, 3]
-    # data1 = [1, 5, 3]
-    # data2 = [4, 7, 9, 8]
+    ind1 = List([0, 1, 2])
+    ind2 = List([0, 1, 2, 3])
+    data1 = List([1, 5, 3])
+    data2 = List([4, 7, 9, 8])
 
-    # inter_feat_data, inter_feat_ind = compute_interactions(data1,
-    #                                                        ind1,
-    #                                                        data2,
-    #                                                        ind2)
+    inter_feat_data, inter_feat_ind = compute_interactions(data1,
+                                                           ind1,
+                                                           data2,
+                                                           ind2)
 
-    # print("inter feat data = ", inter_feat_data)
-    # print("inter feat ind = ", inter_feat_ind)
+    print("inter feat data = ", inter_feat_data)
+    print("inter feat ind = ", inter_feat_ind)
 
     ##############################################################
     #             Test for compute inner product
@@ -1309,11 +1313,11 @@ def main():
     #################################################################
     #                   Test for SPP function
     #################################################################
-    beta_hat_t, safe_set_data, safe_set_ind, safe_set_key = SPP(
-        X_binned_data=X_binned_data, X_binned_indices=X_binned_indices, 
-        X_binned_indptr=X_binned_indptr, y=y, n_val_gs=n_val_gs, 
-        max_depth=max_depth, epsilon=epsilon, f=f, n_epochs=n_epochs, 
-        screening=screening, store_history=store_history)
+    # beta_hat_t, safe_set_data, safe_set_ind, safe_set_key = SPP(
+    #     X_binned_data=X_binned_data, X_binned_indices=X_binned_indices, 
+    #     X_binned_indptr=X_binned_indptr, y=y, n_val_gs=n_val_gs, 
+    #     max_depth=max_depth, epsilon=epsilon, f=f, n_epochs=n_epochs, 
+    #     screening=screening, store_history=store_history)
 
     # print("beta_hat_t =", beta_hat_t)
 
