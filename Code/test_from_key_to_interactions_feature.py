@@ -7,6 +7,7 @@ from scipy.sparse import csc_matrix
 from SPP import from_key_to_interactions_feature, compute_interactions
 from numba import njit
 from numba.typed import List
+from numba import generated_jit
 
 
 # @njit

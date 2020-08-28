@@ -9,7 +9,7 @@ from sklearn.linear_model import Lasso as sklearn_Lasso
 from sklearn.utils import check_random_state
 from scipy.sparse import csc_matrix
 from cd_solver_lasso_numba import Lasso, sparse_cd
-
+from numba import generated_jit
 
 #######################################################################
 #                   Safe Pattern Pruning Algorithm
@@ -271,7 +271,7 @@ def compute_inner_prod(data1, ind1, residuals):
 #     return inter_feat_data[0:counter], inter_feat_ind[0:counter]
 
 
-# @njit
+@njit
 def compute_interactions(data1, ind1, data2, ind2):
     """
     Parameters
@@ -774,11 +774,6 @@ def from_key_to_interactions_feature(csc_data, csc_ind, csc_indptr,
         of the feature of interactions
 
     """
-    
-    # X_csc = csc_matrix((csc_data, csc_ind, csc_indptr), 
-    #                    shape=(n_samples, n_features)).toarray()
-
-    # interfeat = np.ones(np.shape(X_csc)[0])    
 
     n_features = len(csc_indptr) - 1
     n_samples = len(set(csc_ind)) 
@@ -800,7 +795,7 @@ def from_key_to_interactions_feature(csc_data, csc_ind, csc_indptr,
                                  ind2=ind2)
 
     return interfeat_data, interfeat_ind
-
+    
 
 # @njit
 def SPP(X_binned_data, X_binned_indices, X_binned_indptr, y,
