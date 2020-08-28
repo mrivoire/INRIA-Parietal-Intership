@@ -305,17 +305,8 @@ def compute_interactions(data1, ind1, data2, ind2):
     count1 = 0
     count2 = 0
 
-    # if (type(data1) is List and type(ind1) is List and type(data2) is List and 
-    #     type(ind2) is List):
-    if (isinstance(data1, List) and isinstance(ind1, List) and 
-        isinstance(data2, List) and isinstance(ind2, List)):
-
-        inter_feat_data = List([float(x) for x in range(0)])
-        inter_feat_ind = List([int(x) for x in range(0)])
-
-    else:
-        inter_feat_ind = list()
-        inter_feat_data = list()
+    inter_feat_data = List([float(x) for x in range(0)])
+    inter_feat_ind = List([int(x) for x in range(0)])
 
     # inter_feat_ind = tableau de booléens avec des 1 là où on veut
     # prendre les indices
@@ -742,7 +733,7 @@ def from_numbalists_tocsc(numbalist_data, numbalist_ind):
     return csc_data, csc_ind, csc_indptr
 
 
-# @njit
+@njit
 def from_key_to_interactions_feature(csc_data, csc_ind, csc_indptr, 
                                      key, n_samples, n_features):
     """
@@ -778,14 +769,14 @@ def from_key_to_interactions_feature(csc_data, csc_ind, csc_indptr,
     n_features = len(csc_indptr) - 1
     n_samples = len(set(csc_ind)) 
 
-    interfeat_data = np.ones(n_samples)
-    interfeat_ind = np.arange(n_samples)
+    interfeat_data = List(np.ones(n_samples))
+    interfeat_ind = List(np.arange(n_samples))
     csc_data = csc_data
     csc_ind = csc_ind
     csc_indptr = csc_indptr
 
     for idx in key:
-        start, end = csc_indptr[idx - 1: idx + 1]
+        start, end = csc_indptr[idx: idx + 2]
         data2 = csc_data[start: end]
         ind2 = csc_ind[start: end]
         interfeat_data, interfeat_ind = \
@@ -794,7 +785,7 @@ def from_key_to_interactions_feature(csc_data, csc_ind, csc_indptr,
                                  data2=data2, 
                                  ind2=ind2)
 
-    return interfeat_data, interfeat_ind
+    return list(interfeat_data), list(interfeat_ind)
     
 
 # @njit
@@ -869,7 +860,7 @@ def SPP(X_binned_data, X_binned_indices, X_binned_indptr, y,
     active_set_ind_csc = []
     active_set_ind_csc.extend(max_feat_ind)
     active_set_indptr_csc = []
-    active_set_indptr_csc.extend(0)
+    active_set_indptr_csc.append(0)
     active_set_keys = []
     active_set_keys.append(max_key)
 
@@ -1012,6 +1003,8 @@ def SPP(X_binned_data, X_binned_indices, X_binned_indptr, y,
                 active_set_ind.append(safe_set_ind[idx])
                 active_set_keys.append(safe_set_key[idx])
 
+        # Pop le 0 des 3 listes
+        
         active_set_data_csc, active_set_ind_csc, active_set_indptr_csc = \
             from_numbalists_tocsc(numbalist_data=active_set_data, 
                                   numbalist_ind=active_set_ind)
