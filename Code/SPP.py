@@ -911,16 +911,19 @@ def SPP(X_binned_data, X_binned_indices, X_binned_indptr, y,
         # compute the radius of the safe sphere
 
         max_inner_prod, max_key = \
-            max_val(X_binned_data=active_set_data_csc,
-                    X_binned_indices=active_set_ind_csc,
-                    X_binned_indptr=active_set_indptr_csc,
+            max_val(X_binned_data=X_binned_data,
+                    X_binned_indices=X_binned_indices,
+                    X_binned_indptr=X_binned_indptr,
                     residuals=residuals,
                     max_depth=max_depth)
+
+        print('max_inner_prod:', max_inner_prod)
+        print('lmbda_t::', lmbda_t)
 
         theta = residuals / max(max_inner_prod, lmbda_t)
         P_lmbda = 0.5 * residuals.dot(residuals)
         P_lmbda += lmbda_t * np.linalg.norm(beta_hat_t, 1)
-    
+
         D_lmbda = 0.5 * np.linalg.norm(y, ord=2) ** 2
         D_lmbda -= (((lmbda_t ** 2) / 2)
                     * np.linalg.norm(theta - y / lmbda_t, ord=2) ** 2)
@@ -961,10 +964,10 @@ def SPP(X_binned_data, X_binned_indices, X_binned_indptr, y,
             safe_sphere_center=safe_sphere_center,
             safe_sphere_radius=safe_sphere_radius, max_depth=max_depth)
 
-        print('safe_set_data = ', safe_set_data)
-        print('safe_set_ind = ', safe_set_ind)
-        print('safe_set_key =', safe_set_key)
-        
+        print('After safeprune')
+        print(len(safe_set_data))
+        print(len(safe_set_ind))
+
         # Convert safe_set_data, safe_set_ind and safe_set_key which are list 
         # of lists numba into csc attributs
 
@@ -973,10 +976,6 @@ def SPP(X_binned_data, X_binned_indices, X_binned_indptr, y,
 
         safe_set_data_csc, safe_set_ind_csc, safe_set_indptr_csc = \
             from_numbalists_tocsc(safe_set_data, safe_set_ind)
-
-        print('safe_set_data_csc = ', safe_set_data_csc)
-        print('safe_set_ind_csc = ', safe_set_ind_csc)
-        print('safe_set_indptr_csc = ', safe_set_indptr_csc)
 
         # Les safe sets retournent des listes de listes numba
         # convertir les listes de listes numba en une matrice sparse
@@ -989,29 +988,39 @@ def SPP(X_binned_data, X_binned_indices, X_binned_indptr, y,
         # ou réécrire sparse_cd avec des listes de listes numba
         # list_data, list_ind, list_indptr
 
-        (beta_hat_t, primal_hist, dual_hist, gap_hist, r_list,
+        print('Before Main LASSO')
+        print(len(safe_set_data_csc))
+        print(len(safe_set_ind_csc))
+        print(len(safe_set_indptr_csc))
+
+        (beta_hat_t, residuals, primal_hist, dual_hist, gap_hist, r_list,
          n_active_features, theta, P_lmbda, D_lmbda, G_lmbda,
          safeset_membership) = sparse_cd(
             X_data=safe_set_data_csc, X_indices=safe_set_ind_csc,
             X_indptr=safe_set_indptr_csc, y=y, lmbda=lmbda_t, epsilon=epsilon, 
             f=f, n_epochs=n_epochs, screening=screening, 
             store_history=store_history)
+
+        print('Main LASSO passed')
        
         active_set_data = List([List([0.])])
         active_set_ind = List([List([0])])
         active_set_keys = List([List([0])])
-        print('safeset_membership = ', safeset_membership)
 
         for idx, membership in enumerate(safeset_membership):
-            print('membership = ', membership)
+            # print('membership = ', membership)
             if membership:
                 active_set_data.append(safe_set_data[idx])
                 active_set_ind.append(safe_set_ind[idx])
                 active_set_keys.append(safe_set_key[idx])
 
-        active_set_data = active_set_data.pop(0)
-        active_set_ind = active_set_ind.pop(0)
-        active_set_keys = active_set_keys.pop(0)
+        print('active set created')
+
+        active_set_data = active_set_data[1:]
+        active_set_ind = active_set_ind[1:]
+        active_set_keys = active_set_keys[1:]
+
+        print('before numba to csc')
         
         active_set_data_csc, active_set_ind_csc, active_set_indptr_csc = \
             from_numbalists_tocsc(numbalist_data=active_set_data, 
@@ -1034,7 +1043,7 @@ def SPP(X_binned_data, X_binned_indices, X_binned_indptr, y,
 
 def main():
 
-    rng = check_random_state(0)
+    rng = check_random_state(1)
     # n_samples, n_features = 100, 40
     n_samples, n_features = 20, 2
     beta = rng.randn(n_features)
