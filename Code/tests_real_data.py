@@ -1,9 +1,11 @@
 """
 Experiments on real data with categorical variables
+
 """
 import numpy as np
 import time
 import matplotlib.pyplot as plt
+import pandas as pd
 
 from xgboost import XGBRegressor
 from sklearn.ensemble import RandomForestRegressor
@@ -265,16 +267,23 @@ def main():
     #                       Auto Prices Dataset
     #########################################################################
 
-    start1 = time.time()
+    load_f = [load_auto_prices(), load_lacrimes(), load_black_friday(), 
+              load_nyc_taxi(), load_housing_prices()]
 
-    X, y = load_auto_prices()
-    print("Auto Prices Dataset")
+    # for f in load_f:
+        # X, y = f
+
+    start = time.time()
+    # X, y = load_auto_prices()
     # X, y = load_lacrimes()
     # X, y = load_black_friday()
-    # X, y = load_housing_prices()
+    X, y = load_housing_prices()
     # X, y = load_nyc_taxi()
     # X, columns_kept_time = time_convert(X)
+    # print("shape = ", X.shape)
 
+    X = X[:10]
+    y = y[:10]
     models, tuned_parameters = get_models(
             X,
             lmbda=lmbda,
@@ -283,14 +292,10 @@ def main():
             screening=screening,
             store_history=store_history)
 
-    cv_scores = compute_cv(X=X,
-                           y=y,
-                           models=models, n_splits=n_splits, n_jobs=n_jobs)
+    cv_scores = compute_cv(X=X, y=y, models=models, n_splits=n_splits, 
+                           n_jobs=n_jobs)
 
     print("cv_scores = ", cv_scores)
-
-    end1 = time.time()
-    delay1 = end1 - start1
 
     list_cv_scores = []
 
@@ -300,27 +305,35 @@ def main():
 
     print("cv_scores without tuning params = ", list_cv_scores)
 
-    start2 = time.time()
-    gs_scores = compute_gs(X=X,
-                           y=y,
-                           models=models, n_splits=n_splits,
+    gs_scores = compute_gs(X=X, y=y, models=models, n_splits=n_splits,
                            tuned_parameters=tuned_parameters, n_jobs=n_jobs)
 
-    end2 = time.time()
-    delay2 = end2 - start2
-    delay = delay1 + delay2
     list_gs_scores = []
+    scores = pd.DataFrame({'model': [],
+                           'best_cv_score': [],
+                           'best_param': []})
+
+    execution_time_list = []
     for k, v in gs_scores.items():
         print(f'{k} -- best params = {v.best_params_}')
         print(f'{k} -- cv scores = {v.best_score_}')
         list_gs_scores.append(v.best_score_)
+        end = time.time()
+        delay = end - start
+        execution_time_list.append(delay)
+        scores = scores.append(pd.DataFrame({'model': [k],
+                                             'best_cv_score': [v.best_score_],
+                                             'best_param': [v.best_params_],
+                                             'delay': [delay]}))
 
+    print("Housing Prices Dataset with 100 samples")
     print("cv_score with tuning params = ", list_gs_scores)
 
-    print("delay_auto_prices = ", delay)
+    print(scores)
+    scores.to_csv('/home/mrivoire/Documents/M2DS_Polytechnique/INRIA-Parietal-Intership/Code/' + 'auto_prices' + '.csv', index=False)
 
     #######################################################################
-    #                     Bar Plots Auto Prices Dataset
+    #                         Bar Plots CV Scores
     #######################################################################
 
     labels = ['Lasso', 'Lasso_cv', 'Ridge_cv', 'XGB', 'RF']
@@ -332,7 +345,7 @@ def main():
     rects1 = ax.bar(x, list_gs_scores, width)
     # Add some text for labels, title and custom x-axis tick labels, etc.
     ax.set_ylabel('CV Scores')
-    ax.set_title('Crossval Scores By Predictive Model With Tuning For 1000 Samples')
+    ax.set_title('Crossval Scores By Predictive Model With Tuning For 100 Samples')
     ax.set_xticks(x)
     ax.set_xticklabels(labels)
     ax.legend()
@@ -342,6 +355,31 @@ def main():
     fig.tight_layout()
 
     plt.show()
+
+    #######################################################################
+    #                         Bar Plots CV Time
+    #######################################################################
+
+    labels = ['Lasso', 'Lasso_cv', 'Ridge_cv', 'XGB', 'RF']
+
+    x = np.arange(len(labels))  # the label locations
+    width = 0.35  # the width of the bars
+
+    fig, ax = plt.subplots()
+    rects1 = ax.bar(x, execution_time_list, width)
+    # Add some text for labels, title and custom x-axis tick labels, etc.
+    ax.set_ylabel('Running Time')
+    ax.set_title('Running Time By Predictive Model With Tuning For 100 Samples')
+    ax.set_xticks(x)
+    ax.set_xticklabels(labels)
+    ax.legend()
+
+    autolabel(rects1, 1000)
+
+    fig.tight_layout()
+
+    plt.show()
+
 
 
 if __name__ == "__main__":

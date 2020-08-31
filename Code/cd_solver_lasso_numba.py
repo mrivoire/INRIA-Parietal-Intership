@@ -393,16 +393,15 @@ def sparse_cd(
     # L = List(L)
     # L = List([int(x) for x in range(0)])
     # L = [0] * (n_features)
+    # L = List()
     for j in range(n_features):
         start, end = X_indptr[j: j + 2]
         start = np.int64(start)
         end = np.int64(end)
-        # print("type start = ", type(start))
-        # print("type end = ", type(end))
 
         for ind in range(start, end):
-
             L[j] += X_data[ind] ** 2
+
     for k in range(n_epochs):
         for j in range(n_features):
             if L[j] == 0.0:

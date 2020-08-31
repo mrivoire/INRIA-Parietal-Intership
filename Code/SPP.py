@@ -786,7 +786,7 @@ def from_key_to_interactions_feature(csc_data, csc_ind, csc_indptr,
                                  ind2=ind2)
 
     return list(interfeat_data), list(interfeat_ind)
-    
+
 
 # @njit
 def SPP(X_binned_data, X_binned_indices, X_binned_indptr, y,
@@ -856,13 +856,18 @@ def SPP(X_binned_data, X_binned_indices, X_binned_indptr, y,
     # features or by calling the function which aims at computing the 
     # features of interactions 
     active_set_data_csc = []
-    active_set_data_csc.extend(max_feat_data)
+    active_set_data_csc.append(max_feat_data)
+    print('active_set_data_csc = ', active_set_data_csc)
+    print("type = ", type(active_set_data_csc))
     active_set_ind_csc = []
-    active_set_ind_csc.extend(max_feat_ind)
+    active_set_ind_csc.append(max_feat_ind)
+    print('active_set_ind_csc = ', active_set_ind_csc)
     active_set_indptr_csc = []
     active_set_indptr_csc.append(0)
+    print('active_set_indptr_csc = ', active_set_indptr_csc)
     active_set_keys = []
     active_set_keys.append(max_key)
+    print('active_set_keys = ', active_set_keys)
 
     n_active_feats = len(active_set_indptr_csc) - 1
 
@@ -884,14 +889,26 @@ def SPP(X_binned_data, X_binned_indices, X_binned_indptr, y,
         #                      screening=False,
         #                      store_history=False).fit(X_active_set, y)
 
+
+        # There is a problem of type concerning the inputs of sparse_cd 
+        # sparse_cd takes as input np.ndarray types whereas active_set_data_csc
+        # active_set_ind_csc and active_set_indptr_csc are class lists 
+        active_set_data_csc = np.asarray(active_set_data_csc)
+        active_set_ind_csc = np.asarray(active_set_ind_csc)
+        active_set_indptr_csc = np.asarray(active_set_indptr_csc)
+        print('type of active_set_data_csc = ', type(active_set_data_csc))
+        print('type of active_set_ind_csc = ', type(active_set_ind_csc))
+        print('type of active_set_indptr_csc = ', type(active_set_indptr_csc))
+        
         (beta_hat_t, residuals, primal_hist_sparse, dual_hist_sparse, 
          gap_hist_sparse, r_list_sparse, n_active_features_true_sparse, 
          theta_hat_cyclic_cd_sparse, P_lmbda_sparse, D_lmbda_sparse, 
          G_lmbda_sparse, safe_set_sparse) = \
-         sparse_cd(X_data=active_set_data_csc, X_indices=active_set_ind_csc, 
-                   X_indptr=active_set_indptr_csc, y=y, lmbda=lmbda_t, 
-                   epsilon=epsilon, f=f, n_epochs=n_epochs, 
-                   screening=screening, store_history=store_history)
+            sparse_cd(X_data=active_set_data_csc, 
+                      X_indices=active_set_ind_csc, 
+                      X_indptr=active_set_indptr_csc, y=y, lmbda=lmbda_t, 
+                      epsilon=epsilon, f=f, n_epochs=n_epochs, 
+                      screening=screening, store_history=store_history)
 
         # ajouter un point fit sur les features actives données par
         # safe_set_membership
@@ -908,6 +925,10 @@ def SPP(X_binned_data, X_binned_indices, X_binned_indptr, y,
         # compute feasible theta with the max_val
         # compute the radius of the safe sphere
 
+        active_set_data_csc = list(active_set_data_csc)
+        active_set_ind_csc = list(active_set_ind_csc)
+        active_set_indptr_csc = list(active_set_indptr_csc)
+
         max_inner_prod, max_key = \
             max_val(X_binned_data=active_set_data_csc,
                     X_binned_indices=active_set_ind_csc,
@@ -915,21 +936,15 @@ def SPP(X_binned_data, X_binned_indices, X_binned_indptr, y,
                     residuals=residuals,
                     max_depth=max_depth)
 
-        print("max_inner_prod = ", max_inner_prod)
         theta = residuals / max(max_inner_prod, lmbda_t)
-        print("theta = ", theta)
         P_lmbda = 0.5 * residuals.dot(residuals)
         P_lmbda += lmbda_t * np.linalg.norm(beta_hat_t, 1)
-        print("P_lmbda = ", P_lmbda)
-
+    
         D_lmbda = 0.5 * np.linalg.norm(y, ord=2) ** 2
         D_lmbda -= (((lmbda_t ** 2) / 2)
                     * np.linalg.norm(theta - y / lmbda_t, ord=2) ** 2)
 
-        print("D_lmbda = ", D_lmbda)
-
         G_lmbda = P_lmbda - D_lmbda
-        print("G_lmbda = ", G_lmbda)
 
         safe_sphere_radius = np.sqrt(2 * G_lmbda) / lmbda_t
         safe_sphere_center = theta
@@ -985,6 +1000,10 @@ def SPP(X_binned_data, X_binned_indices, X_binned_indptr, y,
         # ou réécrire sparse_cd avec des listes de listes numba
         # list_data, list_ind, list_indptr
 
+        safe_set_data_csc = np.array(safe_set_data_csc)
+        safe_set_ind_csc = np.array(safe_set_ind_csc)
+        safe_set_indptr_csc = np.array(safe_set_indptr_csc)
+
         (beta_hat_t, primal_hist, dual_hist, gap_hist, r_list,
          n_active_features, theta, P_lmbda, D_lmbda, G_lmbda,
          safeset_membership) = sparse_cd(
@@ -996,14 +1015,18 @@ def SPP(X_binned_data, X_binned_indices, X_binned_indptr, y,
         active_set_data = List([List([0.])])
         active_set_ind = List([List([0])])
         active_set_keys = List([List([0])])
+        print('safeset_membership = ', safeset_membership)
 
         for idx, membership in enumerate(safeset_membership):
+            print('membership = ', membership)
             if membership:
                 active_set_data.append(safe_set_data[idx])
                 active_set_ind.append(safe_set_ind[idx])
                 active_set_keys.append(safe_set_key[idx])
 
-        # Pop le 0 des 3 listes
+        active_set_data = active_set_data.pop(0)
+        active_set_ind = active_set_ind.pop(0)
+        active_set_keys = active_set_keys.pop(0)
         
         active_set_data_csc, active_set_ind_csc, active_set_indptr_csc = \
             from_numbalists_tocsc(numbalist_data=active_set_data, 
@@ -1310,7 +1333,8 @@ def main():
     #################################################################
     #                   Test for SPP function
     #################################################################
-    beta_hat_t, safe_set_data, safe_set_ind, safe_set_key = SPP(
+    (active_set_data_csc, active_set_ind_csc, active_set_indptr_csc, 
+        active_set_keys) = SPP(
         X_binned_data=X_binned_data, X_binned_indices=X_binned_indices, 
         X_binned_indptr=X_binned_indptr, y=y, n_val_gs=n_val_gs, 
         max_depth=max_depth, epsilon=epsilon, f=f, n_epochs=n_epochs, 
