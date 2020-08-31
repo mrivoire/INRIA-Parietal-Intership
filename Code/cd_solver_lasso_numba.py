@@ -367,9 +367,7 @@ def sparse_cd(
     """
 
     n_features = len(X_indptr) - 1
-    n_samples = len(X_indices) + 1
     beta = np.zeros(n_features)
-    theta = np.zeros(n_samples)
 
     y_norm2 = np.linalg.norm(y, ord=2) ** 2
     residuals = np.copy(y)
@@ -390,10 +388,7 @@ def sparse_cd(
     safeset_membership = np.ones(n_features)
 
     L = np.zeros(n_features)
-    # L = List(L)
-    # L = List([int(x) for x in range(0)])
-    # L = [0] * (n_features)
-    # L = List()
+
     for j in range(n_features):
         start, end = X_indptr[j: j + 2]
         start = np.int64(start)
@@ -436,7 +431,7 @@ def sparse_cd(
             # Matrix product between the features matrix X and the residuals
             for j in range(n_features):
                 if safeset_membership[j] == 1:
-                    start, end = X_indptr[j : j + 2]
+                    start, end = X_indptr[j: j + 2]
                     dot = 0.0
                     for ind in range(start, end):
                         dot += X_data[ind] * residuals[X_indices[ind]]

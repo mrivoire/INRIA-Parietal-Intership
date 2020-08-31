@@ -856,11 +856,11 @@ def SPP(X_binned_data, X_binned_indices, X_binned_indptr, y,
     # features or by calling the function which aims at computing the 
     # features of interactions 
     active_set_data_csc = []
-    active_set_data_csc.append(max_feat_data)
+    active_set_data_csc.extend(max_feat_data)
     print('active_set_data_csc = ', active_set_data_csc)
     print("type = ", type(active_set_data_csc))
     active_set_ind_csc = []
-    active_set_ind_csc.append(max_feat_ind)
+    active_set_ind_csc.extend(max_feat_ind)
     print('active_set_ind_csc = ', active_set_ind_csc)
     active_set_indptr_csc = []
     active_set_indptr_csc.append(0)
@@ -988,6 +988,10 @@ def SPP(X_binned_data, X_binned_indices, X_binned_indptr, y,
 
         safe_set_data_csc, safe_set_ind_csc, safe_set_indptr_csc = \
             from_numbalists_tocsc(safe_set_data, safe_set_ind)
+
+        print('safe_set_data_csc = ', safe_set_data_csc)
+        print('safe_set_ind_csc = ', safe_set_ind_csc)
+        print('safe_set_indptr_csc = ', safe_set_indptr_csc)
 
         # Les safe sets retournent des listes de listes numba
         # convertir les listes de listes numba en une matrice sparse
