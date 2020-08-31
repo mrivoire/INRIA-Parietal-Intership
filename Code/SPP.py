@@ -857,17 +857,13 @@ def SPP(X_binned_data, X_binned_indices, X_binned_indptr, y,
     # features of interactions 
     active_set_data_csc = []
     active_set_data_csc.extend(max_feat_data)
-    print('active_set_data_csc = ', active_set_data_csc)
-    print("type = ", type(active_set_data_csc))
     active_set_ind_csc = []
     active_set_ind_csc.extend(max_feat_ind)
-    print('active_set_ind_csc = ', active_set_ind_csc)
     active_set_indptr_csc = []
     active_set_indptr_csc.append(0)
-    print('active_set_indptr_csc = ', active_set_indptr_csc)
+    active_set_indptr_csc.append(len(active_set_ind_csc))  #NNZ element
     active_set_keys = []
     active_set_keys.append(max_key)
-    print('active_set_keys = ', active_set_keys)
 
     n_active_feats = len(active_set_indptr_csc) - 1
 
@@ -889,17 +885,6 @@ def SPP(X_binned_data, X_binned_indices, X_binned_indptr, y,
         #                      screening=False,
         #                      store_history=False).fit(X_active_set, y)
 
-
-        # There is a problem of type concerning the inputs of sparse_cd 
-        # sparse_cd takes as input np.ndarray types whereas active_set_data_csc
-        # active_set_ind_csc and active_set_indptr_csc are class lists 
-        active_set_data_csc = np.asarray(active_set_data_csc)
-        active_set_ind_csc = np.asarray(active_set_ind_csc)
-        active_set_indptr_csc = np.asarray(active_set_indptr_csc)
-        print('type of active_set_data_csc = ', type(active_set_data_csc))
-        print('type of active_set_ind_csc = ', type(active_set_ind_csc))
-        print('type of active_set_indptr_csc = ', type(active_set_indptr_csc))
-        
         (beta_hat_t, residuals, primal_hist_sparse, dual_hist_sparse, 
          gap_hist_sparse, r_list_sparse, n_active_features_true_sparse, 
          theta_hat_cyclic_cd_sparse, P_lmbda_sparse, D_lmbda_sparse, 
@@ -924,10 +909,6 @@ def SPP(X_binned_data, X_binned_indices, X_binned_indptr, y,
         # rescaling of the solution to make it feasible
         # compute feasible theta with the max_val
         # compute the radius of the safe sphere
-
-        active_set_data_csc = list(active_set_data_csc)
-        active_set_ind_csc = list(active_set_ind_csc)
-        active_set_indptr_csc = list(active_set_indptr_csc)
 
         max_inner_prod, max_key = \
             max_val(X_binned_data=active_set_data_csc,
@@ -979,6 +960,10 @@ def SPP(X_binned_data, X_binned_indices, X_binned_indptr, y,
             X_binned_indptr=X_binned_indptr,
             safe_sphere_center=safe_sphere_center,
             safe_sphere_radius=safe_sphere_radius, max_depth=max_depth)
+
+        print('safe_set_data = ', safe_set_data)
+        print('safe_set_ind = ', safe_set_ind)
+        print('safe_set_key =', safe_set_key)
         
         # Convert safe_set_data, safe_set_ind and safe_set_key which are list 
         # of lists numba into csc attributs
@@ -1003,10 +988,6 @@ def SPP(X_binned_data, X_binned_indices, X_binned_indptr, y,
 
         # ou réécrire sparse_cd avec des listes de listes numba
         # list_data, list_ind, list_indptr
-
-        safe_set_data_csc = np.array(safe_set_data_csc)
-        safe_set_ind_csc = np.array(safe_set_ind_csc)
-        safe_set_indptr_csc = np.array(safe_set_indptr_csc)
 
         (beta_hat_t, primal_hist, dual_hist, gap_hist, r_list,
          n_active_features, theta, P_lmbda, D_lmbda, G_lmbda,
