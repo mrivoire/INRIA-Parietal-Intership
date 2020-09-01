@@ -9,13 +9,13 @@ from sklearn.preprocessing import KBinsDiscretizer
 from sklearn.linear_model import Lasso as sklearn_Lasso
 from sklearn.utils import check_random_state
 from cd_solver_lasso_numba import Lasso, sparse_cd
-from SPP import simu, compute_inner_prod, SPP 
+from SPP import simu, SPP 
 
 
 def test_SPP():
 
     # Definition of the parameters 
-    rng = check_random_state(0)
+    rng = check_random_state(1)
     n_samples, n_features = 20, 2
     beta = rng.randn(n_features)
     lmbda = 1.
@@ -52,17 +52,34 @@ def test_SPP():
                                          max_iter=n_epochs,
                                          tol=1e-14).fit(X_binned, y)
 
-    beta_star = sparse_lasso_sklearn.coef_
+    beta_star_lasso = sparse_lasso_sklearn.coef_
     # residuals = y - X_binned.dot(beta_star)
 
-    beta_hat_t, safe_set_data, safe_set_ind, safe_set_key = SPP(
-        X_binned=X_binned, X_binned_data=X_binned_data,
-        X_binned_indices=X_binned_indices, X_binned_indptr=X_binned_indptr,
-        y=y,
-        n_val_gs=n_val_gs, max_depth=max_depth, epsilon=epsilon, f=f,
-        n_epochs=n_epochs, screening=screening, store_history=store_history)
+    (beta_star, beta_hat_dict, active_set_data_csc_opt, 
+     active_set_ind_csc_opt, active_set_indptr_csc_opt, 
+     active_set_keys_opt, active_set_data_csc_dict, 
+     active_set_ind_csc_dict, active_set_indptr_csc_dict, 
+     active_set_keys_dict) = \
+        SPP(X_binned_data=X_binned_data, X_binned_indices=X_binned_indices, 
+            X_binned_indptr=X_binned_indptr, y=y, n_val_gs=n_val_gs, 
+            max_depth=max_depth, epsilon=epsilon, f=f, n_epochs=n_epochs, 
+            screening=screening, store_history=store_history)
 
-    print("beta_hat_t =", beta_hat_t)
+    print('beta_star = ', beta_star)
+    print('beta_star_lasso = ', beta_star_lasso)
 
-    assert beta_hat_t == beta_star
-    assert len(beta_hat_t) == len(beta_star)
+    print('NNZ elements of beta_star = ', np.count_nonzero(beta_star))
+    print('length of active_set_indptr = ', len(active_set_indptr_csc_opt))
+    print('length of active_set_keys = ', len(active_set_keys_opt))
+    assert beta_star == beta_star_lasso
+    assert np.count_nonzero(beta_star) == len(active_set_indptr_csc_opt)
+    assert np.count_nonzero(beta_star) == len(active_set_keys_opt)
+
+
+# def main():
+
+#     test_SPP()
+
+
+# if __name__ == "__main__":
+#     main()
