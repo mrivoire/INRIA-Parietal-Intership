@@ -1,5 +1,6 @@
 import numpy as np
 import time
+import math
 
 from scipy.linalg import toeplitz
 from numba import njit
@@ -10,6 +11,7 @@ from sklearn.utils import check_random_state
 from scipy.sparse import csc_matrix
 from cd_solver_lasso_numba import Lasso, sparse_cd
 from numba import generated_jit
+from math import isnan
 
 #######################################################################
 #                   Safe Pattern Pruning Algorithm
@@ -867,6 +869,12 @@ def SPP(X_binned_data, X_binned_indices, X_binned_indptr, y,
 
     n_active_feats = len(active_set_indptr_csc) - 1
 
+    beta_hat_dict = {}
+    active_set_data_csc_dict = {}
+    active_set_ind_csc_dict = {}
+    active_set_indptr_csc_dict = {}
+    active_set_keys_dict = {}
+
     for lmbda_t in lmbdas_grid:
         # Pre-solve : solve the optimization problem with the new lambda on
         # the previous optimal set of features. (epsilon not too small ~ 10^-8)
@@ -929,121 +937,147 @@ def SPP(X_binned_data, X_binned_indices, X_binned_indptr, y,
                     * np.linalg.norm(theta - y / lmbda_t, ord=2) ** 2)
 
         G_lmbda = P_lmbda - D_lmbda
-
+        print('dual gap = ', G_lmbda)
         safe_sphere_radius = np.sqrt(2 * G_lmbda) / lmbda_t
         safe_sphere_center = theta
+        print('safe_sphere_radius = ', safe_sphere_radius)
+        print('safe_sphere_center = ',  safe_sphere_center)
 
-        # Safe Prune after pre-solve:
-        # epoch == 0 => first perform spp then launch the solver with
-        # screening
-        # then SPP: we obtain a safe set
-        # launch the solver taking as input the safe set
-        # the solver will screen even more the features in the safe set
-        # safe set vector which contains all the nodes which have not
-        # been
-        # screened
-        # safe set contains both the sparse features and an id
-        # (corresponding to the ancestors of the features)
-        # representation of the id of the features
-        # 2 vectors of same size : 1 with the sparse features
-        # (vector of vectors = sparse matrix) and
-        # 1 with the id (vector of tuples)
-        # can be directly given as input to the solver
-        # then remove the ids outside from the solver with regards to the
-        # 0 coeffs of beta
-        # or implement a class "node" with attribute key (id = tuple)
-        # and the sparse
-        # vector which represents the feature
-        # then make a vector of node
+        if isnan(safe_sphere_radius):
+            print('The current active set has already reached the support of the optimal model')
+            beta_star = beta_hat_t
+            beta_hat_dict[lmbda_t] = beta_hat_t
+            active_set_data_csc_opt = active_set_data_csc
+            active_set_ind_csc_opt = active_set_ind_csc
+            active_set_indptr_csc_opt = active_set_indptr_csc
+            active_set_keys_opt = active_set_keys
+            active_set_data_csc_dict[lmbda_t] = active_set_data_csc
+            active_set_ind_csc_dict[lmbda_t] = active_set_ind_csc
+            active_set_indptr_csc_dict[lmbda_t] = active_set_indptr_csc 
+            active_set_keys_dict[lmbda_t] = active_set_keys
+            return (beta_star, beta_hat_dict, active_set_data_csc_opt, 
+                    active_set_ind_csc_opt, active_set_indptr_csc_opt, 
+                    active_set_keys_opt, active_set_data_csc_dict, 
+                    active_set_ind_csc_dict, active_set_indptr_csc_dict, 
+                    active_set_keys_dict)
 
-        # launch the already implemented solver on the safe set
+        else:
+            # Safe Prune after pre-solve:
+            # epoch == 0 => first perform spp then launch the solver with
+            # screening
+            # then SPP: we obtain a safe set
+            # launch the solver taking as input the safe set
+            # the solver will screen even more the features in the safe set
+            # safe set vector which contains all the nodes which have not
+            # been
+            # screened
+            # safe set contains both the sparse features and an id
+            # (corresponding to the ancestors of the features)
+            # representation of the id of the features
+            # 2 vectors of same size : 1 with the sparse features
+            # (vector of vectors = sparse matrix) and
+            # 1 with the id (vector of tuples)
+            # can be directly given as input to the solver
+            # then remove the ids outside from the solver with regards to the
+            # 0 coeffs of beta
+            # or implement a class "node" with attribute key (id = tuple)
+            # and the sparse
+            # vector which represents the feature
+            # then make a vector of node
 
-        (safe_set_data, safe_set_ind, safe_set_key) = safe_prune(
-            X_binned_data=X_binned_data, X_binned_indices=X_binned_indices,
-            X_binned_indptr=X_binned_indptr,
-            safe_sphere_center=safe_sphere_center,
-            safe_sphere_radius=safe_sphere_radius, max_depth=max_depth)
+            # launch the already implemented solver on the safe set
 
-        print('After safeprune')
-        print(len(safe_set_data))
-        print(len(safe_set_ind))
+            (safe_set_data, safe_set_ind, safe_set_key) = safe_prune(
+                X_binned_data=X_binned_data, X_binned_indices=X_binned_indices,
+                X_binned_indptr=X_binned_indptr,
+                safe_sphere_center=safe_sphere_center,
+                safe_sphere_radius=safe_sphere_radius, max_depth=max_depth)
 
-        # Convert safe_set_data, safe_set_ind and safe_set_key which are list 
-        # of lists numba into csc attributs
+            print('After safeprune')
+            print(len(safe_set_data))
+            print(len(safe_set_ind))
 
-        # To convert safe_set_data which is a numba list of lists we just have 
-        # to flatten the numba list as follows 
+            # Convert safe_set_data, safe_set_ind and safe_set_key which are list 
+            # of lists numba into csc attributs
 
-        safe_set_data_csc, safe_set_ind_csc, safe_set_indptr_csc = \
-            from_numbalists_tocsc(safe_set_data, safe_set_ind)
+            # To convert safe_set_data which is a numba list of lists we just have 
+            # to flatten the numba list as follows 
 
-        # Les safe sets retournent des listes de listes numba
-        # convertir les listes de listes numba en une matrice sparse
-        # pour pouvoir les donner en entrée au sparse_cd
-        # la matrice sparse correspond à une matrice csc
-        # ensuite construire les 3 attributs data, ind et indptr
-        # ou déterminer directement data, ind et indptr
-        # essayer de retourner directement data, ind et indptr dans safe_prune
+            safe_set_data_csc, safe_set_ind_csc, safe_set_indptr_csc = \
+                from_numbalists_tocsc(safe_set_data, safe_set_ind)
 
-        # ou réécrire sparse_cd avec des listes de listes numba
-        # list_data, list_ind, list_indptr
+            # Les safe sets retournent des listes de listes numba
+            # convertir les listes de listes numba en une matrice sparse
+            # pour pouvoir les donner en entrée au sparse_cd
+            # la matrice sparse correspond à une matrice csc
+            # ensuite construire les 3 attributs data, ind et indptr
+            # ou déterminer directement data, ind et indptr
+            # essayer de retourner directement data, ind et indptr dans safe_prune
 
-        print('Before Main LASSO')
-        print(len(safe_set_data_csc))
-        print(len(safe_set_ind_csc))
-        print(len(safe_set_indptr_csc))
+            # ou réécrire sparse_cd avec des listes de listes numba
+            # list_data, list_ind, list_indptr
 
-        (beta_hat_t, residuals, primal_hist, dual_hist, gap_hist, r_list,
-         n_active_features, theta, P_lmbda, D_lmbda, G_lmbda,
-         safeset_membership) = sparse_cd(
-            X_data=safe_set_data_csc, X_indices=safe_set_ind_csc,
-            X_indptr=safe_set_indptr_csc, y=y, lmbda=lmbda_t, epsilon=epsilon, 
-            f=f, n_epochs=n_epochs, screening=screening, 
-            store_history=store_history)
+            print('Before Main LASSO')
+            print(len(safe_set_data_csc))
+            print(len(safe_set_ind_csc))
+            print(len(safe_set_indptr_csc))
 
-        print('Main LASSO passed')
-       
-        active_set_data = List([List([0.])])
-        active_set_ind = List([List([0])])
-        active_set_keys = List([List([0])])
+            (beta_hat_t, residuals, primal_hist, dual_hist, gap_hist, r_list,
+            n_active_features, theta, P_lmbda, D_lmbda, G_lmbda,
+            safeset_membership) = sparse_cd(
+                X_data=safe_set_data_csc, X_indices=safe_set_ind_csc,
+                X_indptr=safe_set_indptr_csc, y=y, lmbda=lmbda_t, epsilon=epsilon, 
+                f=f, n_epochs=n_epochs, screening=screening, 
+                store_history=store_history)
 
-        for idx, membership in enumerate(safeset_membership):
-            # print('membership = ', membership)
-            if membership:
-                active_set_data.append(safe_set_data[idx])
-                active_set_ind.append(safe_set_ind[idx])
-                active_set_keys.append(safe_set_key[idx])
+            beta_hat_dict[lmbda_t] = beta_hat_t
+            print(beta_hat_dict) 
 
-        print('active set created')
-
-        active_set_data = active_set_data[1:]
-        active_set_ind = active_set_ind[1:]
-        active_set_keys = active_set_keys[1:]
-
-        print('before numba to csc')
+            print('Main LASSO passed')
         
-        active_set_data_csc, active_set_ind_csc, active_set_indptr_csc = \
-            from_numbalists_tocsc(numbalist_data=active_set_data, 
-                                  numbalist_ind=active_set_ind)
+            active_set_data = List([List([0.])])
+            active_set_ind = List([List([0])])
+            active_set_keys = List([List([0])])
 
-        # count = 0
-        # for feat in active_set_data:
-        #     count += len(feat)
-        #     active_set_indptr_csc.append(count)
-        #     for data in feat:
-        #         active_set_data_csc.append(data)
+            for idx, membership in enumerate(safeset_membership):
+                # print('membership = ', membership)
+                if membership:
+                    active_set_data.append(safe_set_data[idx])
+                    active_set_ind.append(safe_set_ind[idx])
+                    active_set_keys.append(safe_set_key[idx])
 
-        # for ind_list in active_set_ind:
-        #     for ind in ind_list:
-        #         active_set_ind_csc.append(ind)
+            print('active set created')
 
-    return (active_set_data_csc, active_set_ind_csc, active_set_indptr_csc, 
-            active_set_keys)
+            active_set_data = active_set_data[1:]
+            active_set_ind = active_set_ind[1:]
+            active_set_keys = active_set_keys[1:]
+
+            print('before numba to csc')
+            
+            active_set_data_csc, active_set_ind_csc, active_set_indptr_csc = \
+                from_numbalists_tocsc(numbalist_data=active_set_data, 
+                                      numbalist_ind=active_set_ind)
+
+            active_set_data_csc_dict[lmbda_t] = active_set_data_csc
+            active_set_ind_csc_dict[lmbda_t] = active_set_ind_csc
+            active_set_indptr_csc_dict[lmbda_t] = active_set_indptr_csc
+            active_set_keys_dict[lmbda_t] = active_set_keys
+
+        beta_star = beta_hat_t
+        active_set_data_csc_opt = active_set_data_csc
+        active_set_ind_csc_opt = active_set_ind_csc
+        active_set_indptr_csc_opt = active_set_indptr_csc
+        active_set_keys_opt = active_set_keys
+
+        return (beta_star, beta_hat_dict, active_set_data_csc_opt, 
+                active_set_ind_csc_opt, active_set_indptr_csc_opt, 
+                active_set_keys_opt, active_set_data_csc_dict, 
+                active_set_ind_csc_dict, active_set_indptr_csc_dict, 
+                active_set_keys_dict)
 
 
 def main():
-
-    rng = check_random_state(1)
+    rng = check_random_state(0)
     # n_samples, n_features = 100, 40
     n_samples, n_features = 20, 2
     beta = rng.randn(n_features)
@@ -1327,14 +1361,26 @@ def main():
     #################################################################
     #                   Test for SPP function
     #################################################################
-    (active_set_data_csc, active_set_ind_csc, active_set_indptr_csc, 
-        active_set_keys) = SPP(
-        X_binned_data=X_binned_data, X_binned_indices=X_binned_indices, 
-        X_binned_indptr=X_binned_indptr, y=y, n_val_gs=n_val_gs, 
-        max_depth=max_depth, epsilon=epsilon, f=f, n_epochs=n_epochs, 
-        screening=screening, store_history=store_history)
-
-    # print("beta_hat_t =", beta_hat_t)
+    (beta_star, beta_hat_dict, active_set_data_csc_opt, 
+     active_set_ind_csc_opt, active_set_indptr_csc_opt, 
+     active_set_keys_opt, active_set_data_csc_dict, 
+     active_set_ind_csc_dict, active_set_indptr_csc_dict, 
+     active_set_keys_dict) = \
+        SPP(X_binned_data=X_binned_data, X_binned_indices=X_binned_indices, 
+            X_binned_indptr=X_binned_indptr, y=y, n_val_gs=n_val_gs, 
+            max_depth=max_depth, epsilon=epsilon, f=f, n_epochs=n_epochs, 
+            screening=screening, store_history=store_history)
+    
+    print('beta_star = ', beta_star)
+    print('beta_hat_dict = ', beta_hat_dict)
+    print('active_set_data = ', active_set_data_csc_opt)
+    print('active_set_ind = ', active_set_ind_csc_opt)
+    print('active_set_indptr = ', active_set_indptr_csc_opt)
+    print('active_set_keys = ', active_set_keys_opt)
+    print('active_set_data_dict = ', active_set_data_csc_dict)
+    print('active_set_ind_dict = ', active_set_ind_csc_dict)
+    print('active_set_indptr_dict = ', active_set_indptr_csc_dict)
+    print('active_set_keys_dict = ', active_set_keys_dict)
 
 
 if __name__ == "__main__":
