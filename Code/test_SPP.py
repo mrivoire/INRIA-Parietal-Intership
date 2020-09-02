@@ -12,6 +12,7 @@ from cd_solver_lasso_numba import Lasso, sparse_cd
 from SPP import simu, SPP, compute_interactions
 from scipy.sparse import csc_matrix
 
+
 def test_SPP():
 
     # Definition of the parameters 
@@ -60,9 +61,8 @@ def test_SPP():
     X_inter_feat_data = []
     X_inter_feat_ind = []
     X_inter_feat_indptr = []
-    X_inter_feat_indptr.append(0)
-
-    count = len(X_binned_indices)
+    indptr = len(X_binned_indices) 
+    print('init indptr = ', indptr)
     n_inter_feats = 0
     # Computation of the features of interactions
     for i in range(n_features):
@@ -78,22 +78,47 @@ def test_SPP():
                     data2=X_binned_data[start_feat2: end_feat2], 
                     ind2=X_binned_indices[start_feat2: end_feat2])
 
+            print('i = ', i)
+            print('j = ', j)
+            print('length inter_feat_ind = ', len(inter_feat_ind))
+            indptr += len(inter_feat_ind)
+            print('indptr = ', indptr)
+
             X_inter_feat_data.extend(inter_feat_data)
             X_inter_feat_ind.extend(inter_feat_ind)
-            X_inter_feat_indptr.append(count + j * len(X_inter_feat_data))
+            X_inter_feat_indptr.append(indptr)
+
+    X_inter_feat_indptr = list(set(X_inter_feat_indptr))
 
     X_tilde_indptr.extend(X_binned_indptr)
     X_tilde_indptr.extend(X_inter_feat_indptr)
 
     n_tilde_feats = n_features + n_inter_feats
-    print('n_features = ', n_features)
-    print('n_inter_feats = ', n_inter_feats)
-    print('n_tilde_feats = ', n_tilde_feats)
+    # print('n_features = ', n_features)
+    # print('n_inter_feats = ', n_inter_feats)
+    # print('n_tilde_feats = ', n_tilde_feats)
+    # print('length X_tilde_data = ', len(X_tilde_data))
+    # print('lenght X_tilde_ind = ', len(X_tilde_ind))
+    # print('length X_tilde_indptr = ', len(X_tilde_indptr))
+
+    # print('X_binned_data = ', X_binned_data)
+    # print('X_binned_ind = ', X_binned_indices)
+    # print('X_binned_indptr = ', X_binned_indptr)
+    # print('X_inter_feat_data = ', X_inter_feat_data)
+    # print('X_inter_feat_ind = ', X_inter_feat_ind)
+    # print('X_inter_feat_indptr = ', X_inter_feat_indptr)
+    # print('length X_binned_data = ', len(X_binned_data))
+    # print('length X_binned_ind = ', len(X_binned_indices))
+    # print('length X_binned_indptr = ', len(X_binned_indptr))
+
+    # print('X_tilde_indptr = ', X_tilde_indptr)
+    print('X_tilde_data =', X_tilde_data)
     print('length X_tilde_data = ', len(X_tilde_data))
-    print('lenght X_tilde_ind = ', len(X_tilde_ind))
+    print('X_tilde_ind = ', X_tilde_ind)
+    print('length X_tilde_ind = ', len(X_tilde_ind))
+    print('X_tilde_indptr = ', X_tilde_indptr)
     print('length X_tilde_indptr = ', len(X_tilde_indptr))
 
-    print('X_tilde_indptr = ', X_tilde_indptr)
     X_tilde = csc_matrix((X_tilde_data, (X_tilde_ind, X_tilde_indptr)), 
                          shape=(n_samples, n_tilde_feats)).toarray()
 
