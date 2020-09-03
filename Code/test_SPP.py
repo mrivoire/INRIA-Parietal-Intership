@@ -9,7 +9,7 @@ from sklearn.preprocessing import KBinsDiscretizer
 from sklearn.linear_model import Lasso as sklearn_Lasso
 from sklearn.utils import check_random_state
 from cd_solver_lasso_numba import Lasso, sparse_cd
-from SPP import simu, SPP, compute_interactions
+from SPP import simu, SPP, compute_interactions, max_val
 from scipy.sparse import csc_matrix, hstack
 
 
@@ -19,7 +19,6 @@ def test_SPP():
     rng = check_random_state(1)
     n_samples, n_features = 20, 2
     beta = rng.randn(n_features)
-    lmbda = 1.
     f = 10
     epsilon = 1e-14
     n_epochs = 100000
@@ -156,7 +155,7 @@ def test_SPP_csc():
 
     # Definition of the parameters 
     rng = check_random_state(1)
-    n_samples, n_features = 20, 2
+    n_samples, n_features = 100, 10
     beta = rng.randn(n_features)
     lmbda = 1.
     f = 10
@@ -249,6 +248,13 @@ def test_SPP_csc():
     print('X_tilde = ', X_tilde)
     print('shape X_tilde = ', X_tilde.shape)
 
+    lambda_max, max_key = max_val(X_binned_data=X_binned_data,
+                                  X_binned_indices=X_binned_indices,
+                                  X_binned_indptr=X_binned_indptr,
+                                  residuals=y, max_depth=max_depth)
+
+    lmbda = lambda_max / 2
+
     # X_tilde_data.extend(X_inter_feat_data)
     # X_tilde_ind.extend(X_inter_feat_ind)
     # X_inter_feat_indptr = list(set(X_inter_feat_indptr))
@@ -298,9 +304,7 @@ def test_SPP_csc():
 
     beta_star_lasso = sparse_lasso_sklearn.coef_
 
-    (beta_star, beta_hat_dict, active_set_data_csc_opt, 
-     active_set_ind_csc_opt, active_set_indptr_csc_opt, 
-     active_set_keys_opt, active_set_data_csc_dict, 
+    (beta_hat_dict, active_set_data_csc_dict, 
      active_set_ind_csc_dict, active_set_indptr_csc_dict, 
      active_set_keys_dict) = \
         SPP(X_binned_data=X_binned_data, X_binned_indices=X_binned_indices, 
@@ -308,13 +312,13 @@ def test_SPP_csc():
             max_depth=max_depth, epsilon=epsilon, f=f, n_epochs=n_epochs, 
             tol=tol, screening=screening, store_history=store_history)
 
-    print('beta_star = ', beta_star)
-    print('beta_star_lasso = ', beta_star_lasso)
+    # print('beta_star = ', beta_star)
+    # print('beta_star_lasso = ', beta_star_lasso)
 
-    print('NNZ elements in beta_star_lasso', np.count_nonzero(beta_star_lasso))
-    print('NNZ elements in beta_star = ', np.count_nonzero(beta_star))
-    print('length of active_set_indptr = ', len(active_set_indptr_csc_opt))
-    print('length of active_set_keys = ', len(active_set_keys_opt))
+    # print('NNZ elements in beta_star_lasso', np.count_nonzero(beta_star_lasso))
+    # print('NNZ elements in beta_star = ', np.count_nonzero(beta_star))
+    # print('length of active_set_indptr = ', len(active_set_indptr_csc_opt))
+    # print('length of active_set_keys = ', len(active_set_keys_opt))
     # assert beta_star == beta_star_lasso
     # assert np.count_nonzero(beta_star) == len(active_set_indptr_csc_opt)
     # assert np.count_nonzero(beta_star) == len(active_set_keys_opt)
