@@ -64,6 +64,7 @@ def test_SPP(seed):
     # Computation of the features of interactions
     X_tilde_keys = []
 
+    # Why testing with sklearn.preprocessing.PolynomialFeatures(degree=2, interaction_only=True, include_bias=False) ?
     for i in range(n_features):
         X_tilde_keys.append([i])
         start_feat1, end_feat1 = X_binned_indptr[i: i + 2]
