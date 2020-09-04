@@ -63,9 +63,9 @@ def test_SPP(seed):
 
     # Computation of the features of interactions
     X_tilde_keys = []
+        
     for i in range(n_features):
         X_tilde_keys.append([i])
-    for i in range(n_features):
         start_feat1, end_feat1 = X_binned_indptr[i: i + 2]
         for j in range(i, n_features):
             n_inter_feats += 1
@@ -87,9 +87,12 @@ def test_SPP(seed):
 
     X_interfeats = csc_matrix((X_inter_feat_data, X_inter_feat_ind, 
                                X_inter_feat_indptr), 
-                               shape=(n_samples, n_inter_feats)).toarray()
+                               shape=(n_samples, n_inter_feats))
 
     X_tilde = hstack([X_binned, X_interfeats])
+    X_tilde_data = X_tilde.data
+    X_tilde_indptr = X_tilde.indptr
+    X_tilde_ind = X_tilde.indices
 
     lambda_max, max_key = max_val(X_binned_data=X_binned_data,
                                   X_binned_indices=X_binned_indices,
@@ -128,7 +131,7 @@ def test_SPP(seed):
             max_depth=max_depth, epsilon=epsilon, f=f, n_epochs=n_epochs, 
             tol=tol, screening=screening, store_history=store_history)
 
-    beta_star_spp = solutions_dict['coeffs_lasso']
+    beta_star_spp = solutions_dict['spp_lasso_slopes']
     print('beta_star_spp = ', beta_star_spp)
     print('beta_star_lasso = ', beta_star_lasso)
     print('length beta_star_spp = ', len(beta_star_spp))
@@ -136,15 +139,26 @@ def test_SPP(seed):
 
     active_set_data = solutions_dict['data']
     print('length active_set_data = ', len(active_set_data))
+
+    print('length X_tilde_data = ', len(X_tilde_data))
+
     active_set_ind = solutions_dict['ind']
     print('length active_set_ind = ', len(active_set_ind))
+
+    print('length X_tilde_ind = ', len(X_tilde_ind))
+
     active_set_indptr = solutions_dict['indptr']
     print('length active_set_indptr = ', len(active_set_indptr))
+
+    print('length X_tilde_indptr = ', len(X_tilde_indptr))
+
     active_set_keys = solutions_dict['keys']
     print('length active_set_keys = ', len(active_set_keys))
     print('length X_tilde_keys = ', len(X_tilde_keys))
     print('active_set_keys_lasso = ', active_set_keys_lasso)
     print('length active_set_keys_lasso = ', len(active_set_keys_lasso))
+
+    print('X_tilde shape 0 = ', X_tilde.shape[0])
 
     assert len(active_set_data) == len(active_set_ind)
     assert len(active_set_data) == len(active_set_keys)
