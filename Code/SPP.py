@@ -8,7 +8,7 @@ from numba.typed import List
 from sklearn.preprocessing import KBinsDiscretizer
 from sklearn.linear_model import Lasso as sklearn_Lasso
 from sklearn.utils import check_random_state
-from scipy.sparse import csc_matrix
+from scipy.sparse import csc_matrix, hstack
 from cd_solver_lasso_numba import Lasso, sparse_cd
 from numba import generated_jit
 from math import isnan
@@ -931,6 +931,7 @@ def SPP(X_binned_data, X_binned_indices, X_binned_indptr, y,
                     * np.linalg.norm(theta - y / lmbda_t, ord=2) ** 2)
 
         G_lmbda = P_lmbda - D_lmbda
+        print('Dual gap = ', G_lmbda)
         safe_sphere_radius = np.sqrt(2 * G_lmbda) / lmbda_t
         safe_sphere_center = theta
 
@@ -1134,10 +1135,64 @@ class SPP_solver():
         y_hat: numpy.array, shape = (n_samples, )
             predicted target vector
         """
-        beta_hat_lmba = self.spp_lasso_slopes[self.lmbda]
-        print('beta_hat_lmba = ', beta_hat_lmba)
-        print('type = ', type(beta_hat_lmba))
-        y_hat = X.dot(beta_hat_lmba)
+
+        # Binning process
+        enc = KBinsDiscretizer(n_bins=self.n_bins, encode=self.encode, 
+                               strategy=self.strategy)
+        X_binned = enc.fit_transform(X)
+        X_binned = X_binned.tocsc()
+        X_binned_data = X_binned.data
+        X_binned_ind = X_binned.indices
+        X_binned_indptr = X_binned.indptr
+
+        n_features = len(X_binned_indptr) + 1
+        n_samples = X_binned.shape[0]
+        X_inter_feat_data = []
+        X_inter_feat_ind = []
+        X_inter_feat_indptr = []
+        indptr = 0
+        X_inter_feat_indptr.append(indptr)
+        n_inter_feats = 0
+        X_tilde_keys = []
+        for i in range(n_features):
+            start_feat1, end_feat1 = X_binned_indptr[i: i + 2]
+            start_feat1 = np.int64(start_feat1)
+            end_feat1 = np.int64(end_feat1)
+            X_tilde_keys.append([i])
+            for j in range(n_features):
+                n_inter_feats += 1
+                X_tilde_keys.append([i, j])
+
+                start_feat2, end_feat2 = X_binned[j: j + 2]
+                start_feat2 = np.int64(start_feat2)
+                end_feat2 = np.int64(end_feat2)
+
+                inter_feat_data, inter_feat_ind = \
+                    compute_interactions(
+                        data1=X_binned_data[start_feat1: end_feat1],
+                        ind1=X_binned_ind[start_feat1: end_feat1],
+                        data2=X_binned_data[start_feat2: end_feat2],
+                        ind2=X_binned_ind[start_feat2: end_feat2])
+
+                X_inter_feat_data.append(inter_feat_data)
+                X_inter_feat_ind.append(inter_feat_ind)
+                indptr += len(X_inter_feat_ind)
+                X_inter_feat_indptr(indptr)
+
+        X_interfeats = csc_matrix(
+            (X_inter_feat_data, X_inter_feat_ind, X_inter_feat_indptr),
+            shape=(n_samples, n_inter_feats))
+
+        X_tilde = hstack([X_binned, X_interfeats])
+        # X_tilde_data = X_tilde.data
+        # X_tilde_indptr = X_tilde.indptr
+        # X_tilde_ind = X_tilde.indices
+
+        beta_hat_lmbda = self.spp_lasso_slopes[self.lmbda]
+        # print('beta_hat_lmbda = ', beta_hat_lmbda)
+        # print('beta_hat_lmba = ', beta_hat_lmbda)
+        # print('type = ', type(beta_hat_lmbda))
+        y_hat = X_tilde.dot(beta_hat_lmbda)
 
         return y_hat
 
@@ -1288,26 +1343,33 @@ def main():
     # print('active_set_keys = ', solutions_dict['keys'])
     # print('coeffs Lasso = ', solutions_dict['spp_lasso_slopes'])
 
-
     #################################################################
     #                     Test Class SPP Solver
     #################################################################
 
-    lmbda_max, max_key = max_val(X_binned_data=X_binned_data, 
-                                 X_binned_indices=X_binned_indices, 
-                                 X_binned_indptr=X_binned_indptr, 
-                                 residuals=residuals, max_depth=max_depth)
+    # lmbda_max, max_key = max_val(X_binned_data=X_binned_data, 
+    #                              X_binned_indices=X_binned_indices, 
+    #                              X_binned_indptr=X_binned_indptr, 
+    #                              residuals=residuals, max_depth=max_depth)
 
-    spp_solver = SPP_solver(lmbda=lmbda_max / 2, n_val_gs=n_val_gs, 
-                            max_depth=max_depth, 
-                            epsilon=epsilon, f=f, n_epochs=n_epochs, tol=tol, 
-                            screening=screening, store_history=store_history, 
+    lmbda = 0.2481874128375465
+    spp_solver = SPP_solver(lmbda=lmbda, n_val_gs=n_val_gs,
+                            max_depth=max_depth,
+                            epsilon=epsilon, f=f, n_epochs=n_epochs, tol=tol,
+                            screening=screening, store_history=store_history,
                             n_bins=n_bins, encode=encode, strategy=strategy)
 
     solver = spp_solver.fit(X=X, y=y)
     solutions_dict = solver.solutions
-    
+    solutions_dict_slopes = solutions_dict['spp_lasso_slopes']
+    print('solutions_dict_data = ', solutions_dict_slopes)
+    beta_star_lmbda = solutions_dict_slopes[lmbda]
+    print('beta_star_lmbda = ', beta_star_lmbda)
+
     y_hat = solver.predict(X=X)
+    print('y_hat = ', y_hat)
+    # print('shape beta_hat = ', beta_hat.shape)
+    # print('shape X = ', X.shape)
 
 
 if __name__ == "__main__":
