@@ -792,7 +792,7 @@ def from_key_to_interactions_feature(csc_data, csc_ind, csc_indptr,
 
 # @njit
 def SPP(X_binned_data, X_binned_indices, X_binned_indptr, y,
-        n_val_gs, max_depth, epsilon, f, n_epochs, screening=True,
+        n_val_gs, max_depth, epsilon, f, n_epochs, tol, screening=True,
         store_history=True):
     """Safe Patterns Pruning Algorithm
        Scan the tree from the root to the leaves and prunes out the subtrees
@@ -821,9 +821,7 @@ def SPP(X_binned_data, X_binned_indices, X_binned_indptr, y,
                                   X_binned_indices=X_binned_indices,
                                   X_binned_indptr=X_binned_indptr,
                                   residuals=y, max_depth=max_depth)
-    print("lmbda_max = ", lambda_max)
-    print("max_key = ", max_key)
-
+    lambda_max = lambda_max / n_samples
     # If we compute once again the feature of interactions corresponding to 
     # max_key
 
@@ -843,7 +841,6 @@ def SPP(X_binned_data, X_binned_indices, X_binned_indptr, y,
     # if lambda is greater than lambda max then all the nodes of the features
     # tree are pruned out and the active set is empty.
     lmbdas_grid = [lambda_max/2]  
-    print("lmbda_grid = ", lmbdas_grid)
     # find a bettter initialization
     # active_set = List([List([0])])
     
@@ -874,6 +871,7 @@ def SPP(X_binned_data, X_binned_indices, X_binned_indptr, y,
     active_set_ind_csc_dict = {}
     active_set_indptr_csc_dict = {}
     active_set_keys_dict = {}
+    solutions_dict = {}
 
     for lmbda_t in lmbdas_grid:
         # Pre-solve : solve the optimization problem with the new lambda on
@@ -883,7 +881,6 @@ def SPP(X_binned_data, X_binned_indices, X_binned_indptr, y,
         # we obtain a beta_hat which is not the optimal beta but which is a
         # better optimization of beta since it is closer to the optimum then
         # the screening is better from the beginning
-
 
         # instead of using the class Lasso, use the sparse_cd function to solve 
         # the Lasso optimization problem with an input under 
@@ -925,9 +922,6 @@ def SPP(X_binned_data, X_binned_indices, X_binned_indptr, y,
                     residuals=residuals,
                     max_depth=max_depth)
 
-        print('max_inner_prod:', max_inner_prod)
-        print('lmbda_t::', lmbda_t)
-
         theta = residuals / max(max_inner_prod, lmbda_t)
         P_lmbda = 0.5 * residuals.dot(residuals)
         P_lmbda += lmbda_t * np.linalg.norm(beta_hat_t, 1)
@@ -937,29 +931,22 @@ def SPP(X_binned_data, X_binned_indices, X_binned_indptr, y,
                     * np.linalg.norm(theta - y / lmbda_t, ord=2) ** 2)
 
         G_lmbda = P_lmbda - D_lmbda
-        print('dual gap = ', G_lmbda)
         safe_sphere_radius = np.sqrt(2 * G_lmbda) / lmbda_t
         safe_sphere_center = theta
-        print('safe_sphere_radius = ', safe_sphere_radius)
-        print('safe_sphere_center = ',  safe_sphere_center)
 
-        if isnan(safe_sphere_radius):
+        if abs(G_lmbda) < tol:
             print('The current active set has already reached the support of the optimal model')
-            beta_star = beta_hat_t
             beta_hat_dict[lmbda_t] = beta_hat_t
-            active_set_data_csc_opt = active_set_data_csc
-            active_set_ind_csc_opt = active_set_ind_csc
-            active_set_indptr_csc_opt = active_set_indptr_csc
-            active_set_keys_opt = active_set_keys
             active_set_data_csc_dict[lmbda_t] = active_set_data_csc
             active_set_ind_csc_dict[lmbda_t] = active_set_ind_csc
-            active_set_indptr_csc_dict[lmbda_t] = active_set_indptr_csc 
+            active_set_indptr_csc_dict[lmbda_t] = active_set_indptr_csc
             active_set_keys_dict[lmbda_t] = active_set_keys
-            return (beta_star, beta_hat_dict, active_set_data_csc_opt, 
-                    active_set_ind_csc_opt, active_set_indptr_csc_opt, 
-                    active_set_keys_opt, active_set_data_csc_dict, 
-                    active_set_ind_csc_dict, active_set_indptr_csc_dict, 
-                    active_set_keys_dict)
+
+            solutions_dict['data'] = active_set_data_csc_dict
+            solutions_dict['ind'] = active_set_ind_csc_dict
+            solutions_dict['indptr'] = active_set_indptr_csc_dict
+            solutions_dict['keys'] = active_set_keys_dict 
+            solutions_dict['spp_lasso_slopes'] = beta_hat_dict
 
         else:
             # Safe Prune after pre-solve:
@@ -993,9 +980,8 @@ def SPP(X_binned_data, X_binned_indices, X_binned_indptr, y,
                 safe_sphere_center=safe_sphere_center,
                 safe_sphere_radius=safe_sphere_radius, max_depth=max_depth)
 
-            print('After safeprune')
-            print(len(safe_set_data))
-            print(len(safe_set_ind))
+            active_set_keys.append(safe_set_key)
+            active_set_keys_dict[lmbda_t] = active_set_keys
 
             # Convert safe_set_data, safe_set_ind and safe_set_key which are list 
             # of lists numba into csc attributs
@@ -1017,23 +1003,15 @@ def SPP(X_binned_data, X_binned_indices, X_binned_indptr, y,
             # ou réécrire sparse_cd avec des listes de listes numba
             # list_data, list_ind, list_indptr
 
-            print('Before Main LASSO')
-            print(len(safe_set_data_csc))
-            print(len(safe_set_ind_csc))
-            print(len(safe_set_indptr_csc))
-
             (beta_hat_t, residuals, primal_hist, dual_hist, gap_hist, r_list,
-            n_active_features, theta, P_lmbda, D_lmbda, G_lmbda,
-            safeset_membership) = sparse_cd(
+             n_active_features, theta, P_lmbda, D_lmbda, G_lmbda,
+             safeset_membership) = sparse_cd(
                 X_data=safe_set_data_csc, X_indices=safe_set_ind_csc,
                 X_indptr=safe_set_indptr_csc, y=y, lmbda=lmbda_t, epsilon=epsilon, 
                 f=f, n_epochs=n_epochs, screening=screening, 
                 store_history=store_history)
 
             beta_hat_dict[lmbda_t] = beta_hat_t
-            print(beta_hat_dict) 
-
-            print('Main LASSO passed')
         
             active_set_data = List([List([0.])])
             active_set_ind = List([List([0])])
@@ -1046,13 +1024,9 @@ def SPP(X_binned_data, X_binned_indices, X_binned_indptr, y,
                     active_set_ind.append(safe_set_ind[idx])
                     active_set_keys.append(safe_set_key[idx])
 
-            print('active set created')
-
             active_set_data = active_set_data[1:]
             active_set_ind = active_set_ind[1:]
             active_set_keys = active_set_keys[1:]
-
-            print('before numba to csc')
             
             active_set_data_csc, active_set_ind_csc, active_set_indptr_csc = \
                 from_numbalists_tocsc(numbalist_data=active_set_data, 
@@ -1063,23 +1037,138 @@ def SPP(X_binned_data, X_binned_indices, X_binned_indptr, y,
             active_set_indptr_csc_dict[lmbda_t] = active_set_indptr_csc
             active_set_keys_dict[lmbda_t] = active_set_keys
 
-        beta_star = beta_hat_t
-        active_set_data_csc_opt = active_set_data_csc
-        active_set_ind_csc_opt = active_set_ind_csc
-        active_set_indptr_csc_opt = active_set_indptr_csc
-        active_set_keys_opt = active_set_keys
+            solutions_dict['data'] = active_set_data_csc_dict
+            solutions_dict['ind'] = active_set_ind_csc_dict
+            solutions_dict['indptr'] = active_set_indptr_csc_dict
+            solutions_dict['keys'] = active_set_keys_dict 
+            solutions_dict['spp_lasso_slopes'] = beta_hat_dict
 
-        return (beta_star, beta_hat_dict, active_set_data_csc_opt, 
-                active_set_ind_csc_opt, active_set_indptr_csc_opt, 
-                active_set_keys_opt, active_set_data_csc_dict, 
-                active_set_ind_csc_dict, active_set_indptr_csc_dict, 
-                active_set_keys_dict)
+    return solutions_dict
+
+# Faire un objet "solution" avec en attribut lambda, beta, active_set_data, 
+# active_set_ind, active_set_indptr, active_set_keys
+# retourner une liste d'objets solution (un pour chaque lambda)
+# retourner un dictionnaire de dictionnaires avec comme clés : beta, data, ind, 
+# indptr, keys
+# Exemple tirer en 2 dimensions aléatoirement des points entre 0 et 1 et ensuite
+# classifier entre noir (y = 1) et blanc (y = 0)
+# écrire un estimateur spp à la scikit learn avec une fonction predict (sous forme de classe comme pour le Lasso) 
+# store dans les attributs de la classe les keys, data, ind, indptr et qui est capable de les retourner
+# écrire les tests associés
+# puis faire tourner les tests sur les datasets
+# commencer par housing_prices (car plus petit), stopper max_depth à 3, 4 
+# lire le papier de la review d'Alex Safe rule fit (pour la littérature de nos travaux)
+# feedback sur le paper (qu'est-ce qui est similaire et qu'est ce qui est différent par rapport à ce que je fais)
+
+
+class SPP_solver():
+    def __init__(self, lmbda, n_val_gs, max_depth, epsilon, f, n_epochs, tol, 
+                 screening, store_history, n_bins, encode, strategy):
+        
+        self.lmbda = lmbda
+        self.n_val_gs = n_val_gs
+        self.max_depth = max_depth
+        self.epsilon = epsilon
+        self.f = f
+        self.n_epochs = n_epochs
+        self.tol = tol
+        self.screening = screening
+        self.store_history = store_history
+        self.n_bins = n_bins
+        self.encode = encode
+        self.strategy = strategy
+
+        assert epsilon > 0
+        assert tol > 0 and tol < 1e-01
+
+    def fit(self, X, y):
+        """Fit the data (X, y) based on the solver of the SPP class
+        Parameters
+        ----------
+        X: numpy.ndarray, shape = (n_samples, n_features)
+            features matrix
+
+        Returns
+        -------
+        y: numpy.array, shape = (n_samples, )
+            target vector
+        """
+
+        # Binning process
+        enc = KBinsDiscretizer(n_bins=self.n_bins, encode=self.encode, 
+                               strategy=self.strategy)
+        X_binned = enc.fit_transform(X)
+        X_binned = X_binned.tocsc()
+        X_binned_data = X_binned.data
+        X_binned_ind = X_binned.indices
+        X_binned_indptr = X_binned.indptr
+
+        solutions_dict = SPP(X_binned_data=X_binned_data, 
+                             X_binned_indices=X_binned_ind, 
+                             X_binned_indptr=X_binned_indptr, y=y, 
+                             n_val_gs=self.n_val_gs, 
+                             max_depth=self.max_depth, epsilon=self.epsilon, 
+                             f=self.f, n_epochs=self.n_epochs, tol=self.tol, 
+                             screening=self.screening, 
+                             store_history=self.store_history)
+
+        self.solutions = solutions_dict
+        self.spp_lasso_slopes = solutions_dict['spp_lasso_slopes']
+        self.activeset_data = solutions_dict['data']
+        self.activeset_ind = solutions_dict['ind']
+        self.activeset_indptr = solutions_dict['indptr']
+        self.activeset_keys = solutions_dict['keys']
+
+        return self
+
+    def predict(self, X):
+        """Predict the target from the observations matrix
+
+        Parameters
+        ----------
+        X: numpy.ndarray, shape = (n_samples, n_features)
+            features matrix
+
+        Returns
+        -------
+        y_hat: numpy.array, shape = (n_samples, )
+            predicted target vector
+        """
+        beta_hat_lmba = self.spp_lasso_slopes[self.lmbda]
+        print('beta_hat_lmba = ', beta_hat_lmba)
+        print('type = ', type(beta_hat_lmba))
+        y_hat = X.dot(beta_hat_lmba)
+
+        return y_hat
+
+    def score(self, X, y):
+        """Compute the cross-validation score to assess the performance of the
+           model (use R-square)
+
+        Parameters
+        ----------
+        X: numpy.ndarray, shape = (n_samples, n_features)
+            features matrix
+
+        y: numpy.array, shape = (n_samples, )
+            target vector
+
+        Returns
+        -------
+        score: float
+            chosen metric : R-sqare
+        """
+
+        u = ((y - self.predict(X)) ** 2).sum()
+        v = ((y - np.mean(y)) ** 2).sum()
+        score = 1 - u / v
+
+        return score
 
 
 def main():
-    rng = check_random_state(0)
-    # n_samples, n_features = 100, 40
-    n_samples, n_features = 20, 2
+    rng = check_random_state(1)
+    n_samples, n_features = 100, 10
     beta = rng.randn(n_features)
     lmbda = 1.
     f = 10
@@ -1089,10 +1178,10 @@ def main():
     store_history = True
     encode = 'onehot'
     strategy = 'quantile'
-    # lmbdas_grid = [0.1, 0.3, 0.5, 0.7, 1, 2]
     n_bins = 3
     max_depth = 2
     n_val_gs = 10
+    tol = 1e-08
 
     X, y = simu(beta, n_samples=n_samples, corr=0.5, for_logreg=False,
                 random_state=rng)
@@ -1111,44 +1200,6 @@ def main():
 
     n_features = len(X_binned_indptr) - 1
     n_samples = max(X_binned_indices) + 1
-
-    ######################################################
-    #             Test for max val function
-    ######################################################
-
-    residuals = rng.randn(n_samples)
-    # With nested loop
-    max_val_test = 0
-    X_binned = X_binned.toarray()
-    start1 = time.time()
-    for j in range(n_features):
-        for k in range(j, n_features):
-            inter_feat = (X_binned[:, j]
-                          * X_binned[:, k])
-
-            inner_prod = inter_feat.dot(residuals)
-            if abs(inner_prod) > max_val_test:
-                max_val_test = abs(inner_prod)
-                print("key = ", j, k)
-
-    end1 = time.time()
-    delay1 = end1 - start1
-    print("delay 1 = ", delay1)
-    print("max val test = ", max_val_test)
-
-    # With recursive function
-    start2 = time.time()
-    max_inner_prod, max_key = max_val(X_binned_data=X_binned_data,
-                                      X_binned_indices=X_binned_indices,
-                                      X_binned_indptr=X_binned_indptr,
-                                      residuals=residuals,
-                                      max_depth=max_depth)
-
-    end2 = time.time()
-    delay2 = end2 - start2
-    print("delay 2 = ", delay2)
-    print("max inner prod = ", max_inner_prod)
-    print("max key= ", max_key)
 
     ################################################################
     #                           Lasso
@@ -1177,8 +1228,7 @@ def main():
         XTR_absmax = max(abs(inner_prod), XTR_absmax)
 
     XTR_absmax = 0
-    # print("shape X_binned = ", np.shape(X_binned))
-    # print("sahpe residuals = ", np.shape(residuals))
+  
     for j in range(n_features):
         XTR_absmax = max(abs(X_binned[:, j].T.dot(residuals)), XTR_absmax)
 
@@ -1196,142 +1246,6 @@ def main():
     safe_sphere_radius = np.sqrt(2 * G_lmbda) / lmbda
     safe_sphere_radius = 1
     safe_sphere_center = theta
-
-    #####################################################################
-    #                       Test Safe Prune function
-    #####################################################################
-
-    # With recursive function
-
-    start_sp = time.time()
-    (safe_set_data, safe_set_ind, safe_set_key) = safe_prune(
-        X_binned_data=X_binned_data, X_binned_indices=X_binned_indices,
-        X_binned_indptr=X_binned_indptr, safe_sphere_center=safe_sphere_center,
-        safe_sphere_radius=safe_sphere_radius, max_depth=max_depth)
-
-    end_sp = time.time()
-    delay_sp = end_sp - start_sp
-    print("delay safe prune = ", delay_sp)
-    print("safe set ind = ", safe_set_ind)
-    print("safe set data = ", safe_set_data)
-    print("safe set key = ", safe_set_key)
-
-    safe_set_key = list(safe_set_key)
-    for key in safe_set_key:
-        key.sort()
-
-    flat_safe_set_key = []
-
-    for item in safe_set_key:
-        new_item = []
-        for it in item:
-            new_item.append(it)
-        flat_safe_set_key.append(tuple(new_item))
-
-    # print("flat safe set key = ", flat_safe_set_key)
-
-    # With nested loop
-    # X_binned = X_binned.toarray()
-    safe_set_key_test = []
-    safe_set_data_test = []
-    safe_set_data_card_test = []
-    start_sp_test = time.time()
-    for j in range(n_features):
-        for k in range(j, n_features):
-            # for i in range(k, n_features):
-            inter_feat = (X_binned[:, j]
-                          * X_binned[:, k])
-            card = np.count_nonzero(inter_feat)
-            safe_set_data_card_test.append(card)
-            u_t = inter_feat.dot(safe_sphere_center)
-            v_t = 0
-            v_t = (inter_feat**2).sum()
-            sppc_t = abs(u_t) + safe_sphere_radius * np.sqrt(v_t)
-
-            if sppc_t >= 1:
-                safe_set_data_test.append(inter_feat)
-                if j == k:
-                    safe_set_key_test.append([j, ])
-                else:
-                    safe_set_key_test.append([j, k])
-                # if j == k == i:
-                #     safe_set_key_test.append([j, ])
-                # elif j == k and j != i:
-                #     safe_set_key_test.append([j, i, ])
-                # elif j == i and j != k:
-                #     safe_set_key_test.append([j, k, ])
-                # # elif j == i and i != k:
-                # #     safe_set_key_test.append([k, i, ])
-                # elif j != i and j != k:
-                #     safe_set_key_test.append([j, k, i])
-
-    end_sp_test = time.time()
-    delay_sp_test = end_sp_test - start_sp_test
-    print("delay safe pruning test = ", delay_sp_test)
-
-    safe_set_key_test = list(safe_set_key_test)
-    for key in safe_set_key_test:
-        key.sort()
-
-    # safe_set_data_test = tuple([data] for data in safe_set_data_test)
-    # safe_set_key_test = tuple([key] for key in safe_set_key_test)
-
-    for ind in range(len(safe_set_key_test)):
-        safe_set_key_test[ind] = tuple(safe_set_key_test[ind])
-
-    ###################################################################
-    #                  Test intersection of two lists
-    ###################################################################
-
-    # intersect_key = [ele1 for ele1 in flat_safe_set_key if ele1 in 
-    #                  safe_set_key_test]
-    # # print("intersect_key = ", intersect_key)
-
-    # if len(intersect_key) == len(flat_safe_set_key):
-    #     print("The intersection list and the list of keys have the same length")
-
-    # # print("flat safe set key = ", flat_safe_set_key[:15])
-    # # print("safe set key test = ", safe_set_key_test[:15])
-
-    # print("length intersect_key = ", len(intersect_key))
-    # print("length safe set key : ", len(flat_safe_set_key))
-    # print("length safe set key test = ", len(safe_set_key_test))
-
-    #####################################################################
-    #                  Matrix of interaction features
-    #####################################################################
-    # inter_feat_list = []
-    # for j in range(n_features):
-    #     for k in range(j, n_features):
-    #         inter_feat = (X_binned[:, j] * X_binned[:, k])
-    #         inter_feat_list.append(inter_feat)
-
-    # flatten_inter_feat_list = []
-    # for item in inter_feat_list:
-    #     for ind in item:
-    #         flatten_inter_feat_list.append(ind)
-
-    # inter_feat_X = np.zeros((n_samples, len(inter_feat_list)))
-
-    # for k in range(len(flatten_inter_feat_list)):
-    #     ind_col = 0
-    #     ind_row = k % n_samples
-    #     inter_feat_X[ind_row, ind_col] = flatten_inter_feat_list[k]
-    #     if ind_row == 0:
-    #         ind_col += 1
-
-    # print("matrix of interactions = ", inter_feat_X)
-
-    #######################################################################
-    #              Lasso on the matrix of interaction features
-    #######################################################################
-
-    # inter_feat_lasso_sklearn = sklearn_Lasso(
-    #     alpha=1e-2, fit_intercept=False, normalize=False, max_iter=n_epochs,
-    #     tol=1e-14).fit(inter_feat_X, y)
-
-    # print("slopes = ", inter_feat_lasso_sklearn.coef_)
-    # print("nb of non zero coeffs = ", np.count_nonzero(inter_feat_lasso_sklearn.coef_))
 
     ##########################################################
     #       Test for compute interactions function
@@ -1361,26 +1275,39 @@ def main():
     #################################################################
     #                   Test for SPP function
     #################################################################
-    (beta_star, beta_hat_dict, active_set_data_csc_opt, 
-     active_set_ind_csc_opt, active_set_indptr_csc_opt, 
-     active_set_keys_opt, active_set_data_csc_dict, 
-     active_set_ind_csc_dict, active_set_indptr_csc_dict, 
-     active_set_keys_dict) = \
-        SPP(X_binned_data=X_binned_data, X_binned_indices=X_binned_indices, 
-            X_binned_indptr=X_binned_indptr, y=y, n_val_gs=n_val_gs, 
-            max_depth=max_depth, epsilon=epsilon, f=f, n_epochs=n_epochs, 
-            screening=screening, store_history=store_history)
+    solutions_dict = \
+        SPP(X_binned_data=X_binned_data, X_binned_indices=X_binned_indices,
+            X_binned_indptr=X_binned_indptr, y=y, n_val_gs=n_val_gs,
+            max_depth=max_depth, epsilon=epsilon, f=f, n_epochs=n_epochs,
+            tol=tol, screening=screening, store_history=store_history)
     
-    print('beta_star = ', beta_star)
-    print('beta_hat_dict = ', beta_hat_dict)
-    print('active_set_data = ', active_set_data_csc_opt)
-    print('active_set_ind = ', active_set_ind_csc_opt)
-    print('active_set_indptr = ', active_set_indptr_csc_opt)
-    print('active_set_keys = ', active_set_keys_opt)
-    print('active_set_data_dict = ', active_set_data_csc_dict)
-    print('active_set_ind_dict = ', active_set_ind_csc_dict)
-    print('active_set_indptr_dict = ', active_set_indptr_csc_dict)
-    print('active_set_keys_dict = ', active_set_keys_dict)
+    # print('solutions_dict = ', solutions_dict)
+    # print('active_set_data = ', solutions_dict['data'])
+    # print('active_set_ind = ', solutions_dict['ind'])
+    # print('active_set_indptr = ', solutions_dict['indptr'])
+    # print('active_set_keys = ', solutions_dict['keys'])
+    # print('coeffs Lasso = ', solutions_dict['spp_lasso_slopes'])
+
+
+    #################################################################
+    #                     Test Class SPP Solver
+    #################################################################
+
+    lmbda_max, max_key = max_val(X_binned_data=X_binned_data, 
+                                 X_binned_indices=X_binned_indices, 
+                                 X_binned_indptr=X_binned_indptr, 
+                                 residuals=residuals, max_depth=max_depth)
+
+    spp_solver = SPP_solver(lmbda=lmbda_max / 2, n_val_gs=n_val_gs, 
+                            max_depth=max_depth, 
+                            epsilon=epsilon, f=f, n_epochs=n_epochs, tol=tol, 
+                            screening=screening, store_history=store_history, 
+                            n_bins=n_bins, encode=encode, strategy=strategy)
+
+    solver = spp_solver.fit(X=X, y=y)
+    solutions_dict = solver.solutions
+    
+    y_hat = solver.predict(X=X)
 
 
 if __name__ == "__main__":
