@@ -1062,6 +1062,150 @@ def SPP(X_binned_data, X_binned_indices, X_binned_indptr, y,
 # feedback sur le paper (qu'est-ce qui est similaire et qu'est ce qui est différent par rapport à ce que je fais)
 
 
+def complex_features_matrix(X, y, max_depth, n_bins, encode, strategy):
+    """
+    Parameters
+    ----------
+    X: numpy.ndarray(), shape = (n_samples, n_features)
+        matrix of observations with original features 
+
+    y:  numpy.array(), shape = (n_samples, )
+        target vector
+
+    max_depth: int
+        maximum order of interactions (complexity degree of the model)
+
+    n_bins: int
+        number of bins created in each original feature during the binning 
+        process
+
+    encode: string
+        encoding manner, in our case we choose 'onehot'
+
+    strategy: string
+        binning strategy, in our case we choose 'quantile'
+
+    Returns
+    -------
+    X_tilde: numpy.ndarray(), shape = (n_samples, n_features + n_inter_feats)
+        matrix of observations with discrete one-hot encoded 
+        The discrete one-hot encoded features belong to two different categories
+        The first category is the one of the binned features obtained thanks to
+        the binning process applied to the original continuous features
+        The second category is the one of the interactions features obtained 
+        thanks to the scalar product between the binned features until the 
+        maximum order of interactions.
+    """
+
+    enc = KBinsDiscretizer(n_bins=n_bins, encode=encode, strategy=strategy)
+    X_binned = enc.fit_transform(X)
+    X_binned = X_binned.tocsc()
+    X_binned_data = X_binned.data
+    X_binned_ind = X_binned.indices
+    X_binned_indptr = X_binned.indptr
+    X_binned_keys = []
+    n_features = len(X_binned_indptr) + 1
+    n_samples = X_binned.shape[0]
+
+    for i in range(n_features):
+        X_binned_keys.append([i])
+
+    X_tilde_data = []
+    X_tilde_ind = []
+    X_tilde_indptr = []
+    X_tilde_keys = []
+
+    X_tilde_data.append(X_binned_data)
+    X_tilde_ind.append(X_binned_ind)
+    X_tilde_indptr.append(X_binned_indptr)
+    X_tilde_keys.append(X_binned_keys)
+
+    X_interfeats_data = []
+    X_interfeats_ind = []
+    X_interfeats_indptr = []
+    X_interfeats_keys = []
+    indptr = n_features
+
+    n_interfeats = 0
+    for i in range(n_features):
+        start_feat1, end_feat1 = X_binned_indptr[i: i + 2]
+        for j in range(i, n_features):
+            n_interfeats += 1
+            start_feat2, end_feat2 = X_binned_indptr[j: j + 2]
+
+            inter_feat_data, inter_feat_ind = \
+                compute_interactions(
+                    data1=X_binned_data[start_feat1: end_feat1],
+                    ind1=X_binned_ind[start_feat1: end_feat1],
+                    data2=X_binned_data[start_feat2: end_feat2],
+                    ind2=X_binned_ind[start_feat2: end_feat2])
+
+            X_interfeats_data.append(inter_feat_data)
+            X_interfeats_ind.append(inter_feat_ind)
+            indptr += len(inter_feat_data)
+            X_interfeats_indptr.append(indptr)
+
+            key = [i, j]
+            X_interfeats_keys.append(key)
+
+    X_tilde_data.append(X_interfeats_data)
+    X_tilde_ind.append(X_interfeats_ind)
+    X_tilde_indptr.append(X_interfeats_indptr)
+    X_tilde_keys.append(X_interfeats_keys)
+
+    n_interfeats_tmp = len(X_interfeats_indptr) + 1
+
+    current_depth = 2
+
+    while current_depth < max_depth:
+        X_interfeats_data_tmp = []
+        X_interfeats_ind_tmp = []
+        X_interfeats_indptr_tmp = []
+        X_interfeats_keys_tmp = []
+        for i in range(n_interfeats_tmp):
+            inter_feat1_data = X_interfeats_data[i]
+            inter_feat1_ind = X_interfeats_ind[i]
+            key_i = X_interfeats_keys[i]
+            start = key[current_depth - 1]
+            for j in range(start, n_features):
+                n_interfeats += 1
+                start_feat2, end_feat2 = X_binned_indptr[j: j + 2]
+
+                inter_feat_data, inter_feat_ind = \
+                    compute_interactions(
+                        data1=inter_feat1_data,
+                        ind1=inter_feat1_ind,
+                        data2=X_binned_data[start_feat2: end_feat2],
+                        ind2=X_binned_ind[start_feat2: end_feat2])
+
+                X_interfeats_data_tmp.append(inter_feat_data)
+                X_interfeats_ind_tmp.append(inter_feat_ind)
+                indptr += len(inter_feat_data)
+                X_interfeats_indptr_tmp.append(indptr)
+
+                interfeat_key = key_i.append(j)
+                X_interfeats_keys_tmp.append(interfeat_key)
+
+        X_interfeats_data = X_interfeats_data_tmp
+        X_interfeats_ind = X_interfeats_ind_tmp
+        X_interfeats_indptr = X_interfeats_indptr_tmp
+        X_interfeats_keys = X_interfeats_keys_tmp
+
+        X_tilde_data.append(X_interfeats_data)
+        X_tilde_ind.append(X_interfeats_ind)
+        X_tilde_indptr.append(X_interfeats_indptr)
+        X_tilde_keys.append(X_interfeats_keys)
+
+        n_interfeats_tmp = len(X_interfeats_indptr) + 1
+
+        current_depth += 1
+
+    X_tilde = csc_matrix((X_tilde_data, X_tilde_ind, X_tilde_indptr),
+                         shape=(n_samples, n_interfeats))
+
+    return X_tilde, X_tilde_data, X_tilde_ind, X_tilde_indptr
+
+
 class SPP_solver():
     def __init__(self, lmbda, n_val_gs, max_depth, epsilon, f, n_epochs, tol, 
                  screening, store_history, n_bins, encode, strategy):
