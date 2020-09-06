@@ -786,9 +786,9 @@ def from_key_to_interactions_feature(csc_data, csc_ind, csc_indptr,
 
 
 # @njit
-def SPP(X_binned_data, X_binned_indices, X_binned_indptr, y,
-        n_val_gs, max_depth, epsilon, f, n_epochs, tol, screening=True,
-        store_history=True):
+def spp_solver(X_binned, y,
+               n_val_gs, max_depth, epsilon, f, n_epochs, tol, screening=True,
+               store_history=True):
     """Safe Patterns Pruning Algorithm
        Scan the tree from the root to the leaves and prunes out the subtrees
        which statisfie the SPPC(t) criterion
@@ -808,6 +808,10 @@ def SPP(X_binned_data, X_binned_indices, X_binned_indptr, y,
     # logarithmic step
     # on part de lmbda_max et on décroit d'un pas logarithmic
     # en entrée remplacer la lmbdas_grid par le nombre de lmbdas à tester
+
+    X_binned_data = X_binned.data
+    X_binned_indices = X_binned.indices
+    X_binned_indptr = X_binned.indptr
 
     n_features = len(X_binned_indptr) - 1
     n_samples = max(X_binned_indices) + 1
@@ -858,8 +862,6 @@ def SPP(X_binned_data, X_binned_indices, X_binned_indptr, y,
     active_set_indptr_csc.append(len(active_set_ind_csc))  # NNZ element
     active_set_keys = []
     active_set_keys.append(max_key)
-
-    n_active_feats = len(active_set_indptr_csc) - 1
 
     beta_hat_dict = {}
     active_set_data_csc_dict = {}
@@ -1230,16 +1232,14 @@ class SPPRegressor():
         y: numpy.array, shape = (n_samples, )
             target vector
         """
-        X_binned = X.tocsc()
-
-        solutions_dict = SPP(X_binned_data=X_binned.data,
-                             X_binned_indices=X_binned.indices,
-                             X_binned_indptr=X_binned.indptr, y=y,
-                             n_val_gs=self.n_val_gs,
-                             max_depth=self.max_depth, epsilon=self.epsilon,
-                             f=self.f, n_epochs=self.n_epochs, tol=self.tol,
-                             screening=self.screening,
-                             store_history=self.store_history)
+        solutions_dict = spp_solver(X.tocsc(), y=y,
+                                    n_val_gs=self.n_val_gs,
+                                    max_depth=self.max_depth,
+                                    epsilon=self.epsilon,
+                                    f=self.f, n_epochs=self.n_epochs,
+                                    tol=self.tol,
+                                    screening=self.screening,
+                                    store_history=self.store_history)
 
         self.solutions = solutions_dict
         self.spp_lasso_slopes = solutions_dict['spp_lasso_slopes']
@@ -1454,10 +1454,10 @@ def main():
     #                   Test for SPP function
     #################################################################
     solutions_dict = \
-        SPP(X_binned_data=X_binned_data, X_binned_indices=X_binned_indices,
-            X_binned_indptr=X_binned_indptr, y=y, n_val_gs=n_val_gs,
-            max_depth=max_depth, epsilon=epsilon, f=f, n_epochs=n_epochs,
-            tol=tol, screening=screening, store_history=store_history)
+        spp_solver(X_binned, y=y, n_val_gs=n_val_gs,
+                   max_depth=max_depth, epsilon=epsilon, f=f,
+                   n_epochs=n_epochs, tol=tol, screening=screening,
+                   store_history=store_history)
 
     # print('solutions_dict = ', solutions_dict)
     # print('active_set_data = ', solutions_dict['data'])

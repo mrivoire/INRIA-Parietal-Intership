@@ -9,7 +9,7 @@ from sklearn.preprocessing import KBinsDiscretizer
 from sklearn.linear_model import Lasso as sklearn_Lasso
 from sklearn.utils import check_random_state
 # from cd_solver_lasso_numba import Lasso, sparse_cd
-from SPP import simu, SPP, compute_interactions, max_val
+from SPP import simu, spp_solver, compute_interactions, max_val
 from scipy.sparse import csc_matrix, hstack
 
 
@@ -87,14 +87,7 @@ def test_SPP(seed):
     enc = KBinsDiscretizer(n_bins=n_bins, encode=encode, strategy=strategy)
     X_binned = enc.fit_transform(X)
     X_binned = X_binned.tocsc()
-    X_binned_data = X_binned.data
-    X_binned_indices = X_binned.indices
-    X_binned_indptr = X_binned.indptr
 
-    # Definition of the dimensions
-    n_features = len(X_binned_indptr) - 1
-    n_samples = max(X_binned_indices) + 1
-    print('n_features = ', n_features)
     # Lasso
     # We have to run the lasso of sklearn on the matrix containing the whole
     # set of features i.e. both the discrete features provided thanks to the
@@ -109,6 +102,9 @@ def test_SPP(seed):
     X_tilde_indptr = X_tilde.indptr
     X_tilde_ind = X_tilde.indices
 
+    X_binned_data = X_binned.data
+    X_binned_indices = X_binned.indices
+    X_binned_indptr = X_binned.indptr
     lambda_max, max_key = max_val(X_binned_data=X_binned_data,
                                   X_binned_indices=X_binned_indices,
                                   X_binned_indptr=X_binned_indptr,
@@ -138,10 +134,10 @@ def test_SPP(seed):
             active_set_keys_lasso.append(X_tilde_keys[i])
 
     solutions_dict = \
-        SPP(X_binned_data=X_binned_data, X_binned_indices=X_binned_indices,
-            X_binned_indptr=X_binned_indptr, y=y, n_val_gs=n_val_gs,
-            max_depth=max_depth, epsilon=epsilon, f=f, n_epochs=n_epochs,
-            tol=tol, screening=screening, store_history=store_history)
+        spp_solver(X_binned=X_binned, y=y, n_val_gs=n_val_gs,
+                   max_depth=max_depth, epsilon=epsilon, f=f,
+                   n_epochs=n_epochs,
+                   tol=tol, screening=screening, store_history=store_history)
 
     beta_star_spp = solutions_dict['spp_lasso_slopes']
     print('beta_star_spp = ', beta_star_spp)
