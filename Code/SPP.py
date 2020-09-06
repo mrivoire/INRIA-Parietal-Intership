@@ -695,18 +695,18 @@ def from_numbalists_tocsc(numbalist_data, numbalist_ind):
     Parameters
     ----------
     numbalist_data: List([int])
-        numba list of lists of integers containing the non-zero elements 
+        numba list of lists of integers containing the non-zero elements
         of each feature the sparse matrix
 
     numbalist_ind: list([int])
-        nubma list of lists of integers containing the row indices of the 
+        nubma list of lists of integers containing the row indices of the
         non-zero elements of each feature of the sparse matrix
 
     Returns
     -------
     csc_data: list(int)
         list of integers containing the non-zero elements of the sparse matrix
-        without separation between the features 
+        without separation between the features
 
     csc_ind: list(int)
         list of integers containing the row indices of the non-zero elements
@@ -736,7 +736,7 @@ def from_numbalists_tocsc(numbalist_data, numbalist_ind):
 
 
 @njit
-def from_key_to_interactions_feature(csc_data, csc_ind, csc_indptr, 
+def from_key_to_interactions_feature(csc_data, csc_ind, csc_indptr,
                                      key, n_samples, n_features):
     """
     Parameters
@@ -759,9 +759,9 @@ def from_key_to_interactions_feature(csc_data, csc_ind, csc_indptr,
     Returns
     -------
     interfeat_data: list(int)
-        list of integers containing the non-zero elements of the 
+        list of integers containing the non-zero elements of the
         feature of interactions
-    
+
     interfeat_ind: list(int)
         list of integers containing the row indices of the non-zero elements
         of the feature of interactions
@@ -769,7 +769,7 @@ def from_key_to_interactions_feature(csc_data, csc_ind, csc_indptr,
     """
 
     n_features = len(csc_indptr) - 1
-    n_samples = len(set(csc_ind)) 
+    n_samples = len(set(csc_ind))
 
     interfeat_data = List(np.ones(n_samples))
     interfeat_ind = List(np.arange(n_samples))
@@ -782,9 +782,9 @@ def from_key_to_interactions_feature(csc_data, csc_ind, csc_indptr,
         data2 = csc_data[start: end]
         ind2 = csc_ind[start: end]
         interfeat_data, interfeat_ind = \
-            compute_interactions(data1=interfeat_data, 
-                                 ind1=interfeat_ind, 
-                                 data2=data2, 
+            compute_interactions(data1=interfeat_data,
+                                 ind1=interfeat_ind,
+                                 data2=data2,
                                  ind2=ind2)
 
     return list(interfeat_data), list(interfeat_ind)
@@ -822,14 +822,14 @@ def SPP(X_binned_data, X_binned_indices, X_binned_indptr, y,
                                   X_binned_indptr=X_binned_indptr,
                                   residuals=y, max_depth=max_depth)
     lambda_max = lambda_max / n_samples
-    # If we compute once again the feature of interactions corresponding to 
+    # If we compute once again the feature of interactions corresponding to
     # max_key
 
     max_feat_data, max_feat_ind = \
-        from_key_to_interactions_feature(csc_data=X_binned_data, 
-                                         csc_ind=X_binned_indices, 
-                                         csc_indptr=X_binned_indptr, 
-                                         key=max_key, n_samples=n_samples, 
+        from_key_to_interactions_feature(csc_data=X_binned_data,
+                                         csc_ind=X_binned_indices,
+                                         csc_indptr=X_binned_indptr,
+                                         key=max_key, n_samples=n_samples,
                                          n_features=n_features)
 
     beta_hat_t = np.zeros(n_features)
@@ -837,23 +837,23 @@ def SPP(X_binned_data, X_binned_indices, X_binned_indptr, y,
     # lmbdas_grid = np.logspace(start=0, stop=lambda_max, num=n_val_gs,
     #                           endpoint=True, base=10.0, dtype=None, axis=0)
 
-    # test on only one value of lambda which is lower than lambda_max 
+    # test on only one value of lambda which is lower than lambda_max
     # if lambda is greater than lambda max then all the nodes of the features
     # tree are pruned out and the active set is empty.
-    lmbdas_grid = [lambda_max/2]  
+    lmbdas_grid = [lambda_max/2]
     # find a bettter initialization
     # active_set = List([List([0])])
-    
-    # Initialization of the active set 
+
+    # Initialization of the active set
     # (with the feature corresponding to max_key)
-    # Two possibilities : either modify the max_val function so that it 
+    # Two possibilities : either modify the max_val function so that it
     # returns the feature of interactions corresponding to max_key
     # or compute again the feature of interactions corresponding to max_key
-    # For this purpose : slice the X_binned_data vector to extract the binned 
-    # features corresponding to each ind in the key, then compute the 
-    # feature of interactions by making the inner product between the binned 
-    # features or by calling the function which aims at computing the 
-    # features of interactions 
+    # For this purpose : slice the X_binned_data vector to extract the binned
+    # features corresponding to each ind in the key, then compute the
+    # feature of interactions by making the inner product between the binned
+    # features or by calling the function which aims at computing the
+    # features of interactions
     active_set_data_csc = []
     active_set_data_csc.extend(max_feat_data)
     active_set_ind_csc = []
@@ -882,22 +882,22 @@ def SPP(X_binned_data, X_binned_indices, X_binned_indptr, y,
         # better optimization of beta since it is closer to the optimum then
         # the screening is better from the beginning
 
-        # instead of using the class Lasso, use the sparse_cd function to solve 
-        # the Lasso optimization problem with an input under 
+        # instead of using the class Lasso, use the sparse_cd function to solve
+        # the Lasso optimization problem with an input under
         # the csc attribut format
         # sparse_lasso = Lasso(lmbda=lmbda_t, epsilon=epsilon, f=f,
         #                      n_epochs=n_epochs,
         #                      screening=False,
         #                      store_history=False).fit(X_active_set, y)
 
-        (beta_hat_t, residuals, primal_hist_sparse, dual_hist_sparse, 
-         gap_hist_sparse, r_list_sparse, n_active_features_true_sparse, 
-         theta_hat_cyclic_cd_sparse, P_lmbda_sparse, D_lmbda_sparse, 
+        (beta_hat_t, residuals, primal_hist_sparse, dual_hist_sparse,
+         gap_hist_sparse, r_list_sparse, n_active_features_true_sparse,
+         theta_hat_cyclic_cd_sparse, P_lmbda_sparse, D_lmbda_sparse,
          G_lmbda_sparse, safe_set_sparse) = \
-            sparse_cd(X_data=active_set_data_csc, 
-                      X_indices=active_set_ind_csc, 
-                      X_indptr=active_set_indptr_csc, y=y, lmbda=lmbda_t, 
-                      epsilon=epsilon, f=f, n_epochs=n_epochs, 
+            sparse_cd(X_data=active_set_data_csc,
+                      X_indices=active_set_ind_csc,
+                      X_indptr=active_set_indptr_csc, y=y, lmbda=lmbda_t,
+                      epsilon=epsilon, f=f, n_epochs=n_epochs,
                       screening=screening, store_history=store_history)
 
         # ajouter un point fit sur les features actives données par
@@ -946,7 +946,7 @@ def SPP(X_binned_data, X_binned_indices, X_binned_indptr, y,
             solutions_dict['data'] = active_set_data_csc_dict
             solutions_dict['ind'] = active_set_ind_csc_dict
             solutions_dict['indptr'] = active_set_indptr_csc_dict
-            solutions_dict['keys'] = active_set_keys_dict 
+            solutions_dict['keys'] = active_set_keys_dict
             solutions_dict['spp_lasso_slopes'] = beta_hat_dict
 
         else:
@@ -984,11 +984,11 @@ def SPP(X_binned_data, X_binned_indices, X_binned_indptr, y,
             active_set_keys.append(safe_set_key)
             active_set_keys_dict[lmbda_t] = active_set_keys
 
-            # Convert safe_set_data, safe_set_ind and safe_set_key which are list 
+            # Convert safe_set_data, safe_set_ind and safe_set_key which are list
             # of lists numba into csc attributs
 
-            # To convert safe_set_data which is a numba list of lists we just have 
-            # to flatten the numba list as follows 
+            # To convert safe_set_data which is a numba list of lists we just have
+            # to flatten the numba list as follows
 
             safe_set_data_csc, safe_set_ind_csc, safe_set_indptr_csc = \
                 from_numbalists_tocsc(safe_set_data, safe_set_ind)
@@ -1008,12 +1008,12 @@ def SPP(X_binned_data, X_binned_indices, X_binned_indptr, y,
              n_active_features, theta, P_lmbda, D_lmbda, G_lmbda,
              safeset_membership) = sparse_cd(
                 X_data=safe_set_data_csc, X_indices=safe_set_ind_csc,
-                X_indptr=safe_set_indptr_csc, y=y, lmbda=lmbda_t, epsilon=epsilon, 
-                f=f, n_epochs=n_epochs, screening=screening, 
+                X_indptr=safe_set_indptr_csc, y=y, lmbda=lmbda_t, epsilon=epsilon,
+                f=f, n_epochs=n_epochs, screening=screening,
                 store_history=store_history)
 
             beta_hat_dict[lmbda_t] = beta_hat_t
-        
+
             active_set_data = List([List([0.])])
             active_set_ind = List([List([0])])
             active_set_keys = List([List([0])])
@@ -1028,9 +1028,9 @@ def SPP(X_binned_data, X_binned_indices, X_binned_indptr, y,
             active_set_data = active_set_data[1:]
             active_set_ind = active_set_ind[1:]
             active_set_keys = active_set_keys[1:]
-            
+
             active_set_data_csc, active_set_ind_csc, active_set_indptr_csc = \
-                from_numbalists_tocsc(numbalist_data=active_set_data, 
+                from_numbalists_tocsc(numbalist_data=active_set_data,
                                       numbalist_ind=active_set_ind)
 
             active_set_data_csc_dict[lmbda_t] = active_set_data_csc
@@ -1041,23 +1041,23 @@ def SPP(X_binned_data, X_binned_indices, X_binned_indptr, y,
             solutions_dict['data'] = active_set_data_csc_dict
             solutions_dict['ind'] = active_set_ind_csc_dict
             solutions_dict['indptr'] = active_set_indptr_csc_dict
-            solutions_dict['keys'] = active_set_keys_dict 
+            solutions_dict['keys'] = active_set_keys_dict
             solutions_dict['spp_lasso_slopes'] = beta_hat_dict
 
     return solutions_dict
 
-# Faire un objet "solution" avec en attribut lambda, beta, active_set_data, 
+# Faire un objet "solution" avec en attribut lambda, beta, active_set_data,
 # active_set_ind, active_set_indptr, active_set_keys
 # retourner une liste d'objets solution (un pour chaque lambda)
-# retourner un dictionnaire de dictionnaires avec comme clés : beta, data, ind, 
+# retourner un dictionnaire de dictionnaires avec comme clés : beta, data, ind,
 # indptr, keys
 # Exemple tirer en 2 dimensions aléatoirement des points entre 0 et 1 et ensuite
 # classifier entre noir (y = 1) et blanc (y = 0)
-# écrire un estimateur spp à la scikit learn avec une fonction predict (sous forme de classe comme pour le Lasso) 
+# écrire un estimateur spp à la scikit learn avec une fonction predict (sous forme de classe comme pour le Lasso)
 # store dans les attributs de la classe les keys, data, ind, indptr et qui est capable de les retourner
 # écrire les tests associés
 # puis faire tourner les tests sur les datasets
-# commencer par housing_prices (car plus petit), stopper max_depth à 3, 4 
+# commencer par housing_prices (car plus petit), stopper max_depth à 3, 4
 # lire le papier de la review d'Alex Safe rule fit (pour la littérature de nos travaux)
 # feedback sur le paper (qu'est-ce qui est similaire et qu'est ce qui est différent par rapport à ce que je fais)
 
@@ -1067,7 +1067,7 @@ def complex_features_matrix(X, y, max_depth, n_bins, encode, strategy):
     Parameters
     ----------
     X: numpy.ndarray(), shape = (n_samples, n_features)
-        matrix of observations with original features 
+        matrix of observations with original features
 
     y:  numpy.array(), shape = (n_samples, )
         target vector
@@ -1076,7 +1076,7 @@ def complex_features_matrix(X, y, max_depth, n_bins, encode, strategy):
         maximum order of interactions (complexity degree of the model)
 
     n_bins: int
-        number of bins created in each original feature during the binning 
+        number of bins created in each original feature during the binning
         process
 
     encode: string
@@ -1088,12 +1088,12 @@ def complex_features_matrix(X, y, max_depth, n_bins, encode, strategy):
     Returns
     -------
     X_tilde: numpy.ndarray(), shape = (n_samples, n_features + n_inter_feats)
-        matrix of observations with discrete one-hot encoded 
+        matrix of observations with discrete one-hot encoded
         The discrete one-hot encoded features belong to two different categories
         The first category is the one of the binned features obtained thanks to
         the binning process applied to the original continuous features
-        The second category is the one of the interactions features obtained 
-        thanks to the scalar product between the binned features until the 
+        The second category is the one of the interactions features obtained
+        thanks to the scalar product between the binned features until the
         maximum order of interactions.
     """
 
@@ -1206,10 +1206,10 @@ def complex_features_matrix(X, y, max_depth, n_bins, encode, strategy):
     return X_tilde, X_tilde_data, X_tilde_ind, X_tilde_indptr
 
 
-class SPP_solver():
-    def __init__(self, lmbda, n_val_gs, max_depth, epsilon, f, n_epochs, tol, 
+class SPPRegressor():
+    def __init__(self, lmbda, n_val_gs, max_depth, epsilon, f, n_epochs, tol,
                  screening, store_history, n_bins, encode, strategy):
-        
+
         self.lmbda = lmbda
         self.n_val_gs = n_val_gs
         self.max_depth = max_depth
@@ -1240,7 +1240,7 @@ class SPP_solver():
         """
 
         # Binning process
-        enc = KBinsDiscretizer(n_bins=self.n_bins, encode=self.encode, 
+        enc = KBinsDiscretizer(n_bins=self.n_bins, encode=self.encode,
                                strategy=self.strategy)
         X_binned = enc.fit_transform(X)
         X_binned = X_binned.tocsc()
@@ -1248,13 +1248,13 @@ class SPP_solver():
         X_binned_ind = X_binned.indices
         X_binned_indptr = X_binned.indptr
 
-        solutions_dict = SPP(X_binned_data=X_binned_data, 
-                             X_binned_indices=X_binned_ind, 
-                             X_binned_indptr=X_binned_indptr, y=y, 
-                             n_val_gs=self.n_val_gs, 
-                             max_depth=self.max_depth, epsilon=self.epsilon, 
-                             f=self.f, n_epochs=self.n_epochs, tol=self.tol, 
-                             screening=self.screening, 
+        solutions_dict = SPP(X_binned_data=X_binned_data,
+                             X_binned_indices=X_binned_ind,
+                             X_binned_indptr=X_binned_indptr, y=y,
+                             n_val_gs=self.n_val_gs,
+                             max_depth=self.max_depth, epsilon=self.epsilon,
+                             f=self.f, n_epochs=self.n_epochs, tol=self.tol,
+                             screening=self.screening,
                              store_history=self.store_history)
 
         self.solutions = solutions_dict
@@ -1281,7 +1281,7 @@ class SPP_solver():
         """
 
         # Binning process
-        enc = KBinsDiscretizer(n_bins=self.n_bins, encode=self.encode, 
+        enc = KBinsDiscretizer(n_bins=self.n_bins, encode=self.encode,
                                strategy=self.strategy)
         X_binned = enc.fit_transform(X)
         X_binned = X_binned.tocsc()
@@ -1427,7 +1427,7 @@ def main():
         XTR_absmax = max(abs(inner_prod), XTR_absmax)
 
     XTR_absmax = 0
-  
+
     for j in range(n_features):
         XTR_absmax = max(abs(X_binned[:, j].T.dot(residuals)), XTR_absmax)
 
@@ -1479,7 +1479,7 @@ def main():
             X_binned_indptr=X_binned_indptr, y=y, n_val_gs=n_val_gs,
             max_depth=max_depth, epsilon=epsilon, f=f, n_epochs=n_epochs,
             tol=tol, screening=screening, store_history=store_history)
-    
+
     # print('solutions_dict = ', solutions_dict)
     # print('active_set_data = ', solutions_dict['data'])
     # print('active_set_ind = ', solutions_dict['ind'])
@@ -1491,19 +1491,19 @@ def main():
     #                     Test Class SPP Solver
     #################################################################
 
-    # lmbda_max, max_key = max_val(X_binned_data=X_binned_data, 
-    #                              X_binned_indices=X_binned_indices, 
-    #                              X_binned_indptr=X_binned_indptr, 
+    # lmbda_max, max_key = max_val(X_binned_data=X_binned_data,
+    #                              X_binned_indices=X_binned_indices,
+    #                              X_binned_indptr=X_binned_indptr,
     #                              residuals=residuals, max_depth=max_depth)
 
     lmbda = 0.2481874128375465
-    spp_solver = SPP_solver(lmbda=lmbda, n_val_gs=n_val_gs,
-                            max_depth=max_depth,
-                            epsilon=epsilon, f=f, n_epochs=n_epochs, tol=tol,
-                            screening=screening, store_history=store_history,
-                            n_bins=n_bins, encode=encode, strategy=strategy)
+    spp_reg = SPPRegressor(lmbda=lmbda, n_val_gs=n_val_gs,
+                           max_depth=max_depth,
+                           epsilon=epsilon, f=f, n_epochs=n_epochs, tol=tol,
+                           screening=screening, store_history=store_history,
+                           n_bins=n_bins, encode=encode, strategy=strategy)
 
-    solver = spp_solver.fit(X=X, y=y)
+    solver = spp_reg.fit(X=X, y=y)
     solutions_dict = solver.solutions
     solutions_dict_slopes = solutions_dict['spp_lasso_slopes']
     print('solutions_dict_data = ', solutions_dict_slopes)
