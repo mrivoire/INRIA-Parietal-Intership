@@ -1,6 +1,4 @@
 import numpy as np
-import time
-import math
 
 from scipy.linalg import toeplitz
 from numba import njit
@@ -9,9 +7,8 @@ from sklearn.preprocessing import KBinsDiscretizer
 from sklearn.linear_model import Lasso as sklearn_Lasso
 from sklearn.utils import check_random_state
 from scipy.sparse import csc_matrix, hstack
-from cd_solver_lasso_numba import Lasso, sparse_cd
-from numba import generated_jit
-from math import isnan
+from cd_solver_lasso_numba import sparse_cd
+
 
 #######################################################################
 #                   Safe Pattern Pruning Algorithm
@@ -767,8 +764,6 @@ def from_key_to_interactions_feature(csc_data, csc_ind, csc_indptr,
         of the feature of interactions
 
     """
-
-    n_features = len(csc_indptr) - 1
     n_samples = len(set(csc_ind))
 
     interfeat_data = List(np.ones(n_samples))
@@ -840,7 +835,7 @@ def SPP(X_binned_data, X_binned_indices, X_binned_indptr, y,
     # test on only one value of lambda which is lower than lambda_max
     # if lambda is greater than lambda max then all the nodes of the features
     # tree are pruned out and the active set is empty.
-    lmbdas_grid = [lambda_max/2]
+    lmbdas_grid = [lambda_max / 2]
     # find a bettter initialization
     # active_set = List([List([0])])
 
@@ -860,7 +855,7 @@ def SPP(X_binned_data, X_binned_indices, X_binned_indptr, y,
     active_set_ind_csc.extend(max_feat_ind)
     active_set_indptr_csc = []
     active_set_indptr_csc.append(0)
-    active_set_indptr_csc.append(len(active_set_ind_csc))  #NNZ element
+    active_set_indptr_csc.append(len(active_set_ind_csc))  # NNZ element
     active_set_keys = []
     active_set_keys.append(max_key)
 
@@ -1208,7 +1203,7 @@ def complex_features_matrix(X, y, max_depth, n_bins, encode, strategy):
 
 class SPPRegressor():
     def __init__(self, lmbda, n_val_gs, max_depth, epsilon, f, n_epochs, tol,
-                 screening, store_history, n_bins, encode, strategy):
+                 screening, store_history):
 
         self.lmbda = lmbda
         self.n_val_gs = n_val_gs
@@ -1219,9 +1214,6 @@ class SPPRegressor():
         self.tol = tol
         self.screening = screening
         self.store_history = store_history
-        self.n_bins = n_bins
-        self.encode = encode
-        self.strategy = strategy
 
         assert epsilon > 0
         assert tol > 0 and tol < 1e-01
@@ -1238,19 +1230,11 @@ class SPPRegressor():
         y: numpy.array, shape = (n_samples, )
             target vector
         """
+        X_binned = X.tocsc()
 
-        # Binning process
-        enc = KBinsDiscretizer(n_bins=self.n_bins, encode=self.encode,
-                               strategy=self.strategy)
-        X_binned = enc.fit_transform(X)
-        X_binned = X_binned.tocsc()
-        X_binned_data = X_binned.data
-        X_binned_ind = X_binned.indices
-        X_binned_indptr = X_binned.indptr
-
-        solutions_dict = SPP(X_binned_data=X_binned_data,
-                             X_binned_indices=X_binned_ind,
-                             X_binned_indptr=X_binned_indptr, y=y,
+        solutions_dict = SPP(X_binned_data=X_binned.data,
+                             X_binned_indices=X_binned.indices,
+                             X_binned_indptr=X_binned.indptr, y=y,
                              n_val_gs=self.n_val_gs,
                              max_depth=self.max_depth, epsilon=self.epsilon,
                              f=self.f, n_epochs=self.n_epochs, tol=self.tol,
@@ -1279,12 +1263,7 @@ class SPPRegressor():
         y_hat: numpy.array, shape = (n_samples, )
             predicted target vector
         """
-
-        # Binning process
-        enc = KBinsDiscretizer(n_bins=self.n_bins, encode=self.encode,
-                               strategy=self.strategy)
-        X_binned = enc.fit_transform(X)
-        X_binned = X_binned.tocsc()
+        X_binned = X.tocsc()
         X_binned_data = X_binned.data
         X_binned_ind = X_binned.indices
         X_binned_indptr = X_binned.indptr
@@ -1496,21 +1475,25 @@ def main():
     #                              X_binned_indptr=X_binned_indptr,
     #                              residuals=residuals, max_depth=max_depth)
 
+    # Binning process
+    enc = KBinsDiscretizer(n_bins=n_bins, encode=encode,
+                           strategy=strategy)
+    X_binned = enc.fit_transform(X)
+
     lmbda = 0.2481874128375465
     spp_reg = SPPRegressor(lmbda=lmbda, n_val_gs=n_val_gs,
                            max_depth=max_depth,
                            epsilon=epsilon, f=f, n_epochs=n_epochs, tol=tol,
-                           screening=screening, store_history=store_history,
-                           n_bins=n_bins, encode=encode, strategy=strategy)
+                           screening=screening, store_history=store_history)
 
-    solver = spp_reg.fit(X=X, y=y)
+    solver = spp_reg.fit(X_binned, y)
     solutions_dict = solver.solutions
     solutions_dict_slopes = solutions_dict['spp_lasso_slopes']
     print('solutions_dict_data = ', solutions_dict_slopes)
     beta_star_lmbda = solutions_dict_slopes[lmbda]
     print('beta_star_lmbda = ', beta_star_lmbda)
 
-    y_hat = solver.predict(X=X)
+    y_hat = solver.predict(X_binned)
     print('y_hat = ', y_hat)
     # print('shape beta_hat = ', beta_hat.shape)
     # print('shape X = ', X.shape)
