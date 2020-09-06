@@ -1,6 +1,5 @@
 import numpy as np
 import time
-import pytest
 
 from sklearn.preprocessing import KBinsDiscretizer
 from sklearn.linear_model import Lasso

@@ -2,15 +2,18 @@ import numpy as np
 # import time
 import pytest
 
-# from scipy.linalg import toeplitz
-# from numba import njit
-# from numba.typed import List
+from scipy.sparse import csc_matrix, hstack
+
+from numba.typed import List
+from numba import njit
+
 from sklearn.preprocessing import KBinsDiscretizer
 from sklearn.linear_model import Lasso as sklearn_Lasso
 from sklearn.utils import check_random_state
 # from cd_solver_lasso_numba import Lasso, sparse_cd
+
 from SPP import simu, spp_solver, compute_interactions, max_val
-from scipy.sparse import csc_matrix, hstack
+from SPP import from_numbalists_tocsc
 
 
 def _compute_all_interactions(X_binned):
@@ -172,6 +175,34 @@ def test_SPP(seed):
     assert len(active_set_data) == len(active_set_keys)
     assert len(active_set_data) == np.count_nonzero(beta_star_spp)
     # assert np.count_nonzero(beta_star_spp) == np.count_nonzero(beta_star_lasso)
+
+
+@njit
+def _aux_from_numbalists_tocscmain():
+
+    numbalist_data = List([[1, 2], [4, 5], [6]])
+    numbalist_ind = List([[0, 3], [1, 2], [2]])
+
+    print("numbalist_data = ", numbalist_data)
+    print("numbalist_ind = ", numbalist_ind)
+
+    csc_data, csc_ind, csc_indptr = \
+        from_numbalists_tocsc(numbalist_data=numbalist_data,
+                              numbalist_ind=numbalist_ind)
+
+    return csc_data, csc_ind, csc_indptr
+
+
+def test_from_numbalists_tocsc():
+    csc_data, csc_ind, csc_indptr = _aux_from_numbalists_tocscmain()
+
+    print("csc_data = ", csc_data)
+    print("csc_ind = ", csc_ind)
+    print("csc_indptr = ", csc_indptr)
+
+    np.testing.assert_array_equal(csc_data, [1, 2, 4, 5, 6])
+    np.testing.assert_array_equal(csc_ind, [0, 3, 1, 2, 2])
+    np.testing.assert_array_equal(csc_indptr, [0, 2, 4, 5])
 
 
 def main():
