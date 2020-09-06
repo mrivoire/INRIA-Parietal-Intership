@@ -953,9 +953,9 @@ def spp_solver(X_binned, y,
             active_set_indptr_csc_dict[lmbda_t] = active_set_indptr_csc
             active_set_keys_dict[lmbda_t] = active_set_keys
 
-            solutions_dict['data'] = active_set_data_csc_dict
-            solutions_dict['ind'] = active_set_ind_csc_dict
-            solutions_dict['indptr'] = active_set_indptr_csc_dict
+            # solutions_dict['data'] = active_set_data_csc_dict
+            # solutions_dict['ind'] = active_set_ind_csc_dict
+            # solutions_dict['indptr'] = active_set_indptr_csc_dict
             solutions_dict['keys'] = active_set_keys_dict
             solutions_dict['spp_lasso_slopes'] = beta_hat_dict
 
@@ -994,7 +994,7 @@ class SPPRegressor():
         assert epsilon > 0
         assert tol > 0 and tol < 1e-01
 
-    def fit(self, X, y):
+    def fit(self, X_binned, y):
         """Fit the data (X, y) based on the solver of the SPP class
         Parameters
         ----------
@@ -1006,7 +1006,7 @@ class SPPRegressor():
         y: numpy.array, shape = (n_samples, )
             target vector
         """
-        solutions_dict = spp_solver(X.tocsc(), y=y,
+        solutions_dict = spp_solver(X_binned.tocsc(), y=y,
                                     n_val_gs=self.n_val_gs,
                                     max_depth=self.max_depth,
                                     epsilon=self.epsilon,
@@ -1017,14 +1017,14 @@ class SPPRegressor():
 
         self.solutions = solutions_dict
         self.spp_lasso_slopes = solutions_dict['spp_lasso_slopes']
-        self.activeset_data = solutions_dict['data']
-        self.activeset_ind = solutions_dict['ind']
-        self.activeset_indptr = solutions_dict['indptr']
         self.activeset_keys = solutions_dict['keys']
+        # self.activeset_data = solutions_dict['data']
+        # self.activeset_ind = solutions_dict['ind']
+        # self.activeset_indptr = solutions_dict['indptr']
 
         return self
 
-    def predict(self, X):
+    def predict(self, X_binned):
         """Predict the target from the observations matrix
 
         Parameters
@@ -1037,59 +1037,25 @@ class SPPRegressor():
         y_hat: numpy.array, shape = (n_samples, )
             predicted target vector
         """
-        X_binned = X.tocsc()
+        X_binned = X_binned.tocsc()
         X_binned_data = X_binned.data
         X_binned_ind = X_binned.indices
         X_binned_indptr = X_binned.indptr
 
-        n_features = len(X_binned_indptr) + 1
+        
         n_samples = X_binned.shape[0]
-        X_inter_feat_data = []
-        X_inter_feat_ind = []
-        X_inter_feat_indptr = []
-        indptr = 0
-        X_inter_feat_indptr.append(indptr)
-        n_inter_feats = 0
-        X_tilde_keys = []
-        for i in range(n_features):
-            start_feat1, end_feat1 = X_binned_indptr[i: i + 2]
-            start_feat1 = np.int64(start_feat1)
-            end_feat1 = np.int64(end_feat1)
-            X_tilde_keys.append([i])
-            for j in range(n_features):
-                n_inter_feats += 1
-                X_tilde_keys.append([i, j])
+        n_features = len(X_binned_indptr) + 1
+        
+        y_hat = np.zeros(n_samples)
+        for key, slope in zip(self.activeset_keys, self.spp_lasso_slopes):
+            interfeat_data, interfeat_ind = \
+                from_key_to_interactions_feature(csc_data=X_binned_data, 
+                                                 csc_ind=X_binned_ind, 
+                                                 csc_indptr=X_binned_indptr, 
+                                                 key=key, n_samples=n_samples, 
+                                                 n_features=n_features)
 
-                start_feat2, end_feat2 = X_binned[j: j + 2]
-                start_feat2 = np.int64(start_feat2)
-                end_feat2 = np.int64(end_feat2)
-
-                inter_feat_data, inter_feat_ind = \
-                    compute_interactions(
-                        data1=X_binned_data[start_feat1: end_feat1],
-                        ind1=X_binned_ind[start_feat1: end_feat1],
-                        data2=X_binned_data[start_feat2: end_feat2],
-                        ind2=X_binned_ind[start_feat2: end_feat2])
-
-                X_inter_feat_data.append(inter_feat_data)
-                X_inter_feat_ind.append(inter_feat_ind)
-                indptr += len(X_inter_feat_ind)
-                X_inter_feat_indptr(indptr)
-
-        X_interfeats = csc_matrix(
-            (X_inter_feat_data, X_inter_feat_ind, X_inter_feat_indptr),
-            shape=(n_samples, n_inter_feats))
-
-        X_tilde = hstack([X_binned, X_interfeats])
-        # X_tilde_data = X_tilde.data
-        # X_tilde_indptr = X_tilde.indptr
-        # X_tilde_ind = X_tilde.indices
-
-        beta_hat_lmbda = self.spp_lasso_slopes[self.lmbda]
-        # print('beta_hat_lmbda = ', beta_hat_lmbda)
-        # print('beta_hat_lmba = ', beta_hat_lmbda)
-        # print('type = ', type(beta_hat_lmbda))
-        y_hat = X_tilde.dot(beta_hat_lmbda)
+            y_hat += slope * interfeat_data
 
         return y_hat
 
@@ -1266,8 +1232,6 @@ def main():
 
     y_hat = solver.predict(X_binned)
     print('y_hat = ', y_hat)
-    # print('shape beta_hat = ', beta_hat.shape)
-    # print('shape X = ', X.shape)
 
 
 if __name__ == "__main__":
