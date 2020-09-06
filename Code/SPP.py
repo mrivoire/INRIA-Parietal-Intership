@@ -4,7 +4,7 @@ from scipy.linalg import toeplitz
 from numba import njit
 from numba.typed import List
 from sklearn.preprocessing import KBinsDiscretizer
-from sklearn.linear_model import Lasso as sklearn_Lasso
+from sklearn.linear_model import Lasso
 from sklearn.utils import check_random_state
 from scipy.sparse import csc_matrix, hstack
 from cd_solver_lasso_numba import sparse_cd
@@ -68,31 +68,9 @@ def simu(beta, n_samples=1000, corr=0.5, for_logreg=False,
     y = np.dot(X, beta) + rng.randn(n_samples)
 
     if for_logreg:
-        y = sign(y)
+        y = np.sign(y)
 
     return X, y
-
-
-def sign(x):
-    """
-    Parameters
-    ----------
-    x: float
-
-    Returns
-    -------
-    s: sign int
-      (-1) if x < 0,, (+1) if x > 0, 0 if x = 0
-    """
-
-    if x > 0:
-        s = 1
-    elif x < 0:
-        s = -1
-    else:
-        s = 0
-
-    return s
 
 
 #############################################################################
@@ -214,65 +192,10 @@ def compute_inner_prod(data1, ind1, residuals):
     return inner_prod, inner_prod_neg, inner_prod_pos
 
 
-# @njit
-# def compute_interactions(data1, ind1, data2, ind2):
-#     """
-#     Parameters
-#     ----------
-#     data1: numpy.array(), shape = (n_non_zero_coeffs, )
-#         contains all the non-zero elements of the 1st sparse verctor
-
-#     ind1: numpy.array(), shape = (n_non_zero_coeffs, )
-#         contains the indices of the rows in the dense matrix of the
-#         non-zero elements of the 1st sparse vector
-
-#     data2: numpy.array(), shape = (n_non_zero_coeffs, )
-#         contains all the non-zero elements of the 2nd sparse vector
-
-#     ind2: numpy.array(), shape = (n_non_zero_coeffs, )
-#         contains the indices of the rows in the dense matrix of the non-zero
-#         elements of the 2nd sparse vector
-
-#     Returns
-#     -------
-#     inter_feat_data: numpy.array(), shape = (n_non_zero_elements, )
-#         contains the non-zero elements of the sparse vector of interactions
-#         resulting in the product of the non-zero coefficients of same indices
-#         of the two parent vectors data1 and data2
-
-#     inter_feat_indices: numpy.array(), shape = (n_non_zero_elements, )
-#         contains the indices of the rows of the non-zero elements in the
-#         dense matrix
-#     """
-
-#     count1 = 0
-#     count2 = 0
-
-#     min_size = min(len(ind1), len(ind2))
-
-#     inter_feat_ind = [0]*min_size
-#     inter_feat_data = [0]*min_size
-
-#     counter = 0
-#     while count1 < len(ind1) and count2 < len(ind2):
-#         if ind1[count1] == ind2[count2]:
-#             prod = data1[count1] * data2[count2]
-#             inter_feat_ind[counter] = ind1[count1]
-#             inter_feat_data[counter] = prod
-#             counter += 1
-#             count1 += 1
-#             count2 += 1
-#         elif ind1[count1] < ind2[count2]:
-#             count1 += 1
-#         else:
-#             count2 += 1
-
-#     return inter_feat_data[0:counter], inter_feat_ind[0:counter]
-
-
 @njit
 def compute_interactions(data1, ind1, data2, ind2):
-    """
+    """Compute interaction between 2 features
+
     Parameters
     ----------
     data1: numpy.array(), shape = (n_non_zero_coeffs, )
@@ -455,7 +378,6 @@ def max_val_rec(X_binned_data, X_binned_indices, X_binned_indptr,
 @njit
 def safe_prune(X_binned_data, X_binned_indices, X_binned_indptr,
                safe_sphere_center, safe_sphere_radius, max_depth):
-
     """Update the safe_set with the active features
 
     Parameters
@@ -491,16 +413,10 @@ def safe_prune(X_binned_data, X_binned_indices, X_binned_indptr,
     n_features = len(X_binned_indptr) - 1
     n_samples = max(X_binned_indices) + 1
 
-    # safe_set_data
-    # safe_set_data = List([int(x) for x in range(0)])
-    # safe_set_ind = List([int(x) for x in range(0)])
-    # safe_set_key = List([int(x) for x in range(0)])
+    # safe_set_data (initialize with something for numpa)
     safe_set_data = List([List([0.])])
     safe_set_ind = List([List([0])])
-    safe_set_key = List([List([0])])
-    # safe_set_data = list()
-    # safe_set_ind = list()
-    # safe_set_key = list()
+    safe_set_keys = List([List([0])])
 
     depth = 1
 
@@ -518,18 +434,19 @@ def safe_prune(X_binned_data, X_binned_indices, X_binned_indptr,
                        current_key=current_key,
                        safe_set_data=safe_set_data,
                        safe_set_ind=safe_set_ind,
-                       safe_set_key=safe_set_key,
+                       safe_set_key=safe_set_keys,
                        j=i,
                        safe_sphere_center=safe_sphere_center,
                        safe_sphere_radius=safe_sphere_radius,
                        max_depth=max_depth,
                        depth=depth)
 
+    # drop with was inserted above for numba
     safe_set_data = safe_set_data[1:]
     safe_set_ind = safe_set_ind[1:]
-    safe_set_key = safe_set_key[1:]
+    safe_set_keys = safe_set_keys[1:]
 
-    return safe_set_data, safe_set_ind, safe_set_key
+    return safe_set_data, safe_set_ind, safe_set_keys
 
 
 @njit
@@ -539,7 +456,8 @@ def safe_prune_rec(X_binned_data, X_binned_indices, X_binned_indptr,
                    safe_sphere_center, safe_sphere_radius,
                    max_depth, depth):
     """Recursively update the active set with the active features for each
-        node in the tree
+    node in the tree.
+
     Parameters
     ----------
     X_binned: numpy.ndarray(), shape = (n_samples, n_features)
@@ -1376,20 +1294,17 @@ def main():
     X_binned_indptr = X_binned.indptr
     print("X_binned_indptr = ", X_binned_indptr)
 
-    n_features = len(X_binned_indptr) - 1
-    n_samples = max(X_binned_indices) + 1
-
     ################################################################
     #                           Lasso
     ################################################################
 
-    sparse_lasso_sklearn = sklearn_Lasso(alpha=(lmbda / X_binned.shape[0]),
-                                         fit_intercept=False,
-                                         normalize=False,
-                                         max_iter=n_epochs,
-                                         tol=1e-14).fit(X_binned, y)
+    lasso_sklearn = Lasso(alpha=(lmbda / X_binned.shape[0]),
+                          fit_intercept=False,
+                          normalize=False,
+                          max_iter=n_epochs,
+                          tol=1e-14).fit(X_binned, y)
 
-    beta_star = sparse_lasso_sklearn.coef_
+    beta_star = lasso_sklearn.coef_
     residuals = y - X_binned.dot(beta_star)
     XTR_absmax = 0
     for j in range(n_features - 1):
