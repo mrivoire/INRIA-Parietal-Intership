@@ -99,11 +99,6 @@ def test_SPP(seed):
 
     X_tilde, X_tilde_keys = _compute_all_interactions(X_binned)
     n_tilde_feats = X_tilde.shape[1]
-    print('n_tilde_feats = ', n_tilde_feats)
-
-    X_tilde_data = X_tilde.data
-    X_tilde_indptr = X_tilde.indptr
-    X_tilde_ind = X_tilde.indices
 
     X_binned_data = X_binned.data
     X_binned_indices = X_binned.indices
@@ -114,15 +109,6 @@ def test_SPP(seed):
                                   residuals=y, max_depth=max_depth)
 
     lmbda = lambda_max / 2
-
-    # (beta_star_lasso, residuals, primal_hist_sparse, dual_hist_sparse,
-    #  gap_hist_sparse, r_list_sparse, n_active_features_true_sparse,
-    #  theta_hat_cyclic_cd_sparse, P_lmbda_sparse, D_lmbda_sparse,
-    #  G_lmbda_sparse, safe_set_sparse) = \
-    #     sparse_cd(X_data=X_tilde_data, X_indices=X_tilde_ind,
-    #               X_indptr=X_tilde_indptr, y=y, lmbda=lmbda,
-    #               epsilon=epsilon, f=f, n_epochs=n_epochs,
-    #               screening=screening, store_history=store_history)
 
     sparse_lasso_sklearn = sklearn_Lasso(alpha=(lmbda / X_tilde.shape[0]),
                                          fit_intercept=False,
@@ -143,38 +129,14 @@ def test_SPP(seed):
                    tol=tol, screening=screening, store_history=store_history)
 
     beta_star_spp = solutions_dict['spp_lasso_slopes']
-    print('beta_star_spp = ', beta_star_spp)
-    print('beta_star_lasso = ', beta_star_lasso)
-    print('length beta_star_spp = ', len(beta_star_spp))
-    print('length beta_star_lasso = ', np.count_nonzero(beta_star_lasso))
-
-    active_set_data = solutions_dict['data']
-    print('length active_set_data = ', len(active_set_data))
-
-    print('length X_tilde_data = ', len(X_tilde_data))
-
-    active_set_ind = solutions_dict['ind']
-    print('length active_set_ind = ', len(active_set_ind))
-
-    print('length X_tilde_ind = ', len(X_tilde_ind))
-
-    active_set_indptr = solutions_dict['indptr']
-    print('length active_set_indptr = ', len(active_set_indptr))
-
-    print('length X_tilde_indptr = ', len(X_tilde_indptr))
 
     active_set_keys = solutions_dict['keys']
+
+    assert len(active_set_keys) == len(beta_star_spp)
+    # assert len(active_set_keys) == np.count_nonzero(beta_star_lasso)
     print('length active_set_keys = ', len(active_set_keys))
-    print('length X_tilde_keys = ', len(X_tilde_keys))
-    print('active_set_keys_lasso = ', active_set_keys_lasso)
-    print('length active_set_keys_lasso = ', len(active_set_keys_lasso))
-
-    print('X_tilde shape 0 = ', X_tilde.shape[0])
-
-    assert len(active_set_data) == len(active_set_ind)
-    assert len(active_set_data) == len(active_set_keys)
-    assert len(active_set_data) == np.count_nonzero(beta_star_spp)
-    # assert np.count_nonzero(beta_star_spp) == np.count_nonzero(beta_star_lasso)
+    print('length beta_star_spp = ', len(beta_star_spp))
+    print('NNZ beta_star_lasso = ', np.count_nonzero(beta_star_lasso))
 
 
 @njit
@@ -206,7 +168,32 @@ def test_from_numbalists_tocsc():
 
 
 def main():
-    seed = 1
+    rng = check_random_state(1)
+    n_samples, n_features = 100, 10
+    beta = rng.randn(n_features)
+    lmbda = 1.
+    f = 10
+    epsilon = 1e-14
+    n_epochs = 100000
+    screening = True
+    store_history = True
+    encode = 'onehot'
+    strategy = 'quantile'
+    n_bins = 3
+    max_depth = 2
+    n_val_gs = 10
+    tol = 1e-08
+
+    X, y = simu(beta, n_samples=n_samples, corr=0.5, for_logreg=False,
+                random_state=rng)
+
+    enc = KBinsDiscretizer(n_bins=n_bins, encode=encode, strategy=strategy)
+    X_binned = enc.fit_transform(X)
+    X_tilde, X_tilde_keys = _compute_all_interactions(X_binned)
+
+    print('X_tilde = ', X_tilde)
+    print('X_tilde_keys = ', X_tilde_keys)
+    seed = 0 
     test_SPP(seed)
 
 
