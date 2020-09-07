@@ -738,7 +738,6 @@ def spp_solver(X_binned, y,
                                   X_binned_indices=X_binned_indices,
                                   X_binned_indptr=X_binned_indptr,
                                   residuals=y, max_depth=max_depth)
-    lambda_max = lambda_max / n_samples
     # If we compute once again the feature of interactions corresponding to
     # max_key
 
@@ -757,7 +756,7 @@ def spp_solver(X_binned, y,
     # test on only one value of lambda which is lower than lambda_max
     # if lambda is greater than lambda max then all the nodes of the features
     # tree are pruned out and the active set is empty.
-    lmbdas_grid = [lambda_max / 2]
+    lmbdas_grid = [lambda_max/2]
     # find a bettter initialization
     # active_set = List([List([0])])
 
@@ -781,12 +780,7 @@ def spp_solver(X_binned, y,
     active_set_keys = []
     active_set_keys.append(max_key)
 
-    beta_hat_dict = {}
-    active_set_data_csc_dict = {}
-    active_set_ind_csc_dict = {}
-    active_set_indptr_csc_dict = {}
-    active_set_keys_dict = {}
-    solutions_dict = {}
+    solutions = []
 
     for lmbda_t in lmbdas_grid:
         # Pre-solve : solve the optimization problem with the new lambda on
@@ -846,24 +840,22 @@ def spp_solver(X_binned, y,
                     * np.linalg.norm(theta - y / lmbda_t, ord=2) ** 2)
 
         G_lmbda = P_lmbda - D_lmbda
-        print('Dual gap = ', G_lmbda)
         safe_sphere_radius = np.sqrt(2 * G_lmbda) / lmbda_t
         safe_sphere_center = theta
 
+        solutions_dict = {}
+        solutions_dict['lambda'] = lmbda_t 
+
         if abs(G_lmbda) < tol:
-            print('The current active set has already reached the support of the optimal model')
-            beta_hat_dict[lmbda_t] = beta_hat_t
-            active_set_data_csc_dict[lmbda_t] = active_set_data_csc
-            active_set_ind_csc_dict[lmbda_t] = active_set_ind_csc
-            active_set_indptr_csc_dict[lmbda_t] = active_set_indptr_csc
-            active_set_keys_dict[lmbda_t] = active_set_keys
+            print('The current active set has already reached the support' +
+                  'of the optimal model')
 
-            solutions_dict['data'] = active_set_data_csc_dict
-            solutions_dict['ind'] = active_set_ind_csc_dict
-            solutions_dict['indptr'] = active_set_indptr_csc_dict
-            solutions_dict['keys'] = active_set_keys_dict
-            solutions_dict['spp_lasso_slopes'] = beta_hat_dict
-
+            solutions_dict['data'] = active_set_data_csc
+            solutions_dict['ind'] = active_set_ind_csc
+            solutions_dict['indptr'] = active_set_indptr_csc
+            solutions_dict['keys'] = active_set_keys
+            solutions_dict['spp_lasso_slopes'] = beta_hat_t
+            
         else:
             # Safe Prune after pre-solve:
             # epoch == 0 => first perform spp then launch the solver with
@@ -896,9 +888,6 @@ def spp_solver(X_binned, y,
                 safe_sphere_center=safe_sphere_center,
                 safe_sphere_radius=safe_sphere_radius, max_depth=max_depth)
 
-            active_set_keys.append(safe_set_key)
-            active_set_keys_dict[lmbda_t] = active_set_keys
-
             # Convert safe_set_data, safe_set_ind and safe_set_key which are list
             # of lists numba into csc attributs
 
@@ -927,11 +916,10 @@ def spp_solver(X_binned, y,
                 f=f, n_epochs=n_epochs, screening=screening,
                 store_history=store_history)
 
-            beta_hat_dict[lmbda_t] = beta_hat_t
-
             active_set_data = List([List([0.])])
             active_set_ind = List([List([0])])
             active_set_keys = List([List([0])])
+            beta_hat_t_sparse = []
 
             for idx, membership in enumerate(safeset_membership):
                 # print('membership = ', membership)
@@ -939,6 +927,7 @@ def spp_solver(X_binned, y,
                     active_set_data.append(safe_set_data[idx])
                     active_set_ind.append(safe_set_ind[idx])
                     active_set_keys.append(safe_set_key[idx])
+                    beta_hat_t_sparse.append(beta_hat_t[idx])
 
             active_set_data = active_set_data[1:]
             active_set_ind = active_set_ind[1:]
@@ -948,18 +937,15 @@ def spp_solver(X_binned, y,
                 from_numbalists_tocsc(numbalist_data=active_set_data,
                                       numbalist_ind=active_set_ind)
 
-            active_set_data_csc_dict[lmbda_t] = active_set_data_csc
-            active_set_ind_csc_dict[lmbda_t] = active_set_ind_csc
-            active_set_indptr_csc_dict[lmbda_t] = active_set_indptr_csc
-            active_set_keys_dict[lmbda_t] = active_set_keys
+            solutions_dict['data'] = active_set_data_csc
+            solutions_dict['ind'] = active_set_ind_csc
+            solutions_dict['indptr'] = active_set_indptr_csc
+            solutions_dict['keys'] = active_set_keys
+            solutions_dict['spp_lasso_slopes'] = beta_hat_t_sparse
 
-            # solutions_dict['data'] = active_set_data_csc_dict
-            # solutions_dict['ind'] = active_set_ind_csc_dict
-            # solutions_dict['indptr'] = active_set_indptr_csc_dict
-            solutions_dict['keys'] = active_set_keys_dict
-            solutions_dict['spp_lasso_slopes'] = beta_hat_dict
+            solutions.append(solutions_dict)
 
-    return solutions_dict
+    return solutions
 
 # Faire un objet "solution" avec en attribut lambda, beta, active_set_data,
 # active_set_ind, active_set_indptr, active_set_keys
@@ -1042,10 +1028,9 @@ class SPPRegressor():
         X_binned_ind = X_binned.indices
         X_binned_indptr = X_binned.indptr
 
-        
         n_samples = X_binned.shape[0]
         n_features = len(X_binned_indptr) + 1
-        
+
         y_hat = np.zeros(n_samples)
         for key, slope in zip(self.activeset_keys, self.spp_lasso_slopes):
             interfeat_data, interfeat_ind = \

@@ -35,7 +35,6 @@ def _compute_all_interactions(X_binned):
 
     # Why testing with sklearn.preprocessing.PolynomialFeatures(degree=2, interaction_only=True, include_bias=False) ?
     for i in range(n_features):
-        X_tilde_keys.append([i])
         start_feat1, end_feat1 = X_binned_indptr[i: i + 2]
         for j in range(i, n_features):
             n_inter_feats += 1
@@ -48,7 +47,10 @@ def _compute_all_interactions(X_binned):
                     data2=X_binned_data[start_feat2: end_feat2],
                     ind2=X_binned_indices[start_feat2: end_feat2])
 
-            X_tilde_keys.append([i, j])
+            if i != j:
+                X_tilde_keys.append([i, j])
+            else:
+                X_tilde_keys.append([i])
             indptr += len(inter_feat_ind)
 
             X_inter_feat_data.extend(inter_feat_data)
@@ -59,8 +61,7 @@ def _compute_all_interactions(X_binned):
         (X_inter_feat_data, X_inter_feat_ind, X_inter_feat_indptr),
         shape=(n_samples, n_inter_feats))
 
-    X_tilde = hstack([X_binned, X_interfeats])
-    return X_tilde, X_tilde_keys
+    return X_interfeats, X_tilde_keys
 
 
 @pytest.mark.parametrize("seed", [0, 1, 2, 5, 10])
@@ -98,7 +99,6 @@ def test_SPP(seed):
     # interactions until the maximum order
 
     X_tilde, X_tilde_keys = _compute_all_interactions(X_binned)
-    n_tilde_feats = X_tilde.shape[1]
 
     X_binned_data = X_binned.data
     X_binned_indices = X_binned.indices
@@ -108,7 +108,7 @@ def test_SPP(seed):
                                   X_binned_indptr=X_binned_indptr,
                                   residuals=y, max_depth=max_depth)
 
-    lmbda = lambda_max / 2
+    lmbda = lambda_max/2
 
     sparse_lasso_sklearn = sklearn_Lasso(alpha=(lmbda / X_tilde.shape[0]),
                                          fit_intercept=False,
@@ -116,27 +116,31 @@ def test_SPP(seed):
                                          max_iter=n_epochs,
                                          tol=1e-14).fit(X_tilde, y)
 
-    beta_star_lasso = sparse_lasso_sklearn.coef_
+    beta_star_lasso = []
     active_set_keys_lasso = []
-    for i in range(n_tilde_feats):
-        if beta_star_lasso[i] != 0:
+    for i, coef in enumerate(sparse_lasso_sklearn.coef_):
+        if coef != 0:
             active_set_keys_lasso.append(X_tilde_keys[i])
+            beta_star_lasso.append(coef)
 
-    solutions_dict = \
+    solutions = \
         spp_solver(X_binned=X_binned, y=y, n_val_gs=n_val_gs,
                    max_depth=max_depth, epsilon=epsilon, f=f,
                    n_epochs=n_epochs,
                    tol=tol, screening=screening, store_history=store_history)
 
-    beta_star_spp = solutions_dict['spp_lasso_slopes']
+    beta_star_spp = solutions[0]['spp_lasso_slopes']
+    active_set_keys_spp = solutions[0]['keys']
 
-    active_set_keys = solutions_dict['keys']
-
-    assert len(active_set_keys) == len(beta_star_spp)
+    assert len(active_set_keys_spp) == len(beta_star_spp)
     # assert len(active_set_keys) == np.count_nonzero(beta_star_lasso)
-    print('length active_set_keys = ', len(active_set_keys))
+    print('length active_set_keys_spp = ', len(active_set_keys_spp))
     print('length beta_star_spp = ', len(beta_star_spp))
     print('NNZ beta_star_lasso = ', np.count_nonzero(beta_star_lasso))
+    print(beta_star_spp)
+    print(beta_star_lasso)
+    print(active_set_keys_spp)
+    print(active_set_keys_lasso)
 
 
 @njit
