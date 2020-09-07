@@ -64,11 +64,11 @@ def _compute_all_interactions(X_binned):
     return X_interfeats, X_tilde_keys
 
 
-@pytest.mark.parametrize("seed", [0, 1, 2, 5, 10])
-def test_SPP(seed):
+# @pytest.mark.parametrize("seed", [0, 1, 2, 5, 10])
+def test_SPP():
 
     # Definition of the parameters
-    rng = check_random_state(1)
+    rng = check_random_state(2)
     n_samples, n_features = 100, 10
     beta = rng.randn(n_features)
     lmbda = 1.
@@ -133,14 +133,26 @@ def test_SPP(seed):
     active_set_keys_spp = solutions[0]['keys']
 
     assert len(active_set_keys_spp) == len(beta_star_spp)
-    # assert len(active_set_keys) == np.count_nonzero(beta_star_lasso)
+    assert len(active_set_keys_spp) == len(active_set_keys_lasso)
+    assert len(beta_star_spp) == len(beta_star_lasso)
+    
     print('length active_set_keys_spp = ', len(active_set_keys_spp))
     print('length beta_star_spp = ', len(beta_star_spp))
     print('NNZ beta_star_lasso = ', np.count_nonzero(beta_star_lasso))
-    print(beta_star_spp)
-    print(beta_star_lasso)
-    print(active_set_keys_spp)
-    print(active_set_keys_lasso)
+    print('beta_star_spp = ', beta_star_spp)
+    print('beta_star_lasso = ', beta_star_lasso)
+    print('active_set_keys_spp = ', active_set_keys_spp)
+    print('active_set_keys_lasso = ', active_set_keys_lasso)
+
+    for i, key_spp in enumerate(active_set_keys_spp):
+        for j, key_lasso in enumerate(active_set_keys_lasso):
+            key_lasso = list(key_lasso)
+            key_spp = list(key_spp)
+
+            if key_lasso == key_spp:
+                np.testing.assert_allclose(beta_star_spp[i], 
+                                           beta_star_lasso[j],
+                                           rtol=1e-12)
 
 
 @njit
@@ -171,35 +183,10 @@ def test_from_numbalists_tocsc():
     np.testing.assert_array_equal(csc_indptr, [0, 2, 4, 5])
 
 
-def main():
-    rng = check_random_state(1)
-    n_samples, n_features = 100, 10
-    beta = rng.randn(n_features)
-    lmbda = 1.
-    f = 10
-    epsilon = 1e-14
-    n_epochs = 100000
-    screening = True
-    store_history = True
-    encode = 'onehot'
-    strategy = 'quantile'
-    n_bins = 3
-    max_depth = 2
-    n_val_gs = 10
-    tol = 1e-08
+# def main():
 
-    X, y = simu(beta, n_samples=n_samples, corr=0.5, for_logreg=False,
-                random_state=rng)
-
-    enc = KBinsDiscretizer(n_bins=n_bins, encode=encode, strategy=strategy)
-    X_binned = enc.fit_transform(X)
-    X_tilde, X_tilde_keys = _compute_all_interactions(X_binned)
-
-    print('X_tilde = ', X_tilde)
-    print('X_tilde_keys = ', X_tilde_keys)
-    seed = 0 
-    test_SPP(seed)
+#     test_SPP()
 
 
-if __name__ == "__main__":
-    main()
+# if __name__ == "__main__":
+#     main()
