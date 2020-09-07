@@ -144,15 +144,28 @@ def test_SPP():
     print('active_set_keys_spp = ', active_set_keys_spp)
     print('active_set_keys_lasso = ', active_set_keys_lasso)
 
+    equality_test = []
     for i, key_spp in enumerate(active_set_keys_spp):
         for j, key_lasso in enumerate(active_set_keys_lasso):
             key_lasso = list(key_lasso)
             key_spp = list(key_spp)
 
-            if key_lasso == key_spp:
+            if (key_lasso == key_spp) or (key_lasso.reverse() == key_spp):
                 np.testing.assert_allclose(beta_star_spp[i], 
                                            beta_star_lasso[j],
-                                           rtol=1e-12)
+                                           rtol=1e-08)
+
+                equality_test.append(True)
+
+                pass 
+            else:
+                equality_test.append(False)
+
+    if 'False' not in equality_test:
+        np.testing.assert_allclose(beta_star_spp, beta_star_lasso, rtol=1e-08)
+
+
+            
 
 
 @njit
@@ -183,10 +196,10 @@ def test_from_numbalists_tocsc():
     np.testing.assert_array_equal(csc_indptr, [0, 2, 4, 5])
 
 
-# def main():
+def main():
 
-#     test_SPP()
+    test_SPP()
 
 
-# if __name__ == "__main__":
-#     main()
+if __name__ == "__main__":
+    main()
