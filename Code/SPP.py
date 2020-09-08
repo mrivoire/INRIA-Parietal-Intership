@@ -992,21 +992,21 @@ class SPPRegressor():
         y: numpy.array, shape = (n_samples, )
             target vector
         """
-        solutions_dict = spp_solver(X_binned.tocsc(), y=y,
-                                    n_val_gs=self.n_val_gs,
-                                    max_depth=self.max_depth,
-                                    epsilon=self.epsilon,
-                                    f=self.f, n_epochs=self.n_epochs,
-                                    tol=self.tol,
-                                    screening=self.screening,
-                                    store_history=self.store_history)
+        solutions = spp_solver(X_binned.tocsc(), y=y,
+                               n_val_gs=self.n_val_gs,
+                               max_depth=self.max_depth,
+                               epsilon=self.epsilon,
+                               f=self.f, n_epochs=self.n_epochs,
+                               tol=self.tol,
+                               screening=self.screening,
+                               store_history=self.store_history)
 
-        self.solutions = solutions_dict
-        self.spp_lasso_slopes = solutions_dict['spp_lasso_slopes']
-        self.activeset_keys = solutions_dict['keys']
-        # self.activeset_data = solutions_dict['data']
-        # self.activeset_ind = solutions_dict['ind']
-        # self.activeset_indptr = solutions_dict['indptr']
+        self.spp_solutions = solutions
+        self.spp_lasso_slopes = solutions[0]['spp_lasso_slopes']
+        self.activeset_keys = solutions[0]['keys']
+        self.activeset_data = solutions[0]['data']
+        self.activeset_ind = solutions[0]['ind']
+        self.activeset_indptr = solutions[0]['indptr']
 
         return self
 
@@ -1039,8 +1039,16 @@ class SPPRegressor():
                                                  csc_indptr=X_binned_indptr, 
                                                  key=key, n_samples=n_samples, 
                                                  n_features=n_features)
-
-            y_hat += slope * interfeat_data
+            
+            print('slope = ', slope)
+            print('spp_lasso_slopes = ', self.spp_lasso_slopes)
+            print('type slope = ', type(slope))
+            print('type spp_lasso_slopes = ', type(self.spp_lasso_slopes))
+            print('length spp_lasso_slopes = ', len(self.spp_lasso_slopes))
+            print('length inter_feat_data = ', len(interfeat_data))
+            print('length inter_feat_ind = ', len(interfeat_ind))
+            print('length active_set_keys = ', len(self.activeset_keys))
+            # y_hat += self.spp_lasso_slopes * interfeat_data
 
         return y_hat
 
@@ -1209,14 +1217,8 @@ def main():
                            screening=screening, store_history=store_history)
 
     solver = spp_reg.fit(X_binned, y)
-    solutions_dict = solver.solutions
-    solutions_dict_slopes = solutions_dict['spp_lasso_slopes']
-    print('solutions_dict_data = ', solutions_dict_slopes)
-    beta_star_lmbda = solutions_dict_slopes[lmbda]
-    print('beta_star_lmbda = ', beta_star_lmbda)
+    predictor = spp_reg.predict(X_binned)
 
-    y_hat = solver.predict(X_binned)
-    print('y_hat = ', y_hat)
 
 
 if __name__ == "__main__":
