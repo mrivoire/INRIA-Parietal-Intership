@@ -1032,6 +1032,7 @@ class SPPRegressor():
         n_features = len(X_binned_indptr) + 1
 
         y_hat = np.zeros(n_samples)
+        interfeats = []
         for key, slope in zip(self.activeset_keys, self.spp_lasso_slopes):
             interfeat_data, interfeat_ind = \
                 from_key_to_interactions_feature(csc_data=X_binned_data, 
@@ -1039,6 +1040,8 @@ class SPPRegressor():
                                                  csc_indptr=X_binned_indptr, 
                                                  key=key, n_samples=n_samples, 
                                                  n_features=n_features)
+
+            interfeats.append(interfeat_data)
             
             print('slope = ', slope)
             print('spp_lasso_slopes = ', self.spp_lasso_slopes)
@@ -1048,7 +1051,9 @@ class SPPRegressor():
             print('length inter_feat_data = ', len(interfeat_data))
             print('length inter_feat_ind = ', len(interfeat_ind))
             print('length active_set_keys = ', len(self.activeset_keys))
-            # y_hat += self.spp_lasso_slopes * interfeat_data
+
+            for i in range(len(interfeat_data)):
+                y_hat += slope * interfeat_data[i]
 
         return y_hat
 
@@ -1217,8 +1222,9 @@ def main():
                            screening=screening, store_history=store_history)
 
     solver = spp_reg.fit(X_binned, y)
-    predictor = spp_reg.predict(X_binned)
-
+    y_hat = spp_reg.predict(X_binned)
+    print('y_hat = ', y_hat)
+    print('length y_hat = ', len(y_hat))
 
 
 if __name__ == "__main__":
