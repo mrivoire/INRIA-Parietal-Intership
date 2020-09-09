@@ -71,9 +71,14 @@ def decision_function(x1, x2, dim1, dim2, n_bins):
     # belongs have the same parity, then the given sample belongs to the
     # class 1 (black) otherwise it belongs to the class 0
 
-    if (int(x1 / bin_width_dim1) % 2) == 0 and ((int(x2 / bin_width_dim2) % 2) == 0):
-        y = 1
-    elif ((int(x1 / bin_width_dim1) % 2) == 1) and ((int(x2 / bin_width_dim2) % 2) == 1):
+    # if (int(x1 / bin_width_dim1) % 2) == 0 and ((int(x2 / bin_width_dim2) % 2) == 0):
+    #     y = 1
+    # elif ((int(x1 / bin_width_dim1) % 2) == 1) and ((int(x2 / bin_width_dim2) % 2) == 1):
+    #     y = 1
+
+    # The same parity of the two quotients can also be expressed by the 
+    # equality of the rests in the Euclidean division of each quotient par 2
+    if (int(x1 / bin_width_dim1) % 2) == (int(x2 / bin_width_dim2) % 2) :
         y = 1
     else:
         y = -1
@@ -139,16 +144,23 @@ def checkerboard(dim1, dim2, n_samples, n_bins):
     # intended to classify the samples of the training set in the same way
     # that the decision function proceeds
 
-    for idx in range(n_samples):
-        x1coor = x1[idx]
-        x2coor = x2[idx]
+    y = [decision_function(x1=u, x2=v, dim1=dim1, dim2=dim2, n_bins=n_bins) 
+         for u, v in zip(x1, x2)]
 
-        y = decision_function(x1=x1coor, x2=x2coor, dim1=dim1,
-                              dim2=dim2, n_bins=n_bins)
+    # for idx in range(n_samples):
+    #     x1coor = x1[idx]
+    #     x2coor = x2[idx]
 
-        data['x1'].append(x1coor)
-        data['x2'].append(x2coor)
-        data['y'].append(y)
+    #     y = decision_function(x1=x1coor, x2=x2coor, dim1=dim1,
+    #                           dim2=dim2, n_bins=n_bins)
+
+    #     data['x1'].append(x1coor)
+    #     data['x2'].append(x2coor)
+    #     data['y'].append(y)
+
+    data['x1'] = x1
+    data['x2'] = x2
+    data['y'] = y
 
     data = pd.DataFrame(data)
     X = data[['x1', 'x2']].values
