@@ -6,7 +6,6 @@ from numba.typed import List
 from sklearn.preprocessing import KBinsDiscretizer
 from sklearn.linear_model import Lasso
 from sklearn.utils import check_random_state
-from scipy.sparse import csc_matrix, hstack
 from cd_solver_lasso_numba import sparse_cd
 
 
@@ -652,14 +651,10 @@ def from_numbalists_tocsc(numbalist_data, numbalist_ind):
 
 @njit
 def from_key_to_interactions_feature(csc_data, csc_ind, csc_indptr,
-                                     key, n_samples, n_features):
+                                     key):
     """
     Parameters
     ----------
-    key: list(int)
-        list of integers containing the indices of the binned features taking
-        part in the interaction
-
     csc_data: list(int)
         list of integers containing the non-zero elements of the sparse matrix
 
@@ -670,6 +665,10 @@ def from_key_to_interactions_feature(csc_data, csc_ind, csc_indptr,
     csc_indptr: list(int)
         list of integers containing the indices of each first non-zero elements
         of each feature in the csc_data vector
+
+    key: list(int)
+        list of integers containing the indices of the binned features taking
+        part in the interaction
 
     Returns
     -------
@@ -682,15 +681,11 @@ def from_key_to_interactions_feature(csc_data, csc_ind, csc_indptr,
         of the feature of interactions
 
     """
-    n_samples = len(set(csc_ind))
+    start, end = csc_indptr[key[0]: key[0] + 2]
+    interfeat_data = List(csc_data[start: end])
+    interfeat_ind = List(csc_ind[start: end].astype(np.int64))
 
-    interfeat_data = List(np.ones(n_samples))
-    interfeat_ind = List(np.arange(n_samples))
-    csc_data = csc_data
-    csc_ind = csc_ind
-    csc_indptr = csc_indptr
-
-    for idx in key:
+    for idx in key[1:]:
         start, end = csc_indptr[idx: idx + 2]
         data2 = csc_data[start: end]
         ind2 = csc_ind[start: end]
@@ -732,7 +727,6 @@ def spp_solver(X_binned, y,
     X_binned_indptr = X_binned.indptr
 
     n_features = len(X_binned_indptr) - 1
-    n_samples = max(X_binned_indices) + 1
 
     lambda_max, max_key = max_val(X_binned_data=X_binned_data,
                                   X_binned_indices=X_binned_indices,
@@ -745,8 +739,7 @@ def spp_solver(X_binned, y,
         from_key_to_interactions_feature(csc_data=X_binned_data,
                                          csc_ind=X_binned_indices,
                                          csc_indptr=X_binned_indptr,
-                                         key=max_key, n_samples=n_samples,
-                                         n_features=n_features)
+                                         key=max_key)
 
     beta_hat_t = np.zeros(n_features)
 
@@ -844,7 +837,7 @@ def spp_solver(X_binned, y,
         safe_sphere_center = theta
 
         solutions_dict = {}
-        solutions_dict['lambda'] = lmbda_t 
+        solutions_dict['lambda'] = lmbda_t
 
         if abs(G_lmbda) < tol:
             print('The current active set has already reached the support' +
@@ -855,7 +848,7 @@ def spp_solver(X_binned, y,
             solutions_dict['indptr'] = active_set_indptr_csc
             solutions_dict['keys'] = active_set_keys
             solutions_dict['spp_lasso_slopes'] = beta_hat_t
-            
+
         else:
             # Safe Prune after pre-solve:
             # epoch == 0 => first perform spp then launch the solver with
@@ -1029,20 +1022,18 @@ class SPPRegressor():
         X_binned_indptr = X_binned.indptr
 
         n_samples = X_binned.shape[0]
-        n_features = len(X_binned_indptr) + 1
 
         y_hat = np.zeros(n_samples)
         interfeats = []
         for key, slope in zip(self.activeset_keys, self.spp_lasso_slopes):
             interfeat_data, interfeat_ind = \
-                from_key_to_interactions_feature(csc_data=X_binned_data, 
-                                                 csc_ind=X_binned_ind, 
-                                                 csc_indptr=X_binned_indptr, 
-                                                 key=key, n_samples=n_samples, 
-                                                 n_features=n_features)
+                from_key_to_interactions_feature(csc_data=X_binned_data,
+                                                 csc_ind=X_binned_ind,
+                                                 csc_indptr=X_binned_indptr,
+                                                 key=key)
 
             interfeats.append(interfeat_data)
-            
+
             print('slope = ', slope)
             print('spp_lasso_slopes = ', self.spp_lasso_slopes)
             print('type slope = ', type(slope))
@@ -1052,8 +1043,7 @@ class SPPRegressor():
             print('length inter_feat_ind = ', len(interfeat_ind))
             print('length active_set_keys = ', len(self.activeset_keys))
 
-            for i in range(len(interfeat_data)):
-                y_hat += slope * interfeat_data[i]
+            y_hat[interfeat_ind] += slope * np.array(interfeat_data)
 
         return y_hat
 

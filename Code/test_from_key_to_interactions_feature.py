@@ -19,9 +19,7 @@ def test_from_key_to_interactions_feature():
     n_samples, n_features = X.shape
     (interfeat_data, interfeat_ind) = \
         from_key_to_interactions_feature(csc_data=X.data, csc_ind=X.indices,
-                                         csc_indptr=X.indptr, key=key,
-                                         n_samples=n_samples,
-                                         n_features=n_features)
+                                         csc_indptr=X.indptr, key=key)
 
     np.testing.assert_array_equal(interfeat_data, inter_feat.data)
     np.testing.assert_array_equal(interfeat_ind, inter_feat.indices)
