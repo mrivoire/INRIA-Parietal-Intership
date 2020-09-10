@@ -1034,15 +1034,6 @@ class SPPRegressor():
 
             interfeats.append(interfeat_data)
 
-            print('slope = ', slope)
-            print('spp_lasso_slopes = ', self.spp_lasso_slopes)
-            print('type slope = ', type(slope))
-            print('type spp_lasso_slopes = ', type(self.spp_lasso_slopes))
-            print('length spp_lasso_slopes = ', len(self.spp_lasso_slopes))
-            print('length inter_feat_data = ', len(interfeat_data))
-            print('length inter_feat_ind = ', len(interfeat_ind))
-            print('length active_set_keys = ', len(self.activeset_keys))
-
             y_hat[interfeat_ind] += slope * np.array(interfeat_data)
 
         return y_hat

@@ -22,6 +22,8 @@ from cd_solver_lasso_numba import Lasso
 from dataset import (
     load_auto_prices, load_lacrimes, load_black_friday, load_nyc_taxi,
     load_housing_prices)
+from SPP import SPPRegressorsklearn.model_selection.KFold
+from sklearn.model_selection import KFold
 # from pandas_profiling import ProfileReport
 
 #################################################
@@ -125,17 +127,17 @@ def get_models(X, **kwargs):
                                ('regressor', lasso)])
     lmbdas = np.logspace(-4, -0.5, 3)
     tuned_parameters['lasso'] = \
-        {'regressor__lmbda': lmbdas, 'preprocessor__num__binning__n_bins': [2, 3, 5, 7, 10, 12, 15, 20]}
+        {'regressor__lmbda': lmbdas, 'preprocessor__num__binning__n_bins': [2, 3, 4, 5]}
 
     # LassoCV
     models['lasso_cv'] = Pipeline(steps=[('preprocessor', preprocessor),
                                          ('regressor', linear_model.LassoCV())])
-    tuned_parameters['lasso_cv'] = {'preprocessor__num__binning__n_bins': [2, 3, 5, 7, 10, 12, 15, 20]}
+    tuned_parameters['lasso_cv'] = {'preprocessor__num__binning__n_bins': [2, 3, 4, 5]}
 
     # RidgeCV
     models['ridge_cv'] = Pipeline(steps=[('preprocessor', preprocessor),
                                          ('regressor', linear_model.RidgeCV())])
-    tuned_parameters['ridge_cv'] = {'preprocessor__num__binning__n_bins': [2, 3, 5, 7, 10, 12, 15, 20]}
+    tuned_parameters['ridge_cv'] = {'preprocessor__num__binning__n_bins': [2, 3, 4, 5]}
 
     # XGBoost
     xgb = XGBRegressor()
@@ -144,14 +146,21 @@ def get_models(X, **kwargs):
     alphas = [0.0001, 0.001, 0.01, 0.1, 0.2, 0.3]
     tuned_parameters['xgb'] = {'regressor__alpha': alphas,
                                'regressor__n_estimators': [30, 100]}
-
-    # tuned_parameters['xgb'] = {'regressor__n_estimators': [30, 100]}
     
     # Random Forest
     rf = RandomForestRegressor()
     models['rf'] = Pipeline(steps=[('preprocessor', rf_preprocessor),
                                    ('regressor', rf)])
-    tuned_parameters['rf'] = {'regressor__max_depth': [3, 5]}
+    tuned_parameters['rf'] = {'regressor__max_depth': [2, 3, 4, 5]}
+
+    # SPP Regressor
+    spp_reg = SPPRegressor(**kwargs)
+    models['spp_reg'] = Pipeline(steps=[('preprocessor', preprocessor),
+                                 ('regressor', spp_reg)])
+
+    tuned_parameters['spp_reg'] = \
+        {'preprocessor__num__binning__n_bins': [2, 3, 4, 5],
+         'regressor__max_depth': [2, 3, 4, 5]}
 
     return models, tuned_parameters
 
@@ -190,7 +199,7 @@ def compute_cv(X, y, models, n_splits, n_jobs=1):
     return cv_scores
 
 
-def compute_gs(X, y, models, tuned_parameters, n_splits, n_jobs=1):
+def compute_gs(X, y, models, tuned_parameters, n_splits, n_jobs=1, **kwargs):
     """
     Parameters
     ----------
@@ -222,10 +231,29 @@ def compute_gs(X, y, models, tuned_parameters, n_splits, n_jobs=1):
     gs_models = {}
 
     for name, model in models.items():
-        gs = \
-            GridSearchCV(model, cv=n_splits,
-                         param_grid=tuned_parameters[name], n_jobs=n_jobs)
-        gs.fit(X, y)
+        if model != 'spp_reg':
+            gs = \
+                GridSearchCV(model, cv=n_splits,
+                             param_grid=tuned_parameters[name], n_jobs=n_jobs)
+
+            gs.fit(X, y)
+
+        else:
+            kf = KFold(n_splits=n_splits, random_state=None, shuffle=False)
+            for train_index, test_index in kf.split(X):
+                print("TRAIN:", train_index, "TEST:", test_index)
+                X_train, X_test = X[train_index], X[test_index]
+                y_train, y_test = y[train_index], y[test_index]
+
+                spp_reg = SPPRegressor(**kwargs)
+                spp_reg.fit(X_train, y_train)
+                y_hat = spp_reg.predict(X_test)
+                R_square = score(X_test, y_test)
+
+                gs = {'cv_scores': [], 'y_hat': []}
+                gs['cv_scores'].append(R_square)
+                gs['y_hat'].append(y_hat)
+        
         gs_models[name] = gs
 
     return gs_models
@@ -298,93 +326,95 @@ def main():
                 screening=screening,
                 store_history=store_history)
 
-        cv_scores = compute_cv(X=X, y=y, models=models, n_splits=n_splits, 
-                            n_jobs=n_jobs)
+        print('models = ', models)
 
-        print("cv_scores = ", cv_scores)
+        # cv_scores = compute_cv(X=X, y=y, models=models, n_splits=n_splits, 
+        #                        n_jobs=n_jobs)
 
-        list_cv_scores = []
+        # print("cv_scores = ", cv_scores)
 
-        for k, v in cv_scores.items():
-            print(f'{k}: {v}')
-            list_cv_scores.append(v)
+        # list_cv_scores = []
 
-        print("cv_scores without tuning params = ", list_cv_scores)
+        # for k, v in cv_scores.items():
+        #     print(f'{k}: {v}')
+        #     list_cv_scores.append(v)
 
-        gs_scores = compute_gs(X=X, y=y, models=models, n_splits=n_splits,
-                            tuned_parameters=tuned_parameters, n_jobs=n_jobs)
+        # print("cv_scores without tuning params = ", list_cv_scores)
 
-        list_gs_scores = []
-        scores = pd.DataFrame({'model': [],
-                            'best_cv_score': [],
-                            'best_param': []})
+        # gs_scores = compute_gs(X=X, y=y, models=models, n_splits=n_splits,
+        #                        tuned_parameters=tuned_parameters, n_jobs=n_jobs)
 
-        execution_time_list = []
-        for k, v in gs_scores.items():
-            print(f'{k} -- best params = {v.best_params_}')
-            print(f'{k} -- cv scores = {v.best_score_}')
-            list_gs_scores.append(v.best_score_)
-            end = time.time()
-            delay = end - start
-            execution_time_list.append(delay)
-            scores = scores.append(pd.DataFrame({'model': [k],
-                                                'best_cv_score': [v.best_score_],
-                                                'best_param': [v.best_params_],
-                                                'delay': [delay]}))
+        # list_gs_scores = []
+        # scores = pd.DataFrame({'model': [],
+        #                     'best_cv_score': [],
+        #                     'best_param': []})
 
-        print("Housing Prices Dataset with 100 samples")
-        print("cv_score with tuning params = ", list_gs_scores)
+        # execution_time_list = []
+        # for k, v in gs_scores.items():
+        #     print(f'{k} -- best params = {v.best_params_}')
+        #     print(f'{k} -- cv scores = {v.best_score_}')
+        #     list_gs_scores.append(v.best_score_)
+        #     end = time.time()
+        #     delay = end - start
+        #     execution_time_list.append(delay)
+        #     scores = scores.append(pd.DataFrame({'model': [k],
+        #                                         'best_cv_score': [v.best_score_],
+        #                                         'best_param': [v.best_params_],
+        #                                         'delay': [delay]}))
 
-        print(scores)
-        scores.to_csv('/home/mrivoire/Documents/M2DS_Polytechnique/INRIA-Parietal-Intership/Code/' + data_name + '.csv', index=False)
+        # print("Housing Prices Dataset with 100 samples")
+        # print("cv_score with tuning params = ", list_gs_scores)
 
-        #######################################################################
-        #                         Bar Plots CV Scores
-        #######################################################################
+        # print(scores)
+        # scores.to_csv('/home/mrivoire/Documents/M2DS_Polytechnique/INRIA-Parietal-Intership/Code/' + data_name + '.csv', index=False)
 
-        labels = ['Lasso', 'Lasso_cv', 'Ridge_cv', 'XGB', 'RF']
+        # #######################################################################
+        # #                         Bar Plots CV Scores
+        # #######################################################################
 
-        x = np.arange(len(labels))  # the label locations
-        width = 0.35  # the width of the bars
+        # labels = ['Lasso', 'Lasso_cv', 'Ridge_cv', 'XGB', 'RF']
 
-        fig, ax = plt.subplots()
-        rects1 = ax.bar(x, list_gs_scores, width)
-        # Add some text for labels, title and custom x-axis tick labels, etc.
-        ax.set_ylabel('CV Scores')
-        ax.set_title('Crossval Scores By Predictive Model With Tuning For 100 Samples')
-        ax.set_xticks(x)
-        ax.set_xticklabels(labels)
-        ax.legend()
+        # x = np.arange(len(labels))  # the label locations
+        # width = 0.35  # the width of the bars
 
-        autolabel(rects1, 1000)
+        # fig, ax = plt.subplots()
+        # rects1 = ax.bar(x, list_gs_scores, width)
+        # # Add some text for labels, title and custom x-axis tick labels, etc.
+        # ax.set_ylabel('CV Scores')
+        # ax.set_title('Crossval Scores By Predictive Model With Tuning For 100 Samples')
+        # ax.set_xticks(x)
+        # ax.set_xticklabels(labels)
+        # ax.legend()
 
-        fig.tight_layout()
+        # autolabel(rects1, 1000)
 
-        plt.show()
+        # fig.tight_layout()
 
-        #######################################################################
-        #                         Bar Plots CV Time
-        #######################################################################
+        # plt.show()
 
-        labels = ['Lasso', 'Lasso_cv', 'Ridge_cv', 'XGB', 'RF']
+        # #######################################################################
+        # #                         Bar Plots CV Time
+        # #######################################################################
 
-        x = np.arange(len(labels))  # the label locations
-        width = 0.35  # the width of the bars
+        # labels = ['Lasso', 'Lasso_cv', 'Ridge_cv', 'XGB', 'RF']
 
-        fig, ax = plt.subplots()
-        rects1 = ax.bar(x, execution_time_list, width)
-        # Add some text for labels, title and custom x-axis tick labels, etc.
-        ax.set_ylabel('Running Time')
-        ax.set_title('Running Time By Predictive Model With Tuning For 100 Samples')
-        ax.set_xticks(x)
-        ax.set_xticklabels(labels)
-        ax.legend()
+        # x = np.arange(len(labels))  # the label locations
+        # width = 0.35  # the width of the bars
 
-        autolabel(rects1, 1000)
+        # fig, ax = plt.subplots()
+        # rects1 = ax.bar(x, execution_time_list, width)
+        # # Add some text for labels, title and custom x-axis tick labels, etc.
+        # ax.set_ylabel('Running Time')
+        # ax.set_title('Running Time By Predictive Model With Tuning For 100 Samples')
+        # ax.set_xticks(x)
+        # ax.set_xticklabels(labels)
+        # ax.legend()
 
-        fig.tight_layout()
+        # autolabel(rects1, 1000)
 
-        plt.show()
+        # fig.tight_layout()
+
+        # plt.show()
 
 
 
