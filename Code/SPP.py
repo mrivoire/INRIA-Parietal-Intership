@@ -1074,11 +1074,15 @@ class SPPRegressor():
             chosen metric : R-sqare
         """
 
-        u = ((y - self.predict(X)) ** 2).sum()
-        v = ((y - np.mean(y)) ** 2).sum()
-        score = 1 - u / v
+        y_hat_dict = self.predict(X)
+        cv_scores = []
+        for y_hat in y_hat_dict['y_hat']:
+            u = ((y - y_hat) ** 2).sum()
+            v = ((y - np.mean(y)) ** 2).sum()
+            score = 1 - u / v
+            cv_scores.append(score)
 
-        return score
+        return cv_scores
 
 
 def main():
@@ -1224,8 +1228,9 @@ def main():
 
     solver = spp_reg.fit(X_binned, y)
     y_hat_dict = spp_reg.predict(X_binned)
-    print('y_hat_dict = ', y_hat_dict)
-
+    # print('y_hat_dict = ', y_hat_dict)
+    cv_scores = spp_reg.score(X_binned, y)
+    print('cv_scores = ', cv_scores)
 
 if __name__ == "__main__":
     main()
