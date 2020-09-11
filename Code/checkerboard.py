@@ -5,6 +5,8 @@ import matplotlib.pyplot as plt
 from matplotlib.colors import ListedColormap
 from sklearn.preprocessing import KBinsDiscretizer
 from sklearn.model_selection import train_test_split
+from sklearn.linear_model import Lasso
+from sklearn.preprocessing import PolynomialFeatures
 from sklearn.pipeline import make_pipeline
 
 from SPP import SPPRegressor
@@ -29,7 +31,7 @@ def compute_quantiles(x1, x2, n_bins):
     quantiles_dim1_idx: list of ints
         list containing the indices of the cut points delineating the quantiles 
         in the series of coordinates in the first dimension
-    
+
     quantiles_dim2_idx: list of ints
         list containing the indices of the cut points delineating the quantiles
         in the series of coordinates in the second dimension
@@ -356,39 +358,40 @@ def main():
     n_samples = 1000
     binning_strategy = 'uniform'
 
-    rng = np.random.RandomState(42)
-    x1 = rng.rand(n_samples) * dim1
-    x2 = rng.rand(n_samples) * dim2
+    # rng = np.random.RandomState(42)
+    # x1 = rng.rand(n_samples) * dim1
+    # x2 = rng.rand(n_samples) * dim2
 
-    x1 = list(x1)
-    x2 = list(x2)
+    # x1 = list(x1)
+    # x2 = list(x2)
 
-    (quantiles_dim1_val, quantiles_dim2_val, quantiles_dim1_idx, 
-     quantiles_dim2_idx) = compute_quantiles(x1=x1, x2=x2, n_bins=n_bins)
+    # (quantiles_dim1_val, quantiles_dim2_val, quantiles_dim1_idx, 
+    #  quantiles_dim2_idx) = compute_quantiles(x1=x1, x2=x2, n_bins=n_bins)
 
-    # X, y = checkerboard(dim1=dim1, dim2=dim2, n_samples=n_samples, n_bins=n_bins)
+    X, y = checkerboard(dim1=dim1, dim2=dim2, n_samples=n_samples,
+                        n_bins=n_bins, binning_strategy='uniform')
 
-    # X_train, X_test, y_train, y_test = \
-    #     train_test_split(X, y, test_size=.4, random_state=42)
+    X_train, X_test, y_train, y_test = \
+        train_test_split(X, y, test_size=.4, random_state=42)
 
-    # f = 10
-    # epsilon = 1e-14
-    # n_epochs = 1000
-    # screening = True
-    # store_history = True
-    # max_depth = 2
-    # n_val_gs = 10
-    # tol = 1e-08
-    # lmbda = 0.00001
-    # encode = 'onehot'
-    # strategy = 'quantile'
+    f = 10
+    epsilon = 1e-14
+    n_epochs = 1000
+    screening = True
+    store_history = True
+    max_depth = 2
+    n_val_gs = 10
+    tol = 1e-08
+    lmbda = 0.00001
+    encode = 'onehot'
+    strategy = 'quantile'
 
     # spp_reg = SPPRegressor(lmbda=lmbda, n_val_gs=n_val_gs,
     #                        max_depth=max_depth,
     #                        epsilon=epsilon, f=f, n_epochs=n_epochs, tol=tol,
     #                        screening=screening, store_history=store_history)
 
-    # enc = KBinsDiscretizer(n_bins=n_bins, encode=encode, strategy=strategy)
+    enc = KBinsDiscretizer(n_bins=n_bins, encode=encode, strategy=strategy)
 
     # X_binned = enc.fit_transform(X_train).tocsc()
 
@@ -398,6 +401,13 @@ def main():
 
     # est = make_pipeline(enc, spp_reg)
     # plot_est(est, X, y, X_train, y_train, X_test, y_test)
+
+    est = make_pipeline(
+        enc,
+        PolynomialFeatures(order=2, include_bias=False, interaction_only=True),
+        Lasso(alpha=0.01)
+    )
+    plot_est(est, X, y, X_train, y_train, X_test, y_test)
 
 
 if __name__ == "__main__":
