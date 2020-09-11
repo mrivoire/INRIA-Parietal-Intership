@@ -749,7 +749,12 @@ def spp_solver(X_binned, y,
     # test on only one value of lambda which is lower than lambda_max
     # if lambda is greater than lambda max then all the nodes of the features
     # tree are pruned out and the active set is empty.
-    lmbdas_grid = [lambda_max/2]
+    # lmbdas_grid = [lambda_max / 1000]
+    lmbdas_grid = np.linspace(start=(lambda_max / 2), stop=(lambda_max / 20), 
+                              num=n_val_gs, endpoint=True, 
+                              retstep=False, dtype=None, axis=0)
+    # Create a grid starting from lmbda_max to lmbda_max / 20 
+    # lmbda max has not to be too small otherwise we obtain too many features
     # find a bettter initialization
     # active_set = List([List([0])])
 
@@ -776,6 +781,8 @@ def spp_solver(X_binned, y,
     solutions = []
 
     for lmbda_t in lmbdas_grid:
+
+        print('lmbda_t = ', lmbda_t)
         # Pre-solve : solve the optimization problem with the new lambda on
         # the previous optimal set of features. (epsilon not too small ~ 10^-8)
         # use the implemented lasso with as input only the previous
@@ -841,13 +848,15 @@ def spp_solver(X_binned, y,
 
         if abs(G_lmbda) < tol:
             print('The current active set has already reached the support' +
-                  'of the optimal model')
+                  ' of the optimal model')
 
             solutions_dict['data'] = active_set_data_csc
             solutions_dict['ind'] = active_set_ind_csc
             solutions_dict['indptr'] = active_set_indptr_csc
             solutions_dict['keys'] = active_set_keys
             solutions_dict['spp_lasso_slopes'] = beta_hat_t
+
+            return solutions
 
         else:
             # Safe Prune after pre-solve:
@@ -915,7 +924,6 @@ def spp_solver(X_binned, y,
             beta_hat_t_sparse = []
 
             for idx, membership in enumerate(safeset_membership):
-                # print('membership = ', membership)
                 if membership:
                     active_set_data.append(safe_set_data[idx])
                     active_set_ind.append(safe_set_ind[idx])
@@ -938,7 +946,7 @@ def spp_solver(X_binned, y,
 
             solutions.append(solutions_dict)
 
-    return solutions
+            return solutions
 
 # Faire un objet "solution" avec en attribut lambda, beta, active_set_data,
 # active_set_ind, active_set_indptr, active_set_keys
@@ -957,10 +965,10 @@ def spp_solver(X_binned, y,
 
 
 class SPPRegressor():
-    def __init__(self, lmbda, n_val_gs, max_depth, epsilon, f, n_epochs, tol,
+    def __init__(self, n_val_gs, max_depth, epsilon, f, n_epochs, tol,
                  screening, store_history):
 
-        self.lmbda = lmbda
+        # self.lmbda = lmbda
         self.n_val_gs = n_val_gs
         self.max_depth = max_depth
         self.epsilon = epsilon
@@ -995,11 +1003,12 @@ class SPPRegressor():
                                store_history=self.store_history)
 
         self.spp_solutions = solutions
-        self.spp_lasso_slopes = solutions[0]['spp_lasso_slopes']
-        self.activeset_keys = solutions[0]['keys']
-        self.activeset_data = solutions[0]['data']
-        self.activeset_ind = solutions[0]['ind']
-        self.activeset_indptr = solutions[0]['indptr']
+        # remove this part to keep for all lmbdas
+        # self.spp_lasso_slopes = solutions[0]['spp_lasso_slopes']
+        # self.activeset_keys = solutions[0]['keys']
+        # self.activeset_data = solutions[0]['data']
+        # self.activeset_ind = solutions[0]['ind']
+        # self.activeset_indptr = solutions[0]['indptr']
 
         return self
 
@@ -1016,27 +1025,36 @@ class SPPRegressor():
         y_hat: numpy.array, shape = (n_samples, )
             predicted target vector
         """
+
+        # itérer sur les solutions et calculer le y_hat 
+        # renvoyer une liste de y_hat pour chaque lmbda
         X_binned = X_binned.tocsc()
         X_binned_data = X_binned.data
         X_binned_ind = X_binned.indices
         X_binned_indptr = X_binned.indptr
 
         n_samples = X_binned.shape[0]
+        y_hat_dict = {'lambda': [], 'y_hat': []}
+        for i in range(len(self.spp_solutions)):
+            y_hat = np.zeros(n_samples)
+            interfeats = []
+            for key, slope in zip(self.spp_solutions[i]['keys'], 
+                                  self.spp_solutions[i]['spp_lasso_slopes']):
 
-        y_hat = np.zeros(n_samples)
-        interfeats = []
-        for key, slope in zip(self.activeset_keys, self.spp_lasso_slopes):
-            interfeat_data, interfeat_ind = \
-                from_key_to_interactions_feature(csc_data=X_binned_data,
-                                                 csc_ind=X_binned_ind,
-                                                 csc_indptr=X_binned_indptr,
-                                                 key=key)
+                interfeat_data, interfeat_ind = \
+                    from_key_to_interactions_feature(csc_data=X_binned_data,
+                                                     csc_ind=X_binned_ind,
+                                                     csc_indptr=X_binned_indptr,
+                                                     key=key)
 
-            interfeats.append(interfeat_data)
+                interfeats.append(interfeat_data)
 
-            y_hat[interfeat_ind] += slope * np.array(interfeat_data)
+                y_hat[interfeat_ind] += slope * np.array(interfeat_data)
 
-        return y_hat
+            y_hat_dict['lambda'].append(self.spp_solutions[i]['lambda'])
+            y_hat_dict['y_hat'].append(y_hat)
+
+        return y_hat_dict
 
     def score(self, X, y):
         """Compute the cross-validation score to assess the performance of the
@@ -1064,7 +1082,7 @@ class SPPRegressor():
 
 
 def main():
-    rng = check_random_state(1)
+    rng = check_random_state(2)
     n_samples, n_features = 100, 10
     beta = rng.randn(n_features)
     lmbda = 1.
@@ -1077,7 +1095,7 @@ def main():
     strategy = 'quantile'
     n_bins = 3
     max_depth = 2
-    n_val_gs = 10
+    n_val_gs = 100
     tol = 1e-08
 
     X, y = simu(beta, n_samples=n_samples, corr=0.5, for_logreg=False,
@@ -1169,18 +1187,20 @@ def main():
     #################################################################
     #                   Test for SPP function
     #################################################################
-    solutions_dict = \
+    solutions = \
         spp_solver(X_binned, y=y, n_val_gs=n_val_gs,
                    max_depth=max_depth, epsilon=epsilon, f=f,
                    n_epochs=n_epochs, tol=tol, screening=screening,
                    store_history=store_history)
 
-    # print('solutions_dict = ', solutions_dict)
-    # print('active_set_data = ', solutions_dict['data'])
-    # print('active_set_ind = ', solutions_dict['ind'])
-    # print('active_set_indptr = ', solutions_dict['indptr'])
-    # print('active_set_keys = ', solutions_dict['keys'])
-    # print('coeffs Lasso = ', solutions_dict['spp_lasso_slopes'])
+    print('solutions = ', solutions)
+    print('length solutions = ', len(solutions))
+    print('lmbda = ', solutions[0]['lambda'])
+    print('data = ', solutions[0]['data'])
+    print('ind = ', solutions[0]['ind'])
+    print('indptr = ', solutions[0]['indptr'])
+    print('keys = ', solutions[0]['keys'])
+    print('slopes = ', solutions[0]['spp_lasso_slopes'])
 
     #################################################################
     #                     Test Class SPP Solver
@@ -1197,15 +1217,14 @@ def main():
     X_binned = enc.fit_transform(X)
 
     lmbda = 0.2481874128375465
-    spp_reg = SPPRegressor(lmbda=lmbda, n_val_gs=n_val_gs,
+    spp_reg = SPPRegressor(n_val_gs=n_val_gs,
                            max_depth=max_depth,
                            epsilon=epsilon, f=f, n_epochs=n_epochs, tol=tol,
                            screening=screening, store_history=store_history)
 
     solver = spp_reg.fit(X_binned, y)
-    y_hat = spp_reg.predict(X_binned)
-    print('y_hat = ', y_hat)
-    print('length y_hat = ', len(y_hat))
+    y_hat_dict = spp_reg.predict(X_binned)
+    print('y_hat_dict = ', y_hat_dict)
 
 
 if __name__ == "__main__":
