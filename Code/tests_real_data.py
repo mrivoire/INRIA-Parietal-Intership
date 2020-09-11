@@ -240,20 +240,56 @@ def compute_gs(X, y, models, tuned_parameters, n_splits, n_jobs=1, **kwargs):
 
         else:
             kf = KFold(n_splits=n_splits, random_state=None, shuffle=False)
+
+            n_bins_list = [2, 3, 4, 5]
+            max_depth_list = [2, 3, 4, 5]
+            # for n in n_bins
+            # for depth in max_depth 
+            # sur chaque fold on calcule un score 
+            # et on sélectionne le triplet pour lequel le score est le plus élevé
+            # on peut retourner les résultats sous forme de pd dataframe
+            scores_dict = {'num_split': [], 
+                           'cv_scores': []}
+
+            gs = {'cv_results_': scores_dict, 
+                  'best_estimator_': 'SPPRegressor', 
+                  'best_score_': [], 
+                  'best_params_': [], 
+                  'best_index_': [],
+                  'scorer_': 'R_square',
+                  'n_splits_': n_splits,
+                  'refit_time_': []}
+
+            num_fold = 0
             for train_index, test_index in kf.split(X):
+                num_fold += 1
                 print("TRAIN:", train_index, "TEST:", test_index)
                 X_train, X_test = X[train_index], X[test_index]
                 y_train, y_test = y[train_index], y[test_index]
 
-                spp_reg = SPPRegressor(**kwargs)
-                spp_reg.fit(X_train, y_train)
-                y_hat = spp_reg.predict(X_test)
-                R_square = spp_reg.score(X_test, y_test)
+                for n_bins in n_bins_list:
+                    for max_depth in max_depth_list:
+                        spp_reg = SPPRegressor(**kwargs)
+                        spp_reg.fit(X_train, y_train)
+                        y_hat = spp_reg.predict(X_test)
+                        cv_scores = spp_reg.score(X_test, y_test)
 
-                gs = {'cv_scores': [], 'y_hat': []}
-                gs['cv_scores'].append(R_square)
-                gs['y_hat'].append(y_hat)
-        
+                        best_score = max(cv_scores)
+                        idx_best_score = cv_scores.index(max(cv_scores))
+                        best_lmbda = spp_reg.spp_solutions['lmbda'][idx_best_score]
+                        best_params = [n_bins, max_depth, best_lmbda]
+
+                        scores_dict['num_split'].append(num_fold)
+                        scores_dict['cv_scores'].append(cv_scores)
+
+                        gs['best_score_'].append(best_score)
+                        gs['best_params_'].append(best_params)
+                        gs['best_index_'].append(idx_best_score)
+
+            best_avg_score = max(gs['best_score_'])
+            idx_best_avg_score = gs['best_score_'].index(max(gs['best_score_']))
+            best_avg_params = gs['best_params_'][idx_best_avg_score]
+  
         gs_models[name] = gs
 
     return gs_models
@@ -273,6 +309,15 @@ def main():
     store_history = True
     n_epochs = 10000
     n_jobs = 4
+    encode = 'onehot'
+    strategy = 'quantile'
+    n_bins = 3
+    max_depth = 2
+    n_val_gs = 100
+    tol = 1e-08
+
+    # kwargs = [n_val_gs, max_depth, epsilon, f, n_epochs, tol, screening, 
+    #           store_history]
 
     ######################################################################
     #                  Auto Label Function For Bar Plots
