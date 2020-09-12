@@ -101,7 +101,9 @@ def get_models(X, **kwargs):
             ("scaler", StandardScaler()),
             (
                 "binning",
-                KBinsDiscretizer(n_bins=3, encode="onehot", strategy="quantile"),
+                KBinsDiscretizer(
+                    n_bins=3, encode="onehot", strategy="quantile"
+                ),
             ),
         ]
     )
@@ -116,7 +118,10 @@ def get_models(X, **kwargs):
     categorical_feats = categorical_features(X)
     categorical_transformer = Pipeline(
         steps=[
-            ("imputer", SimpleImputer(strategy="constant", fill_value="missing")),
+            (
+                "imputer",
+                SimpleImputer(strategy="constant", fill_value="missing"),
+            ),
             ("onehot", OneHotEncoder(handle_unknown="ignore")),
         ]
     )
@@ -153,15 +158,25 @@ def get_models(X, **kwargs):
 
     # LassoCV
     models["lasso_cv"] = Pipeline(
-        steps=[("preprocessor", preprocessor), ("regressor", linear_model.LassoCV())]
+        steps=[
+            ("preprocessor", preprocessor),
+            ("regressor", linear_model.LassoCV()),
+        ]
     )
-    tuned_parameters["lasso_cv"] = {"preprocessor__num__binning__n_bins": [2, 3, 4, 5]}
+    tuned_parameters["lasso_cv"] = {
+        "preprocessor__num__binning__n_bins": [2, 3, 4, 5]
+    }
 
     # RidgeCV
     models["ridge_cv"] = Pipeline(
-        steps=[("preprocessor", preprocessor), ("regressor", linear_model.RidgeCV())]
+        steps=[
+            ("preprocessor", preprocessor),
+            ("regressor", linear_model.RidgeCV()),
+        ]
     )
-    tuned_parameters["ridge_cv"] = {"preprocessor__num__binning__n_bins": [2, 3, 4, 5]}
+    tuned_parameters["ridge_cv"] = {
+        "preprocessor__num__binning__n_bins": [2, 3, 4, 5]
+    }
 
     # XGBoost
     xgb = XGBRegressor()
@@ -264,12 +279,18 @@ def compute_gs(X, y, models, tuned_parameters, n_splits, n_jobs=1, **kwargs):
     for name, model in models.items():
         if model != "spp_reg":
             gs = GridSearchCV(
-                model, cv=n_splits, param_grid=tuned_parameters[name], n_jobs=n_jobs
+                model,
+                cv=n_splits,
+                param_grid=tuned_parameters[name],
+                n_jobs=n_jobs,
             )
 
             gs.fit(X, y)
 
-            results_gs = {"best_score": gs.best_score_, "best_params": gs.best_params_}
+            results_gs = {
+                "best_score": gs.best_score_,
+                "best_params": gs.best_params_,
+            }
 
         else:
             kf = KFold(n_splits=n_splits, random_state=None, shuffle=False)
@@ -297,9 +318,12 @@ def compute_gs(X, y, models, tuned_parameters, n_splits, n_jobs=1, **kwargs):
                         gs_list.append(
                             pd.DataFrame(
                                 {
-                                    "n_bins": [n_bins for i in range(len(cv_scores))],
+                                    "n_bins": [
+                                        n_bins for i in range(len(cv_scores))
+                                    ],
                                     "max_depth": [
-                                        max_depth for i in range(len(cv_scores))
+                                        max_depth
+                                        for i in range(len(cv_scores))
                                     ],
                                     "lambda": spp_reg.spp_solutions["lambda"],
                                     "score": cv_scores,
@@ -313,7 +337,9 @@ def compute_gs(X, y, models, tuned_parameters, n_splits, n_jobs=1, **kwargs):
             gs_dataframe = pd.concat(gs_list)
 
             gs_groupby_params = (
-                gs_dataframe.groupby(by=["n_bins", "max_depth", "lambda"])["score"]
+                gs_dataframe.groupby(by=["n_bins", "max_depth", "lambda"])[
+                    "score"
+                ]
                 .mean()
                 .reset_index()
             )
@@ -321,7 +347,8 @@ def compute_gs(X, y, models, tuned_parameters, n_splits, n_jobs=1, **kwargs):
             results_gs = {
                 "best_score": gs_groupby_params["score"].max(),
                 "best_params": gs_groupby_params.loc[
-                    gs_groupby_params["score"] == gs_groupby_params["score"].max(),
+                    gs_groupby_params["score"]
+                    == gs_groupby_params["score"].max(),
                     ["n_bins", "max_depth", "lambda"],
                 ].to_dict(),
             }
@@ -379,8 +406,13 @@ def main():
     #                       Auto Prices Dataset
     #########################################################################
 
-    datasets = ["auto_prices", "lacrimes", "black_friday", "nyc_taxi", 
-                "housing_prices"]
+    datasets = [
+        "auto_prices",
+        "lacrimes",
+        "black_friday",
+        "nyc_taxi",
+        "housing_prices",
+    ]
 
     for i in range(len(datasets)):
         if datasets[i] == "auto_prices":
@@ -439,7 +471,9 @@ def main():
 
         print("gs_scores = ", gs_scores)
         list_gs_scores = []
-        scores = pd.DataFrame({"model": [], "best_cv_score": [], "best_param": []})
+        scores = pd.DataFrame(
+            {"model": [], "best_cv_score": [], "best_param": []}
+        )
 
         execution_time_list = []
         for k, v in gs_scores.items():
