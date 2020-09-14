@@ -81,8 +81,10 @@ def test_SPP():
     strategy = 'quantile'
     n_bins = 3
     max_depth = 2
-    n_val_gs = 10
+    n_lambda = 10
     tol = 1e-08
+    lambda_max_ratio = 0.5
+    n_active_max = 100
 
     X, y = simu(beta, n_samples=n_samples, corr=0.5, for_logreg=False,
                 random_state=rng)
@@ -124,10 +126,12 @@ def test_SPP():
             beta_star_lasso.append(coef)
 
     solutions = \
-        spp_solver(X_binned=X_binned, y=y, n_val_gs=n_val_gs,
+        spp_solver(X_binned=X_binned, y=y, n_lambda=n_lambda,
                    max_depth=max_depth, epsilon=epsilon, f=f,
                    n_epochs=n_epochs,
-                   tol=tol, screening=screening, store_history=store_history)
+                   tol=tol, lambda_max_ratio=lambda_max_ratio, 
+                   n_active_max=n_active_max, screening=screening, 
+                   store_history=store_history)
 
     beta_star_spp = solutions[0]['spp_lasso_slopes']
     active_set_keys_spp = solutions[0]['keys']
@@ -154,13 +158,13 @@ def test_SPP():
             if (key_lasso == key_spp) or (key_lasso.reverse() == key_spp):
                 np.testing.assert_allclose(beta_star_spp[i],
                                            beta_star_lasso[j],
-                                           rtol=1e-08)
+                                           rtol=1e-05)
 
                 equality_test[i] = True
 
                 pass
 
-    if 'False' not in equality_test:
+    if False not in equality_test:
         print('right test : solutions are equal')
     else:
         print('wrong test : solutions are not equal')
