@@ -977,8 +977,8 @@ def spp_solver(X_binned, y,
 
 
 class SPPRegressor():
-    def __init__(self, n_lambda, max_depth, epsilon, f, n_epochs, tol,
-                 screening, store_history):
+    def __init__(self, n_lambda, max_depth, epsilon, f, n_epochs, tol, 
+                 lambda_max_ratio, n_active_max, screening, store_history):
 
         # self.lmbda = lmbda
         self.n_lambda = n_lambda
@@ -987,6 +987,8 @@ class SPPRegressor():
         self.f = f
         self.n_epochs = n_epochs
         self.tol = tol
+        self.lambda_max_ratio = lambda_max_ratio
+        self.n_active_max = n_active_max
         self.screening = screening
         self.store_history = store_history
 
@@ -1011,6 +1013,8 @@ class SPPRegressor():
                                epsilon=self.epsilon,
                                f=self.f, n_epochs=self.n_epochs,
                                tol=self.tol,
+                               lambda_max_ratio=self.lambda_max_ratio,
+                               n_active_max=self.n_active_max,
                                screening=self.screening,
                                store_history=self.store_history)
 
@@ -1046,9 +1050,9 @@ class SPPRegressor():
         X_binned_indptr = X_binned.indptr
 
         n_samples = X_binned.shape[0]
-        # n_lmbdas = n_lambda
-        # y_hat_dict = np.arrays(n_samples, n_lmbdas), 
-        # instead n_lmbdas len(solutions[lmbda])
+        print('dim solutions = ', len(self.spp_solutions))
+        y_hats = np.zeros((n_samples, len(self.spp_solutions)))
+
         for i in range(len(self.spp_solutions)):
             y_hat = np.zeros(n_samples)
             interfeats = []
@@ -1065,9 +1069,9 @@ class SPPRegressor():
 
                 y_hat[interfeat_ind] += slope * np.array(interfeat_data)
 
-            y_hat_dict['y_hat'].append(y_hat)
+            y_hats[i] = y_hat
 
-        return y_hat_dict
+        return y_hats
 
     def score(self, X, y):
         """Compute the cross-validation score to assess the performance of the
@@ -1087,9 +1091,9 @@ class SPPRegressor():
             chosen metric : R-sqare
         """
 
-        y_hat_dict = self.predict(X)
+        y_hats = self.predict(X)
         cv_scores = []
-        for y_hat in y_hat_dict['y_hat']:
+        for y_hat in y_hats:
             u = ((y - y_hat) ** 2).sum()
             v = ((y - np.mean(y)) ** 2).sum()
             score = 1 - u / v
@@ -1114,6 +1118,8 @@ def main():
     max_depth = 2
     n_lambda = 100
     tol = 1e-08
+    lambda_max_ratio = 0.5
+    n_active_max = 100
 
     X, y = simu(beta, n_samples=n_samples, corr=0.5, for_logreg=False,
                 random_state=rng)
@@ -1204,20 +1210,22 @@ def main():
     #################################################################
     #                   Test for SPP function
     #################################################################
-    solutions = \
-        spp_solver(X_binned, y=y, n_lambda=n_lambda,
-                   max_depth=max_depth, epsilon=epsilon, f=f,
-                   n_epochs=n_epochs, tol=tol, screening=screening,
-                   store_history=store_history)
+    # solutions = \
+    #     spp_solver(X_binned, y=y, n_lambda=n_lambda,
+    #                max_depth=max_depth, epsilon=epsilon, f=f,
+    #                n_epochs=n_epochs, tol=tol, 
+    #                lambda_max_ratio=lambda_max_ratio,
+    #                n_active_max=n_active_max, screening=screening,
+    #                store_history=store_history)
 
-    print('solutions = ', solutions)
-    print('length solutions = ', len(solutions))
-    print('lmbda = ', solutions[0]['lambda'])
-    print('data = ', solutions[0]['data'])
-    print('ind = ', solutions[0]['ind'])
-    print('indptr = ', solutions[0]['indptr'])
-    print('keys = ', solutions[0]['keys'])
-    print('slopes = ', solutions[0]['spp_lasso_slopes'])
+    # print('solutions = ', solutions)
+    # print('length solutions = ', len(solutions))
+    # print('lmbda = ', solutions[0]['lambda'])
+    # print('data = ', solutions[0]['data'])
+    # print('ind = ', solutions[0]['ind'])
+    # print('indptr = ', solutions[0]['indptr'])
+    # print('keys = ', solutions[0]['keys'])
+    # print('slopes = ', solutions[0]['spp_lasso_slopes'])
 
     #################################################################
     #                     Test Class SPP Solver
@@ -1236,12 +1244,14 @@ def main():
     lmbda = 0.2481874128375465
     spp_reg = SPPRegressor(n_lambda=n_lambda,
                            max_depth=max_depth,
-                           epsilon=epsilon, f=f, n_epochs=n_epochs, tol=tol,
+                           epsilon=epsilon, f=f, n_epochs=n_epochs, tol=tol, 
+                           lambda_max_ratio=lambda_max_ratio, 
+                           n_active_max=n_active_max,
                            screening=screening, store_history=store_history)
 
     solver = spp_reg.fit(X_binned, y)
-    y_hat_dict = spp_reg.predict(X_binned)
-    # print('y_hat_dict = ', y_hat_dict)
+    y_hats = spp_reg.predict(X_binned)
+    print('y_hats = ', y_hats)
     cv_scores = spp_reg.score(X_binned, y)
     print('cv_scores = ', cv_scores)
 
