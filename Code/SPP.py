@@ -1051,7 +1051,8 @@ class SPPRegressor():
 
         n_samples = X_binned.shape[0]
         print('dim solutions = ', len(self.spp_solutions))
-        y_hats = np.zeros((n_samples, len(self.spp_solutions)))
+        # y_hats = np.zeros((n_samples, len(self.spp_solutions)))
+        y_hats = [0] * len(self.spp_solutions)
 
         for i in range(len(self.spp_solutions)):
             y_hat = np.zeros(n_samples)
@@ -1071,6 +1072,7 @@ class SPPRegressor():
 
             y_hats[i] = y_hat
 
+        y_hats = np.array(y_hats)
         return y_hats
 
     def score(self, X, y):
