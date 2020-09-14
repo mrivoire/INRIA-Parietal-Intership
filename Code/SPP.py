@@ -700,8 +700,10 @@ def from_key_to_interactions_feature(csc_data, csc_ind, csc_indptr,
 
 # @njit
 def spp_solver(X_binned, y,
-               n_val_gs, max_depth, epsilon, f, n_epochs, tol, screening=True,
+               n_lambda, max_depth, epsilon, f, n_epochs, tol, 
+               lambda_max_ratio, n_active_max, screening=True, 
                store_history=True):
+               # n_lmbda = n_lambda, lmbda_max_ratio, n_active_max
     """Safe Patterns Pruning Algorithm
        Scan the tree from the root to the leaves and prunes out the subtrees
        which statisfie the SPPC(t) criterion
@@ -743,13 +745,16 @@ def spp_solver(X_binned, y,
 
     beta_hat_t = np.zeros(n_features)
 
-    # lmbdas_grid = np.logspace(start=0, stop=lambda_max, num=n_val_gs,
+    # lmbdas_grid = np.logspace(start=0, stop=lambda_max, num=n_lambda,
     #                           endpoint=True, base=10.0, dtype=None, axis=0)
 
     # test on only one value of lambda which is lower than lambda_max
     # if lambda is greater than lambda max then all the nodes of the features
     # tree are pruned out and the active set is empty.
-    lmbdas_grid = lambda_max/2*np.logspace(start=0, stop=-2, num=n_val_gs)
+    lmbdas_grid = ((lambda_max * lambda_max_ratio) 
+                   * np.logspace(start=0, stop=-2, num=n_lambda))
+    # add an argument lmbda_0_ratio (= 1/2 for istance) to always keep lmbda_max
+    # x np.logspace()
 
     # Create a grid starting from lmbda_max to lmbda_max / 100
     # lmbda max has not to be too small otherwise we obtain too many features
@@ -944,6 +949,9 @@ def spp_solver(X_binned, y,
             solutions_dict['keys'] = active_set_keys
             solutions_dict['spp_lasso_slopes'] = beta_hat_t_sparse
 
+            if len(active_set_indptr_csc) + 1 >= n_active_max:
+                break
+
         solutions.append(solutions_dict)
 
     return solutions
@@ -969,11 +977,11 @@ def spp_solver(X_binned, y,
 
 
 class SPPRegressor():
-    def __init__(self, n_val_gs, max_depth, epsilon, f, n_epochs, tol,
+    def __init__(self, n_lambda, max_depth, epsilon, f, n_epochs, tol,
                  screening, store_history):
 
         # self.lmbda = lmbda
-        self.n_val_gs = n_val_gs
+        self.n_lambda = n_lambda
         self.max_depth = max_depth
         self.epsilon = epsilon
         self.f = f
@@ -998,7 +1006,7 @@ class SPPRegressor():
             target vector
         """
         solutions = spp_solver(X_binned.tocsc(), y=y,
-                               n_val_gs=self.n_val_gs,
+                               n_lambda=self.n_lambda,
                                max_depth=self.max_depth,
                                epsilon=self.epsilon,
                                f=self.f, n_epochs=self.n_epochs,
@@ -1038,7 +1046,9 @@ class SPPRegressor():
         X_binned_indptr = X_binned.indptr
 
         n_samples = X_binned.shape[0]
-        y_hat_dict = {'lambda': [], 'y_hat': []}
+        # n_lmbdas = n_lambda
+        # y_hat_dict = np.arrays(n_samples, n_lmbdas), 
+        # instead n_lmbdas len(solutions[lmbda])
         for i in range(len(self.spp_solutions)):
             y_hat = np.zeros(n_samples)
             interfeats = []
@@ -1055,7 +1065,6 @@ class SPPRegressor():
 
                 y_hat[interfeat_ind] += slope * np.array(interfeat_data)
 
-            y_hat_dict['lambda'].append(self.spp_solutions[i]['lambda'])
             y_hat_dict['y_hat'].append(y_hat)
 
         return y_hat_dict
@@ -1103,7 +1112,7 @@ def main():
     strategy = 'quantile'
     n_bins = 3
     max_depth = 2
-    n_val_gs = 100
+    n_lambda = 100
     tol = 1e-08
 
     X, y = simu(beta, n_samples=n_samples, corr=0.5, for_logreg=False,
@@ -1196,7 +1205,7 @@ def main():
     #                   Test for SPP function
     #################################################################
     solutions = \
-        spp_solver(X_binned, y=y, n_val_gs=n_val_gs,
+        spp_solver(X_binned, y=y, n_lambda=n_lambda,
                    max_depth=max_depth, epsilon=epsilon, f=f,
                    n_epochs=n_epochs, tol=tol, screening=screening,
                    store_history=store_history)
@@ -1225,7 +1234,7 @@ def main():
     X_binned = enc.fit_transform(X)
 
     lmbda = 0.2481874128375465
-    spp_reg = SPPRegressor(n_val_gs=n_val_gs,
+    spp_reg = SPPRegressor(n_lambda=n_lambda,
                            max_depth=max_depth,
                            epsilon=epsilon, f=f, n_epochs=n_epochs, tol=tol,
                            screening=screening, store_history=store_history)
