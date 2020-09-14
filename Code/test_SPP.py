@@ -108,13 +108,13 @@ def test_SPP():
                                   X_binned_indptr=X_binned_indptr,
                                   residuals=y, max_depth=max_depth)
 
-    lmbda = lambda_max / 1000
+    lmbda = lambda_max / 2
 
     sparse_lasso_sklearn = sklearn_Lasso(alpha=(lmbda / X_tilde.shape[0]),
                                          fit_intercept=False,
                                          normalize=False,
                                          max_iter=n_epochs,
-                                         tol=1e-14).fit(X_tilde, y)
+                                         tol=tol).fit(X_tilde, y)
 
     beta_star_lasso = []
     active_set_keys_lasso = []
@@ -135,7 +135,7 @@ def test_SPP():
     assert len(active_set_keys_spp) == len(beta_star_spp)
     assert len(active_set_keys_spp) == len(active_set_keys_lasso)
     assert len(beta_star_spp) == len(beta_star_lasso)
-    
+
     print('length active_set_keys_spp = ', len(active_set_keys_spp))
     print('length beta_star_spp = ', len(beta_star_spp))
     print('NNZ beta_star_lasso = ', np.count_nonzero(beta_star_lasso))
@@ -152,11 +152,11 @@ def test_SPP():
             key_spp = list(key_spp)
 
             if (key_lasso == key_spp) or (key_lasso.reverse() == key_spp):
-                np.testing.assert_allclose(beta_star_spp[i], 
+                np.testing.assert_allclose(beta_star_spp[i],
                                            beta_star_lasso[j],
                                            rtol=1e-08)
 
-                equality_test.append(True)
+                equality_test[i] = True
 
                 pass
 

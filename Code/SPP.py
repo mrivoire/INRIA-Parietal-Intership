@@ -749,11 +749,9 @@ def spp_solver(X_binned, y,
     # test on only one value of lambda which is lower than lambda_max
     # if lambda is greater than lambda max then all the nodes of the features
     # tree are pruned out and the active set is empty.
-    # lmbdas_grid = [lambda_max / 1000]
-    lmbdas_grid = np.linspace(start=(lambda_max / 2), stop=(lambda_max / 20), 
-                              num=n_val_gs, endpoint=True, 
-                              retstep=False, dtype=None, axis=0)
-    # Create a grid starting from lmbda_max to lmbda_max / 20 
+    lmbdas_grid = lambda_max/2*np.logspace(start=0, stop=-2, num=n_val_gs)
+
+    # Create a grid starting from lmbda_max to lmbda_max / 100
     # lmbda max has not to be too small otherwise we obtain too many features
     # find a bettter initialization
     # active_set = List([List([0])])
@@ -856,8 +854,6 @@ def spp_solver(X_binned, y,
             solutions_dict['keys'] = active_set_keys
             solutions_dict['spp_lasso_slopes'] = beta_hat_t
 
-            return solutions
-
         else:
             # Safe Prune after pre-solve:
             # epoch == 0 => first perform spp then launch the solver with
@@ -890,11 +886,11 @@ def spp_solver(X_binned, y,
                 safe_sphere_center=safe_sphere_center,
                 safe_sphere_radius=safe_sphere_radius, max_depth=max_depth)
 
-            # Convert safe_set_data, safe_set_ind and safe_set_key which are list
-            # of lists numba into csc attributs
+            # Convert safe_set_data, safe_set_ind and safe_set_key which are
+            # list  of lists numba into csc attributs
 
-            # To convert safe_set_data which is a numba list of lists we just have
-            # to flatten the numba list as follows
+            # To convert safe_set_data which is a numba list of lists we just
+            # have to flatten the numba list as follows
 
             safe_set_data_csc, safe_set_ind_csc, safe_set_indptr_csc = \
                 from_numbalists_tocsc(safe_set_data, safe_set_ind)
@@ -905,7 +901,8 @@ def spp_solver(X_binned, y,
             # la matrice sparse correspond à une matrice csc
             # ensuite construire les 3 attributs data, ind et indptr
             # ou déterminer directement data, ind et indptr
-            # essayer de retourner directement data, ind et indptr dans safe_prune
+            # essayer de retourner directement data, ind et indptr dans
+            # safe_prune
 
             # ou réécrire sparse_cd avec des listes de listes numba
             # list_data, list_ind, list_indptr
@@ -914,17 +911,20 @@ def spp_solver(X_binned, y,
              n_active_features, theta, P_lmbda, D_lmbda, G_lmbda,
              safeset_membership) = sparse_cd(
                 X_data=safe_set_data_csc, X_indices=safe_set_ind_csc,
-                X_indptr=safe_set_indptr_csc, y=y, lmbda=lmbda_t, epsilon=epsilon,
-                f=f, n_epochs=n_epochs, screening=screening,
+                X_indptr=safe_set_indptr_csc, y=y, lmbda=lmbda_t,
+                epsilon=epsilon, f=f, n_epochs=n_epochs, screening=screening,
                 store_history=store_history)
+
+            print('beta_hat_t: ', beta_hat_t)
+            print('sum of safeset_membership: ', sum(safeset_membership))
 
             active_set_data = List([List([0.])])
             active_set_ind = List([List([0])])
             active_set_keys = List([List([0])])
             beta_hat_t_sparse = []
 
-            for idx, membership in enumerate(safeset_membership):
-                if membership:
+            for idx, beta in enumerate(beta_hat_t):
+                if beta != 0:
                     active_set_data.append(safe_set_data[idx])
                     active_set_ind.append(safe_set_ind[idx])
                     active_set_keys.append(safe_set_key[idx])
@@ -944,24 +944,28 @@ def spp_solver(X_binned, y,
             solutions_dict['keys'] = active_set_keys
             solutions_dict['spp_lasso_slopes'] = beta_hat_t_sparse
 
-            solutions.append(solutions_dict)
+        solutions.append(solutions_dict)
 
-            return solutions
+    return solutions
 
 # Faire un objet "solution" avec en attribut lambda, beta, active_set_data,
 # active_set_ind, active_set_indptr, active_set_keys
 # retourner une liste d'objets solution (un pour chaque lambda)
 # retourner un dictionnaire de dictionnaires avec comme clés : beta, data, ind,
 # indptr, keys
-# Exemple tirer en 2 dimensions aléatoirement des points entre 0 et 1 et ensuite
-# classifier entre noir (y = 1) et blanc (y = 0)
-# écrire un estimateur spp à la scikit learn avec une fonction predict (sous forme de classe comme pour le Lasso)
-# store dans les attributs de la classe les keys, data, ind, indptr et qui est capable de les retourner
-# écrire les tests associés
+# Exemple tirer en 2 dimensions aléatoirement des points entre 0 et 1 et
+# ensuite classifier entre noir (y = 1) et blanc (y = 0)
+# écrire un estimateur spp à la scikit learn avec une fonction predict
+# (sous forme de classe comme pour le Lasso)
+# store dans les attributs de la classe les keys, data, ind, indptr et qui est
+# capable de les retourner écrire les tests associés
 # puis faire tourner les tests sur les datasets
 # commencer par housing_prices (car plus petit), stopper max_depth à 3, 4
-# lire le papier de la review d'Alex Safe rule fit (pour la littérature de nos travaux)
-# feedback sur le paper (qu'est-ce qui est similaire et qu'est ce qui est différent par rapport à ce que je fais)
+# lire le papier de la review d'Alex Safe rule fit
+# (pour la littérature de nos travaux)
+# feedback sur le paper
+# (qu'est-ce qui est similaire et qu'est ce qui est différent par rapport à ce
+# que je fais)
 
 
 class SPPRegressor():
@@ -1026,7 +1030,7 @@ class SPPRegressor():
             predicted target vector
         """
 
-        # itérer sur les solutions et calculer le y_hat 
+        # itérer sur les solutions et calculer le y_hat
         # renvoyer une liste de y_hat pour chaque lmbda
         X_binned = X_binned.tocsc()
         X_binned_data = X_binned.data
@@ -1038,7 +1042,7 @@ class SPPRegressor():
         for i in range(len(self.spp_solutions)):
             y_hat = np.zeros(n_samples)
             interfeats = []
-            for key, slope in zip(self.spp_solutions[i]['keys'], 
+            for key, slope in zip(self.spp_solutions[i]['keys'],
                                   self.spp_solutions[i]['spp_lasso_slopes']):
 
                 interfeat_data, interfeat_ind = \
