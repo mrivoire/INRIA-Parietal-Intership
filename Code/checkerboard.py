@@ -3,13 +3,14 @@ import pandas as pd
 import matplotlib.pyplot as plt
 
 from matplotlib.colors import ListedColormap
+from matplotlib.pyplot import savefig
 from sklearn.preprocessing import KBinsDiscretizer
 from sklearn.model_selection import train_test_split
 from sklearn.linear_model import Lasso
 from sklearn.preprocessing import PolynomialFeatures
 from sklearn.pipeline import make_pipeline
 
-from SPP import SPPRegressor
+from SPP import SPPRegressor, max_val
 
 
 # def compute_quantiles(x1, x2, n_bins):
@@ -325,13 +326,14 @@ def plot_est(est, X, y, X_train, y_train, X_test, y_test):
     ax.set_ylim(yy.min(), yy.max())
     ax.set_xticks(())
     ax.set_yticks(())
-
     est.fit(X_train, y_train)
     Z = est.predict(np.c_[xx.ravel(), yy.ravel()])
 
     # Put the result into a color plot
     Z = Z.reshape(xx.shape)
     ax.contourf(xx, yy, Z, cmap=cm, alpha=.8)
+    print("Z = ", Z)
+    print("Z length = ", np.count_nonzero(Z))
 
     # Plot the training points
     ax.scatter(X_train[:, 0], X_train[:, 1], c=y_train, cmap=cm_bright,
@@ -346,12 +348,12 @@ def plot_est(est, X, y, X_train, y_train, X_test, y_test):
     ax.set_yticks(())
     plt.show()
 
-
+# save fig en pdf 
 def main():
     dim1 = 10
     dim2 = 10
     n_bins = 5
-    n_samples = 1000
+    n_samples = 100
 
     X, y = checkerboard(dim1=dim1, dim2=dim2, n_samples=n_samples,
                         n_bins=n_bins)
@@ -365,20 +367,37 @@ def main():
     screening = True
     store_history = True
     max_depth = 2
-    n_val_gs = 10
+    n_lambda = 10
     tol = 1e-08
     lmbda = 0.00001
     encode = 'onehot'
     strategy = 'quantile'
+    lambda_max_ratio = 0.5
+    n_active_max = 100
+    lambdas = [0.5]
+    
+    enc = KBinsDiscretizer(n_bins=n_bins, encode=encode, strategy=strategy)
+    X_binned_train = enc.fit_transform(X_train).tocsc()
 
-    spp_reg = SPPRegressor(lmbda=lmbda, n_val_gs=n_val_gs,
+    spp_reg = SPPRegressor(n_lambda=n_lambda,
+                           lambdas=lambdas,
                            max_depth=max_depth,
                            epsilon=epsilon, f=f, n_epochs=n_epochs, tol=tol,
-                           screening=screening, store_history=store_history)
+                           lambda_max_ratio=lambda_max_ratio, 
+                           n_active_max=n_active_max, screening=screening, 
+                           store_history=store_history)
 
-    enc = KBinsDiscretizer(n_bins=n_bins, encode=encode, strategy=strategy)
+    solutions = spp_reg.fit(X_binned=X_binned_train, y=y_train).spp_solutions
+    print('solutions = ', solutions)
+    print('solutions length = ', len(solutions))
+    slopes = solutions[0]['spp_lasso_slopes']
+    print('slopes = ', slopes)
+    print('slopes length = ', len(slopes))
 
-    # X_binned = enc.fit_transform(X_train).tocsc()
+    X_binned_test = enc.fit_transform(X_test).tocsc()
+    y_hats = spp_reg.predict(X_binned=X_binned_test)
+    print('y_hats = ', y_hats)
+    print('y_hats length = ', len(y_hats))
 
     # spp_reg.fit(X_binned=X_binned, y=y_train)
 
@@ -393,7 +412,7 @@ def main():
     #     Lasso(alpha=0.01)
     # )
     # plot_est(est, X, y, X_train, y_train, X_test, y_test)
-
+    
 
 if __name__ == "__main__":
     main()
