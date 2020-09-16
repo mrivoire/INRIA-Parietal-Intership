@@ -125,8 +125,9 @@ def test_SPP():
             active_set_keys_lasso.append(X_tilde_keys[i])
             beta_star_lasso.append(coef)
 
+    lambdas=[lmbda]
     solutions = \
-        spp_solver(X_binned=X_binned, y=y, n_lambda=n_lambda,
+        spp_solver(X_binned=X_binned, y=y, n_lambda=n_lambda, lambdas=lambdas,
                    max_depth=max_depth, epsilon=epsilon, f=f,
                    n_epochs=n_epochs,
                    tol=tol, lambda_max_ratio=lambda_max_ratio, 
