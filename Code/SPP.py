@@ -700,7 +700,7 @@ def from_key_to_interactions_feature(csc_data, csc_ind, csc_indptr,
 
 # @njit
 def spp_solver(X_binned, y,
-               n_lambda, max_depth, epsilon, f, n_epochs, tol, 
+               n_lambda, lambdas, max_depth, epsilon, f, n_epochs, tol, 
                lambda_max_ratio, n_active_max, screening=True, 
                store_history=True):
                # n_lmbda = n_lambda, lmbda_max_ratio, n_active_max
@@ -722,7 +722,7 @@ def spp_solver(X_binned, y,
     # compute lambda_max with max_val with beta = 0 and decrease it with a
     # logarithmic step
     # on part de lmbda_max et on décroit d'un pas logarithmic
-    # en entrée remplacer la lmbdas_grid par le nombre de lmbdas à tester
+    # en entrée remplacer la lambdas_grid par le nombre de lmbdas à tester
 
     X_binned_data = X_binned.data
     X_binned_indices = X_binned.indices
@@ -745,14 +745,16 @@ def spp_solver(X_binned, y,
 
     beta_hat_t = np.zeros(n_features)
 
-    # lmbdas_grid = np.logspace(start=0, stop=lambda_max, num=n_lambda,
-    #                           endpoint=True, base=10.0, dtype=None, axis=0)
-
     # test on only one value of lambda which is lower than lambda_max
     # if lambda is greater than lambda max then all the nodes of the features
     # tree are pruned out and the active set is empty.
-    lmbdas_grid = ((lambda_max * lambda_max_ratio) 
-                   * np.logspace(start=0, stop=-2, num=n_lambda))
+
+    if lambdas is None:
+        lambdas_grid = np.logspace(np.log10(lambda_max * lambda_max_ratio), 
+                                   np.log10(lambda_max), num=n_lambda)[::-1]
+    else:
+        lambdas_grid = np.sort(lambdas)[::-1]
+                   
     # add an argument lmbda_0_ratio (= 1/2 for istance) to always keep lmbda_max
     # x np.logspace()
 
@@ -783,7 +785,7 @@ def spp_solver(X_binned, y,
 
     solutions = []
 
-    for lmbda_t in lmbdas_grid:
+    for lmbda_t in lambdas_grid:
 
         print('lmbda_t = ', lmbda_t)
         # Pre-solve : solve the optimization problem with the new lambda on
@@ -977,11 +979,13 @@ def spp_solver(X_binned, y,
 
 
 class SPPRegressor():
-    def __init__(self, n_lambda, max_depth, epsilon, f, n_epochs, tol, 
+    def __init__(self, n_lambda, lambdas, max_depth, epsilon, f, n_epochs, tol, 
                  lambda_max_ratio, n_active_max, screening, store_history):
-
+        # quel est le plus petit lmbda qu'on s'autorise à chercher
+        # goal : solver ayant les memes perfs en étant plus rapides
         # self.lmbda = lmbda
         self.n_lambda = n_lambda
+        self.lambdas = lambdas 
         self.max_depth = max_depth
         self.epsilon = epsilon
         self.f = f
@@ -1009,6 +1013,7 @@ class SPPRegressor():
         """
         solutions = spp_solver(X_binned.tocsc(), y=y,
                                n_lambda=self.n_lambda,
+                               lambdas=self.lambdas,
                                max_depth=self.max_depth,
                                epsilon=self.epsilon,
                                f=self.f, n_epochs=self.n_epochs,
@@ -1044,15 +1049,15 @@ class SPPRegressor():
 
         # itérer sur les solutions et calculer le y_hat
         # renvoyer une liste de y_hat pour chaque lmbda
-        X_binned = X_binned.tocsc()
+        tolX_binned = X_binned.tocsc()
         X_binned_data = X_binned.data
         X_binned_ind = X_binned.indices
         X_binned_indptr = X_binned.indptr
 
         n_samples = X_binned.shape[0]
+        print('n_samples = ', n_samples)
         print('dim solutions = ', len(self.spp_solutions))
-        # y_hats = np.zeros((n_samples, len(self.spp_solutions)))
-        y_hats = [0] * len(self.spp_solutions)
+        y_hats = np.zeros((n_samples, len(self.spp_solutions)))
 
         for i in range(len(self.spp_solutions)):
             y_hat = np.zeros(n_samples)
@@ -1070,9 +1075,10 @@ class SPPRegressor():
 
                 y_hat[interfeat_ind] += slope * np.array(interfeat_data)
 
-            y_hats[i] = y_hat
+            y_hats[:, i] = y_hat
+            print('shape y_hat = ', y_hat.shape)
+            print('n_samples = ', n_samples)
 
-        y_hats = np.array(y_hats)
         return y_hats
 
     def score(self, X, y):
@@ -1118,7 +1124,8 @@ def main():
     strategy = 'quantile'
     n_bins = 3
     max_depth = 2
-    n_lambda = 100
+    n_lambda = 1
+    # if n_lmbda is none otherwise list lmbdas 
     tol = 1e-08
     lambda_max_ratio = 0.5
     n_active_max = 100
@@ -1213,7 +1220,7 @@ def main():
     #                   Test for SPP function
     #################################################################
     # solutions = \
-    #     spp_solver(X_binned, y=y, n_lambda=n_lambda,
+    #     spp_solver(X_binned, y=y, n_lambda=n_lambda, lambdas=lambdas,
     #                max_depth=max_depth, epsilon=epsilon, f=f,
     #                n_epochs=n_epochs, tol=tol, 
     #                lambda_max_ratio=lambda_max_ratio,
@@ -1233,18 +1240,21 @@ def main():
     #                     Test Class SPP Solver
     #################################################################
 
-    # lmbda_max, max_key = max_val(X_binned_data=X_binned_data,
-    #                              X_binned_indices=X_binned_indices,
-    #                              X_binned_indptr=X_binned_indptr,
-    #                              residuals=residuals, max_depth=max_depth)
+    lmbda_max, max_key = max_val(X_binned_data=X_binned_data,
+                                 X_binned_indices=X_binned_indices,
+                                 X_binned_indptr=X_binned_indptr,
+                                 residuals=residuals, max_depth=max_depth)
 
+    # lambdas = [lmbda_max * lambda_max_ratio]
+    lambdas =[0.5]
     # Binning process
     enc = KBinsDiscretizer(n_bins=n_bins, encode=encode,
                            strategy=strategy)
     X_binned = enc.fit_transform(X)
 
-    lmbda = 0.2481874128375465
+    # lmbda = 0.2481874128375465
     spp_reg = SPPRegressor(n_lambda=n_lambda,
+                           lambdas=lambdas,
                            max_depth=max_depth,
                            epsilon=epsilon, f=f, n_epochs=n_epochs, tol=tol, 
                            lambda_max_ratio=lambda_max_ratio, 
@@ -1254,8 +1264,10 @@ def main():
     solver = spp_reg.fit(X_binned, y)
     y_hats = spp_reg.predict(X_binned)
     print('y_hats = ', y_hats)
-    cv_scores = spp_reg.score(X_binned, y)
-    print('cv_scores = ', cv_scores)
+    print('y_hats shape = ', y_hats.shape)
+    print('non-zeros elemnts of y_hats = ', np.count_nonzero(y_hats))
+    # cv_scores = spp_reg.score(X_binned, y)
+    # print('cv_scores = ', cv_scores)
 
 if __name__ == "__main__":
     main()
