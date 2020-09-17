@@ -13,138 +13,6 @@ from sklearn.pipeline import make_pipeline
 from SPP import SPPRegressor, max_val
 
 
-# def compute_quantiles(x1, x2, n_bins):
-#     """
-#     Parameters
-#     ----------
-#     x1: list of floats
-#         list of coordinates of the observations in the first dimension
-
-#     x2: list of floats
-#         list of coordinates of the observations in the second dimension
-
-#     n_bins: int
-#         number of bins (and then of quantiles) that we want to create in each
-#         dimension
-
-#     Returns
-#     -------
-#     quantiles_dim1_idx: list of ints
-#         list containing the indices of the cut points delineating the quantiles 
-#         in the series of coordinates in the first dimension
-
-#     quantiles_dim2_idx: list of ints
-#         list containing the indices of the cut points delineating the quantiles
-#         in the series of coordinates in the second dimension
-
-#     quantiles_dim1_val: list of floats
-#         list containing the values of the cut points delineating the quantiles 
-#         in the series of coordinates in the first dimension
-
-#     quantiles_dim2_val: list of floats
-#         list containing the values of the cut points delineating the quantiles 
-#         int the series of coordinates in the second dimension
-
-#     """
-
-#     sorted_x1 = x1.sort()
-#     sorted_x2 = x2.sort()
-
-#     n_obs_quantile_dim1 = int(len(x1) / n_bins)
-#     n_obs_quantile_dim2 = int(len(x2) / n_bins)
-
-#     quantiles_dim1_idx = []
-#     quantiles_dim2_idx = []
-#     quantiles_dim1_val = []
-#     quantiles_dim2_val = []
-
-#     for q in range(n_bins):
-#         q_quantile_dim1_idx = q * n_obs_quantile_dim1 + 1
-#         q_quantile_dim2_idx = q * n_obs_quantile_dim2 + 1
-#         print('q_quantile_dim1_idx = ', q_quantile_dim1_idx)
-#         print('q_quantile_dim2_idx = ', q_quantile_dim2_idx)
-
-#         quantiles_dim1_idx.append(q_quantile_dim1_idx)
-#         quantiles_dim2_idx.append(q_quantile_dim2_idx)
-
-#         print('quantiles_dim1_idx = ', quantiles_dim1_idx)
-#         print('quantiles_dim2_idx = ', quantiles_dim2_idx)
-        
-#         q_quantile_dim1_val = sorted_x1[q_quantile_dim1_idx]
-#         q_quantile_dim2_val = sorted_x2[q_quantile_dim2_idx]
-
-#         print('q_quantile_dim1_val = ', q_quantile_dim1_val)
-#         print('q_quantile_dim2_val = ', q_quantile_dim2_val)
-
-#         quantiles_dim1_val.append(q_quantile_dim1_val)
-#         quantiles_dim2_val.append(q_quantile_dim2_val)
-
-#     return (quantiles_dim1_val, quantiles_dim2_val, quantiles_dim1_idx, 
-#             quantiles_dim2_idx)
-
-
-# def decision_function_quantilestrat(coord1, coord2, x1, x2, dim1, dim2, n_bins):
-#     """
-#     Parameters
-#     ----------
-#     coord1: float
-#         coordinate of the given sample x
-
-#     coord2: float
-#         coordinate of the given sample x
-
-#     x1: list of floats 
-#         list of coordinates of the observations in the first dimension 
-
-#     x2: list of floats
-#         list of coordinates of the observations in the second dimension 
-
-#     dim1: int
-#         range of values for the first dimension
-
-#     dim2: int
-#         range of values for the second dimension
-
-#     n_bins: int
-#         number of bins (and then of quantiles) created in each dimension
-
-#     Returns
-#     -------
-#     y: int
-#         target variable with binary values :
-#         1 if the floor in the Euclidean division of the coordinates in the
-#         first and in the second dimension have the same parity
-#         (both even or both odds)
-#         0 otherwise
-#     """
-
-#     (quantiles_dim1_val, quantiles_dim2_val, quantiles_dim1_idx, 
-#      quantiles_dim2_idx) = \
-#         compute_quantiles(x1=x1, x2=x2, n_bins=n_bins)
-
-#     quantile_num_coord1 = 0
-#     quantile_num_coord2 = 0
-
-#     for num, quantile_val in enumerate(quantiles_dim1_val):
-#         if coord1 < quantile_val:
-#             pass
-#         else:
-#             quantile_num_coord1 = num - 1
-
-#     for num, quantile_val in enumerate(quantiles_dim2_val):
-#         if x2 < quantile_val:
-#             pass
-#         else:
-#             quantile_num_coord2 = num - 1
-
-#     if (quantile_num_coord1 % 2) == (quantile_num_coord2 % 2):
-#         y = 1
-#     else:
-#         y = -1
-
-#     return y
-
-
 def decision_function_uniformstrat(x1, x2, dim1, dim2, n_bins):
     """
     Parameters
@@ -253,10 +121,6 @@ def checkerboard(dim1, dim2, n_samples, n_bins):
     x1 = rng.rand(n_samples) * dim1
     x2 = rng.rand(n_samples) * dim2
 
-    data = {'x1': [],
-            'x2': [],
-            'y': []}
-
     # From the list of coordinates of the 2 dimensions we create samples by
     # attributing to each sample the coordinates of same index in the lists
     # Then for each sample of coordinates (x1, x2), we classify the sample
@@ -282,26 +146,7 @@ def checkerboard(dim1, dim2, n_samples, n_bins):
     y = [decision_function_uniformstrat(x1=u, x2=v, dim1=dim1, dim2=dim2, 
          n_bins=n_bins) for u, v in zip(x1, x2)]
 
-    # for idx in range(n_samples):
-    #     x1coor = x1[idx]
-    #     x2coor = x2[idx]
-
-    #     y = decision_function_uniformstrat(x1=x1coor, x2=x2coor, dim1=dim1,
-    #                           dim2=dim2, n_bins=n_bins)
-
-    #     data['x1'].append(x1coor)
-    #     data['x2'].append(x2coor)
-    #     data['y'].append(y)
-
-    data['x1'] = x1
-    data['x2'] = x2
-    data['y'] = y
-
-    data = pd.DataFrame(data)
-    X = data[['x1', 'x2']].values
-    y = data['y'].values.astype(float)
-
-    return X, y
+    return np.c_[x1, x2], y
 
 
 def plot_est(est, X, y, X_train, y_train, X_test, y_test):
@@ -387,7 +232,7 @@ def main():
                            n_active_max=n_active_max, screening=screening, 
                            store_history=store_history)
 
-    solutions = spp_reg.fit(X_binned=X_binned_train, y=y_train).spp_solutions
+    solutions = spp_reg.fit(X_binned=X_binned_train, y=y_train).solutions_
     print('solutions = ', solutions)
     print('solutions length = ', len(solutions))
     slopes = solutions[0]['spp_lasso_slopes']
@@ -399,9 +244,8 @@ def main():
     print('y_hats = ', y_hats)
     print('y_hats length = ', len(y_hats))
 
-    # spp_reg.fit(X_binned=X_binned, y=y_train)
-
-    # print(f'R2 score: {spp_reg.score(X_binned, y_train)}')
+    print(f'R2 score (train): {spp_reg.score(X_binned_train, y_train)}')
+    print(f'R2 score (test): {spp_reg.score(X_binned_test, y_test)}')
 
     est = make_pipeline(enc, spp_reg)
     plot_est(est, X, y, X_train, y_train, X_test, y_test)

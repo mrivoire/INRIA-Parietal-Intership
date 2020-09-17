@@ -5,6 +5,7 @@ from numba import njit
 from numba.typed import List
 from sklearn.preprocessing import KBinsDiscretizer
 from sklearn.linear_model import Lasso
+from sklearn.metrics import r2_score
 from sklearn.utils import check_random_state
 from cd_solver_lasso_numba import sparse_cd
 
@@ -1001,16 +1002,20 @@ class SPPRegressor():
 
     def fit(self, X_binned, y):
         """Fit the data (X, y) based on the solver of the SPP class
+
         Parameters
         ----------
         X: numpy.ndarray, shape = (n_samples, n_features)
             features matrix
 
-        Returns
-        -------
         y: numpy.array, shape = (n_samples, )
             target vector
+
+        Returns
+        -------
+        self
         """
+        y = np.array(y, dtype=float)
         solutions = spp_solver(X_binned.tocsc(), y=y,
                                n_lambda=self.n_lambda,
                                lambdas=self.lambdas,
@@ -1023,13 +1028,7 @@ class SPPRegressor():
                                screening=self.screening,
                                store_history=self.store_history)
 
-        self.spp_solutions = solutions
-        # remove this part to keep for all lmbdas
-        # self.spp_lasso_slopes = solutions[0]['spp_lasso_slopes']
-        # self.activeset_keys = solutions[0]['keys']
-        # self.activeset_data = solutions[0]['data']
-        # self.activeset_ind = solutions[0]['ind']
-        # self.activeset_indptr = solutions[0]['indptr']
+        self.solutions_ = solutions
 
         return self
 
@@ -1056,14 +1055,14 @@ class SPPRegressor():
 
         n_samples = X_binned.shape[0]
         print('n_samples = ', n_samples)
-        print('dim solutions = ', len(self.spp_solutions))
-        y_hats = np.zeros((n_samples, len(self.spp_solutions)))
+        print('dim solutions = ', len(self.solutions_))
+        y_hats = np.zeros((n_samples, len(self.solutions_)))
 
-        for i in range(len(self.spp_solutions)):
+        for i in range(len(self.solutions_)):
             y_hat = np.zeros(n_samples)
             interfeats = []
-            for key, slope in zip(self.spp_solutions[i]['keys'],
-                                  self.spp_solutions[i]['spp_lasso_slopes']):
+            for key, slope in zip(self.solutions_[i]['keys'],
+                                  self.solutions_[i]['spp_lasso_slopes']):
 
                 interfeat_data, interfeat_ind = \
                     from_key_to_interactions_feature(csc_data=X_binned_data,
@@ -1098,19 +1097,22 @@ class SPPRegressor():
 
         Returns
         -------
-        score: float
-            chosen metric : R-sqare
+        scores: float | list
+            chosen metric : R-square
         """
-
         y_hats = self.predict(X)
-        cv_scores = []
-        for y_hat in y_hats:
-            u = ((y - y_hat) ** 2).sum()
-            v = ((y - np.mean(y)) ** 2).sum()
-            score = 1 - u / v
-            cv_scores.append(score)
 
-        return cv_scores
+        if y_hats.ndim == 1:
+            y_hats = y_hats[:, None]
+
+        scores = []
+        for y_hat in y_hats.T:
+            scores.append(r2_score(y, y_hat))
+
+        if len(scores) == 1:
+            scores = scores[0]
+
+        return scores
 
 
 def main():
