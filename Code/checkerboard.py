@@ -377,7 +377,7 @@ def main():
     lambdas = [0.5]
     
     enc = KBinsDiscretizer(n_bins=n_bins, encode=encode, strategy=strategy)
-    X_binned_train = enc.fit_transform(X_train).tocsc()
+    X_binned_train = enc.fit_transform(X_train)
 
     spp_reg = SPPRegressor(n_lambda=n_lambda,
                            lambdas=lambdas,
@@ -394,7 +394,7 @@ def main():
     print('slopes = ', slopes)
     print('slopes length = ', len(slopes))
 
-    X_binned_test = enc.fit_transform(X_test).tocsc()
+    X_binned_test = enc.transform(X_test)
     y_hats = spp_reg.predict(X_binned=X_binned_test)
     print('y_hats = ', y_hats)
     print('y_hats length = ', len(y_hats))

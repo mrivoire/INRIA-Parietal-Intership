@@ -1049,7 +1049,7 @@ class SPPRegressor():
 
         # itérer sur les solutions et calculer le y_hat
         # renvoyer une liste de y_hat pour chaque lmbda
-        tolX_binned = X_binned.tocsc()
+        X_binned = X_binned.tocsc()
         X_binned_data = X_binned.data
         X_binned_ind = X_binned.indices
         X_binned_indptr = X_binned.indptr
@@ -1078,6 +1078,9 @@ class SPPRegressor():
             y_hats[:, i] = y_hat
             print('shape y_hat = ', y_hat.shape)
             print('n_samples = ', n_samples)
+
+        if y_hats.shape[1] == 1:
+            y_hats = y_hats[:, 0]
 
         return y_hats
 
