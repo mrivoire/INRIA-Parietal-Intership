@@ -89,13 +89,25 @@ def time_convert(X):
 ################################################################
 
 
-def get_models(X, n_lambda, lambdas, lambda_lasso, max_depth, epsilon, f, 
-               n_epochs, tol, lambda_max_ratio, n_active_max, screening, 
-               store_history):
+def get_models(
+    X,
+    n_lambda,
+    lambdas,
+    lambda_lasso,
+    max_depth,
+    epsilon,
+    f,
+    n_epochs,
+    tol,
+    lambda_max_ratio,
+    n_active_max,
+    screening,
+    store_history,
+):
     # Pipeline
-    # **kwargs_lasso, **kwargs_spp 
+    # **kwargs_lasso, **kwargs_spp
     # kwargs_lasso = dict, kwargs_spp = dict
-    # call **kwargs_lasso, **kwargs_spp 
+    # call **kwargs_lasso, **kwargs_spp
 
     time_feats = time_features(X)
     time_transformer = FunctionTransformer(time_convert)
@@ -107,9 +119,7 @@ def get_models(X, n_lambda, lambdas, lambda_lasso, max_depth, epsilon, f,
             ("scaler", StandardScaler()),
             (
                 "binning",
-                KBinsDiscretizer(
-                    n_bins=3, encode="onehot", strategy="quantile"
-                ),
+                KBinsDiscretizer(n_bins=3, encode="onehot", strategy="quantile"),
             ),
         ]
     )
@@ -124,10 +134,7 @@ def get_models(X, n_lambda, lambdas, lambda_lasso, max_depth, epsilon, f,
     categorical_feats = categorical_features(X)
     categorical_transformer = Pipeline(
         steps=[
-            (
-                "imputer",
-                SimpleImputer(strategy="constant", fill_value="missing"),
-            ),
+            ("imputer", SimpleImputer(strategy="constant", fill_value="missing"),),
             ("onehot", OneHotEncoder(handle_unknown="ignore")),
         ]
     )
@@ -152,9 +159,14 @@ def get_models(X, n_lambda, lambdas, lambda_lasso, max_depth, epsilon, f,
     tuned_parameters = {}
 
     # Lasso
-    lasso = Lasso(lmbda=lambda_lasso, epsilon=epsilon, f=f, 
-                  n_epochs=n_epochs, screening=screening, 
-                  store_history=store_history)
+    lasso = Lasso(
+        lmbda=lambda_lasso,
+        epsilon=epsilon,
+        f=f,
+        n_epochs=n_epochs,
+        screening=screening,
+        store_history=store_history,
+    )
     models["lasso"] = Pipeline(
         steps=[("preprocessor", preprocessor), ("regressor", lasso)]
     )
@@ -166,25 +178,15 @@ def get_models(X, n_lambda, lambdas, lambda_lasso, max_depth, epsilon, f,
 
     # LassoCV
     models["lasso_cv"] = Pipeline(
-        steps=[
-            ("preprocessor", preprocessor),
-            ("regressor", linear_model.LassoCV()),
-        ]
+        steps=[("preprocessor", preprocessor), ("regressor", linear_model.LassoCV()),]
     )
-    tuned_parameters["lasso_cv"] = {
-        "preprocessor__num__binning__n_bins": [2, 3, 4, 5]
-    }
+    tuned_parameters["lasso_cv"] = {"preprocessor__num__binning__n_bins": [2, 3, 4, 5]}
 
     # RidgeCV
     models["ridge_cv"] = Pipeline(
-        steps=[
-            ("preprocessor", preprocessor),
-            ("regressor", linear_model.RidgeCV()),
-        ]
+        steps=[("preprocessor", preprocessor), ("regressor", linear_model.RidgeCV()),]
     )
-    tuned_parameters["ridge_cv"] = {
-        "preprocessor__num__binning__n_bins": [2, 3, 4, 5]
-    }
+    tuned_parameters["ridge_cv"] = {"preprocessor__num__binning__n_bins": [2, 3, 4, 5]}
 
     # XGBoost
     xgb = XGBRegressor()
@@ -205,9 +207,19 @@ def get_models(X, n_lambda, lambdas, lambda_lasso, max_depth, epsilon, f,
     tuned_parameters["rf"] = {"regressor__max_depth": [2, 3, 4, 5]}
 
     # SPP Regressor
-    spp_reg = SPPRegressor(n_lambda, lambdas, max_depth, epsilon, f, n_epochs, 
-                           tol, lambda_max_ratio, n_active_max, screening, 
-                           store_history)
+    spp_reg = SPPRegressor(
+        n_lambda,
+        lambdas,
+        max_depth,
+        epsilon,
+        f,
+        n_epochs,
+        tol,
+        lambda_max_ratio,
+        n_active_max,
+        screening,
+        store_history,
+    )
     models["spp_reg"] = Pipeline(
         steps=[("preprocessor", preprocessor), ("regressor", spp_reg)]
     )
@@ -255,9 +267,25 @@ def compute_cv(X, y, models, n_splits, n_jobs=1):
     return cv_scores
 
 
-def compute_gs(X, y, models, tuned_parameters, n_splits, n_lambda, lambdas, 
-               max_depth, epsilon, f, n_epochs, tol, lambda_max_ratio, 
-               n_active_max, screening, store_history, n_jobs=1):
+def compute_gs(
+    X,
+    y,
+    models,
+    tuned_parameters,
+    n_splits,
+    n_lambda,
+    lambdas,
+    max_depth,
+    epsilon,
+    f,
+    n_epochs,
+    tol,
+    lambda_max_ratio,
+    n_active_max,
+    screening,
+    store_history,
+    n_jobs=1,
+):
     """
     Parameters
     ----------
@@ -291,10 +319,7 @@ def compute_gs(X, y, models, tuned_parameters, n_splits, n_lambda, lambdas,
     for name, model in models.items():
         if name != "spp_reg":
             gs = GridSearchCV(
-                model,
-                cv=n_splits,
-                param_grid=tuned_parameters[name],
-                n_jobs=n_jobs,
+                model, cv=n_splits, param_grid=tuned_parameters[name], n_jobs=n_jobs,
             )
 
             gs.fit(X, y)
@@ -320,7 +345,7 @@ def compute_gs(X, y, models, tuned_parameters, n_splits, n_lambda, lambdas,
                 shuffled_ind_test = shuffle(test_index)
 
                 X_train, X_test = X.iloc[shuffled_ind_train], X.iloc[shuffled_ind_test]
-                y_train, y_test = y[shuffled_ind_train], y[shuffled_ind_test]
+                y_train, y_test = y.iloc[shuffled_ind_train], y.iloc[shuffled_ind_test]
 
                 # n_bins_list = tuned_parameters['spp_reg']['preprocessor__num__binning__n_bins']
                 # max_depth_list = tuned_parameters['spp_reg']['regressor__max_depth']
@@ -329,37 +354,42 @@ def compute_gs(X, y, models, tuned_parameters, n_splits, n_lambda, lambdas,
 
                 for n_bins in n_bins_list:
                     for max_depth in max_depth_list:
-                        spp_reg = SPPRegressor(n_lambda=n_lambda, 
-                                               lambdas=lambdas, 
-                                               max_depth=max_depth, 
-                                               epsilon=epsilon, f=f, 
-                                               n_epochs=n_epochs, tol=tol, 
-                                               lambda_max_ratio=lambda_max_ratio, 
-                                               n_active_max=n_active_max, 
-                                               screening=screening, 
-                                               store_history=store_history)
+                        spp_reg = SPPRegressor(
+                            n_lambda=n_lambda,
+                            lambdas=lambdas,
+                            max_depth=max_depth,
+                            epsilon=epsilon,
+                            f=f,
+                            n_epochs=n_epochs,
+                            tol=tol,
+                            lambda_max_ratio=lambda_max_ratio,
+                            n_active_max=n_active_max,
+                            screening=screening,
+                            store_history=store_history,
+                        )
 
                         spp_reg.fit(X_train, y_train)
                         solutions = spp_reg.fit(X_train, y_train).solutions_
-                        # y_hats = spp_reg.predict(X_test)
+                        y_hats = spp_reg.predict(X_test)
                         cv_scores = spp_reg.score(X_test, y_test)
 
                         lambda_list = []
+                        slopes_list = []
                         for idx in range(len(solutions)):
-                            lambda_list.append(solutions[idx]['lambdas'])
+                            lambda_list.append(solutions[idx]["lambdas"])
+                            slopes_list.append(solutions[idx]["spp_lasso_slopes"])
 
                         gs_list.append(
                             pd.DataFrame(
                                 {
-                                    "n_bins": [
-                                        n_bins for i in range(len(cv_scores))
-                                    ],
+                                    "n_bins": [n_bins for i in range(len(cv_scores))],
                                     "max_depth": [
-                                        max_depth
-                                        for i in range(len(cv_scores))
+                                        max_depth for i in range(len(cv_scores))
                                     ],
                                     "lambda": lambda_list,
+                                    "coefs": slopes_list,
                                     "score": cv_scores,
+                                    "pred": y_hats,
                                     "fold_number": [
                                         fold_num for i in range(len(cv_scores))
                                     ],
@@ -370,9 +400,7 @@ def compute_gs(X, y, models, tuned_parameters, n_splits, n_lambda, lambdas,
             gs_dataframe = pd.concat(gs_list)
 
             gs_groupby_params = (
-                gs_dataframe.groupby(by=["n_bins", "max_depth", "lambda"])[
-                    "score"
-                ]
+                gs_dataframe.groupby(by=["n_bins", "max_depth", "lambda"])["score"]
                 .mean()
                 .reset_index()
             )
@@ -380,16 +408,23 @@ def compute_gs(X, y, models, tuned_parameters, n_splits, n_lambda, lambdas,
             results_gs = {
                 "best_score": gs_groupby_params["score"].max(),
                 "best_params": gs_groupby_params.loc[
-                    gs_groupby_params["score"]
-                    == gs_groupby_params["score"].max(),
+                    gs_groupby_params["score"] == gs_groupby_params["score"].max(),
                     ["n_bins", "max_depth", "lambda"],
-                ].to_dict(),
+                ],
+                "best_coefs": gs_groupby_params.loc[
+                    gs_groupby_params["score"] == gs_groupby_params["score"].max(),
+                    "coefs",
+                ],
+                "best_pred": gs_groupby_params.loc[
+                    gs_groupby_params["score"] == gs_groupby_params["score"].max(),
+                    "pred",
+                ],
             }
 
         gs_models[name] = results_gs
 
-        # test on a synthetic dataset such as checkerboard and compare optimal 
-        # params with the ones obtained with lasso cv on polynomial features 
+        # test on a synthetic dataset such as checkerboard and compare optimal
+        # params with the ones obtained with lasso cv on polynomial features
         # (function already implemented)
 
     return gs_models
@@ -420,25 +455,28 @@ def main():
     lambdas = [0.5]
     n_active_max = 100
 
-    kwargs_spp = {'n_lambda': n_lambda, 
-                  'lambdas': lambdas, 
-                  'max_depth': max_depth, 
-                  'epsilon': epsilon, 
-                  'f': f, 
-                  'n_epochs': n_epochs, 
-                  'tol': tol, 
-                  'lambda_max_ratio': lambda_max_ratio, 
-                  'n_active_max': n_active_max, 
-                  'screening': screening, 
-                  'store_history': store_history}
+    kwargs_spp = {
+        "n_lambda": n_lambda,
+        "lambdas": lambdas,
+        "max_depth": max_depth,
+        "epsilon": epsilon,
+        "f": f,
+        "n_epochs": n_epochs,
+        "tol": tol,
+        "lambda_max_ratio": lambda_max_ratio,
+        "n_active_max": n_active_max,
+        "screening": screening,
+        "store_history": store_history,
+    }
 
-    kwargs_lasso = {'lmbda': lmbda,
-                    'epsilon': epsilon,
-                    'f': f,
-                    'n_epochs': n_epochs,
-                    'screening': screening,
-                    'store_history': store_history
-                    }
+    kwargs_lasso = {
+        "lmbda": lmbda,
+        "epsilon": epsilon,
+        "f": f,
+        "n_epochs": n_epochs,
+        "screening": screening,
+        "store_history": store_history,
+    }
 
     ######################################################################
     #                  Auto Label Function For Bar Plots
@@ -492,19 +530,20 @@ def main():
         X = X[:10]
         y = y[:10]
         models, tuned_parameters = get_models(
-            X,
-            n_lambda=n_lambda, 
-            lambdas=lambdas, 
-            lambda_lasso=lmbda, 
-            max_depth=max_depth, 
-            epsilon=epsilon, 
-            f=f, 
-            n_epochs=n_epochs, 
-            tol=tol, 
-            lambda_max_ratio=lambda_max_ratio, 
-            n_active_max=n_active_max, 
-            screening=screening, 
-            store_history=store_history)
+            X=X,
+            n_lambda=n_lambda,
+            lambdas=lambdas,
+            lambda_lasso=lmbda,
+            max_depth=max_depth,
+            epsilon=epsilon,
+            f=f,
+            n_epochs=n_epochs,
+            tol=tol,
+            lambda_max_ratio=lambda_max_ratio,
+            n_active_max=n_active_max,
+            screening=screening,
+            store_history=store_history,
+        )
 
         print("models = ", models)
         print("tuned_params = ", tuned_parameters)
@@ -524,23 +563,23 @@ def main():
         # print("cv_scores without tuning params = ", list_cv_scores)
 
         gs_models = compute_gs(
-            X=X, 
-            y=y, 
-            models=models, 
-            tuned_parameters=tuned_parameters, 
-            n_splits=n_splits, 
-            n_lambda=n_lambda, 
-            lambdas=lambdas, 
-            max_depth=max_depth, 
-            epsilon=epsilon, 
-            f=f, 
-            n_epochs=n_epochs, 
-            tol=tol, 
-            lambda_max_ratio=lambda_max_ratio, 
-            n_active_max=n_active_max, 
-            screening=screening, 
-            store_history=store_history, 
-            n_jobs=1
+            X=X,
+            y=y,
+            models=models,
+            tuned_parameters=tuned_parameters,
+            n_splits=n_splits,
+            n_lambda=n_lambda,
+            lambdas=lambdas,
+            max_depth=max_depth,
+            epsilon=epsilon,
+            f=f,
+            n_epochs=n_epochs,
+            tol=tol,
+            lambda_max_ratio=lambda_max_ratio,
+            n_active_max=n_active_max,
+            screening=screening,
+            store_history=store_history,
+            n_jobs=1,
         )
 
         print("gs_models = ", gs_models)
