@@ -39,6 +39,7 @@ def test_crossval_spp():
     X_train, X_test, y_train, y_test = \
         train_test_split(X, y, test_size=.4, random_state=42)
 
+    # X_train = pd.DataFrame(X_train)
     models, tuned_params = get_models(X=X_train, 
                                       n_lambda=n_lambda, 
                                       lambdas=None, 
@@ -55,7 +56,11 @@ def test_crossval_spp():
 
     print('models = ', models)
     print('tuned_params = ', tuned_params)
-
+    # How to use the best max_depth to perform the binning of X_train whereas 
+    # it is returned by the compute_gs function ?
+    # We need to use get_models befor gs_models but we need to have the 
+    # best_max_depth to run get_models to perform a good binning process 
+    # How to handle that ? 
     gs_models = compute_gs(X=X_train,
                            y=y_train, 
                            models=models, 
@@ -76,10 +81,15 @@ def test_crossval_spp():
 
     best_score_spp = gs_models['spp_reg']['best_score']
     best_params_spp = gs_models['spp_reg']['best_params']
-    best_coefs_spp = gs_models['spp_reg']['best_coefs']
-    pred_spp = gs_models['spp_reg']['best_pred']
+    best_n_bins = best_params_spp[0]
+    best_max_depth = best_params_spp[1]
+    best_lambda_spp = best_params_spp[2]
 
-    poly = PolynomialFeatures(order=2, 
+    # order = max_depth 
+    # To compare the lambda values we have to run the polynomial features on a 
+    # number of bins and of max_depth equal to the best_n_bins and 
+    # best_max_depth provided by the grid search of spp
+    poly = PolynomialFeatures(order=best_n_bins, 
                               include_bias=False, 
                               interaction_only=True)
 
@@ -103,14 +113,13 @@ def test_crossval_spp():
                           selection='cyclic').fit(poly_train, y_train)
 
     score_lassoCV = reg_lassoCV.score(X=poly_test, y=y_test, sample_weight=None)
-    pred_lassoCV = reg_lassoCV.predict(X=poly_test)
-    best_coefs_lassoCV = reg_lassoCV.coef_
-    best_alpha_lassoCV = reg_lassoCV.alpha_
+    # pred_lassoCV = reg_lassoCV.predict(X=poly_test)
+    # best_coefs_lassoCV = reg_lassoCV.coef_
+    best_alpha_lassoCV = reg_lassoCV.alpha_ 
+    best_lambda_lassoCV = best_alpha_lassoCV * X_train.shpae[0]
 
-    np.testing.assert_allclose(best_alpha_lassoCV, best_params_spp[2], rtol=1e-8)
+    np.testing.assert_allclose(best_lambda_lassoCV, best_lambda_spp, rtol=1e-8)
     np.testing.assert_allclose(best_score_spp, score_lassoCV, rtol=1e-8)
-    np.testing.assert_allclose(best_coefs_lassoCV, best_coefs_spp, rtol=1e-8)
-    np.testing.assert_allclose(pred_lassoCV, pred_spp, rtol=1e-8)
 
 
 def main():
