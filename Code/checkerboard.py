@@ -173,13 +173,19 @@ def plot_est(est, X, y, X_train, y_train, X_test, y_test):
     ax.set_yticks(())
     est.fit(X_train, y_train)
     Z = est.predict(np.c_[xx.ravel(), yy.ravel()])
-
+    print("Z shape = ", Z.shape)
     # Put the result into a color plot
     Z = Z.reshape(xx.shape)
     ax.contourf(xx, yy, Z, cmap=cm, alpha=.8)
     print("Z = ", Z)
+    print("Z shape = ", Z.shape)
     print("Z length = ", np.count_nonzero(Z))
 
+    for j in range(Z.shape[1]):
+        nnz = np.count_nonzero(Z[:, j])
+
+        print('nnz = ', nnz)
+ 
     # Plot the training points
     ax.scatter(X_train[:, 0], X_train[:, 1], c=y_train, cmap=cm_bright,
                edgecolors='k')
@@ -198,7 +204,7 @@ def main():
     dim1 = 10
     dim2 = 10
     n_bins = 5
-    n_samples = 100
+    n_samples = 1000
 
     X, y = checkerboard(dim1=dim1, dim2=dim2, n_samples=n_samples,
                         n_bins=n_bins)
@@ -219,7 +225,8 @@ def main():
     strategy = 'quantile'
     lambda_max_ratio = 0.5
     n_active_max = 100
-    lambdas = [0.5]
+    lambdas = [0.1]
+    
     
     enc = KBinsDiscretizer(n_bins=n_bins, encode=encode, strategy=strategy)
     X_binned_train = enc.fit_transform(X_train)
@@ -250,12 +257,12 @@ def main():
     est = make_pipeline(enc, spp_reg)
     plot_est(est, X, y, X_train, y_train, X_test, y_test)
 
-    # est = make_pipeline(
-    #     enc,
-    #     PolynomialFeatures(order=2, include_bias=False, interaction_only=True),
-    #     Lasso(alpha=0.01)
-    # )
-    # plot_est(est, X, y, X_train, y_train, X_test, y_test)
+    est = make_pipeline(
+        enc,
+        PolynomialFeatures(order=2, include_bias=False, interaction_only=True),
+        Lasso(alpha=0.1/X_binned_train.shape[0])
+    )
+    plot_est(est, X, y, X_train, y_train, X_test, y_test)
     
 
 if __name__ == "__main__":
