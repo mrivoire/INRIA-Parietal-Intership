@@ -425,7 +425,7 @@ def compute_gs(
             )
             best_params = gs_groupby_params.loc[
                 gs_groupby_params["score"] == gs_groupby_params["score"].max(
-                )]["n_bins", "max_depth", "lambda"]
+                ), ["n_bins", "max_depth", "lambda"]]
 
             results_gs = {
                 "best_score": gs_groupby_params["score"].max(),
