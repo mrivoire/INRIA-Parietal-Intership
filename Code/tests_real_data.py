@@ -379,7 +379,7 @@ def compute_gs(
                         enc = KBinsDiscretizer(
                             n_bins=n_bins, encode='onehot', strategy='quantile')
                         X_binned_train = enc.fit_transform(X_train)
-                        X_binned_test = enc.fit_transform(X_test)
+                        X_binned_test = enc.transform(X_test)
 
                         solutions = spp_reg.fit(
                             X_binned_train, y_train).solutions_
@@ -408,8 +408,6 @@ def compute_gs(
                                 fold_num for i in range(len(cv_scores))
                             ],
                         }
-                        for i in results.keys():
-                            print(i, len(results[i]))
 
                         gs_list.append(
                             pd.DataFrame(
@@ -529,15 +527,19 @@ def main():
             X, y = load_auto_prices()
             data_name = "auto_prices"
         if datasets[i] == "lacrimes":
+            continue
             X, y = load_lacrimes()
             data_name = "lacrimes"
         if datasets[i] == "black_friday":
+            continue
             X, y = load_black_friday()
             data_name = "black_friday"
         if datasets[i] == "nyc_taxi":
+            continue
             X, y = load_nyc_taxi()
             data_name = "nyc_taxi"
         if datasets[i] == "housing_prices":
+            continue
             load_housing_prices()
             data_name = "housing_prices"
 
@@ -597,6 +599,11 @@ def main():
         )
 
         print("gs_models = ", gs_models)
+        best_score_spp = gs_models["spp_reg"]["best_score"]
+        best_params_spp = gs_models["spp_reg"]["best_params"]
+
+        print('best_score_spp = ', best_score_spp)
+        print('best_params = ', best_params_spp)
         # list_gs_scores = []
         # scores = pd.DataFrame(
         #     {"model": [], "best_cv_score": [], "best_param": []}
