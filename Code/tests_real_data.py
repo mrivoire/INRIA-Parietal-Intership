@@ -5,6 +5,7 @@ Experiments on real data with categorical variables
 import numpy as np
 import time
 import matplotlib.pyplot as plt
+from numpy.core import numeric
 import pandas as pd
 
 from xgboost import XGBRegressor
@@ -38,7 +39,9 @@ from sklearn.utils import shuffle
 
 
 def numeric_features(X):
-    numeric_feats = X.dtypes[(dtype.kind in "if" for dtype in X.dtypes)].index
+    # numeric_feats = X.dtypes[(dtype.kind in "if" for dtype in X.dtypes)].index
+    numeric_feats = X.dtypes[(X.dtypes == np.float64)
+                             | (X.dtypes == np.int64)].index
     return numeric_feats
 
 
@@ -319,7 +322,7 @@ def compute_gs(
         cross validation scores for different models
     """
     # X = np.array(X.rename_axis('ID'))
-    y = y.to_numpy().astype("float")
+    y = np.array(y).astype("float")
     gs_models = {}
 
     for name, model in models.items():
