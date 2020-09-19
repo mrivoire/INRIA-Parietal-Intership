@@ -94,6 +94,7 @@ def get_models(
     n_lambda,
     lambdas,
     lambda_lasso,
+    n_bins,
     max_depth,
     epsilon,
     f,
@@ -119,7 +120,7 @@ def get_models(
             ("scaler", StandardScaler()),
             (
                 "binning",
-                KBinsDiscretizer(n_bins=3, encode="onehot",
+                KBinsDiscretizer(n_bins=n_bins, encode="onehot",
                                  strategy="quantile"),
             ),
         ]
@@ -552,6 +553,7 @@ def main():
             n_lambda=n_lambda,
             lambdas=lambdas,
             lambda_lasso=lmbda,
+            n_bins=n_bins,
             max_depth=max_depth,
             epsilon=epsilon,
             f=f,
