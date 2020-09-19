@@ -119,7 +119,8 @@ def get_models(
             ("scaler", StandardScaler()),
             (
                 "binning",
-                KBinsDiscretizer(n_bins=3, encode="onehot", strategy="quantile"),
+                KBinsDiscretizer(n_bins=3, encode="onehot",
+                                 strategy="quantile"),
             ),
         ]
     )
@@ -178,15 +179,19 @@ def get_models(
 
     # LassoCV
     models["lasso_cv"] = Pipeline(
-        steps=[("preprocessor", preprocessor), ("regressor", linear_model.LassoCV()),]
+        steps=[("preprocessor", preprocessor),
+               ("regressor", linear_model.LassoCV()), ]
     )
-    tuned_parameters["lasso_cv"] = {"preprocessor__num__binning__n_bins": [2, 3, 4, 5]}
+    tuned_parameters["lasso_cv"] = {
+        "preprocessor__num__binning__n_bins": [2, 3, 4, 5]}
 
     # RidgeCV
     models["ridge_cv"] = Pipeline(
-        steps=[("preprocessor", preprocessor), ("regressor", linear_model.RidgeCV()),]
+        steps=[("preprocessor", preprocessor),
+               ("regressor", linear_model.RidgeCV()), ]
     )
-    tuned_parameters["ridge_cv"] = {"preprocessor__num__binning__n_bins": [2, 3, 4, 5]}
+    tuned_parameters["ridge_cv"] = {
+        "preprocessor__num__binning__n_bins": [2, 3, 4, 5]}
 
     # XGBoost
     xgb = XGBRegressor()
@@ -334,18 +339,21 @@ def compute_gs(
 
             gs_list = []
 
-            X = pd.DataFrame(X, index=X[:, 0])
-            y = pd.DataFrame(y)
+            # X = pd.DataFrame(X, index=X[:, 0])
+            # y = pd.DataFrame(y)
 
+            # change the order of the for loop
             fold_num = 0
             for train_index, test_index in kf.split(X):
                 fold_num += 1
                 print("TRAIN:", train_index, "TEST:", test_index)
-                shuffled_ind_train = shuffle(train_index)
-                shuffled_ind_test = shuffle(test_index)
+                # shuffled_ind_train = np.array(shuffle(train_index))
+                # shuffled_ind_test = np.array(shuffle(test_index))
+                X_train, X_test = X.iloc[train_index].values, X.iloc[test_index].values
+                y_train, y_test = y[train_index], y[test_index]
 
-                X_train, X_test = X.iloc[shuffled_ind_train], X.iloc[shuffled_ind_test]
-                y_train, y_test = y.iloc[shuffled_ind_train], y.iloc[shuffled_ind_test]
+                # X_train, X_test = X.iloc[shuffled_ind_train], X.iloc[shuffled_ind_test]
+                # y_train, y_test = y.iloc[shuffled_ind_train], y.iloc[shuffled_ind_test]
 
                 # n_bins_list = tuned_parameters['spp_reg']['preprocessor__num__binning__n_bins']
                 # max_depth_list = tuned_parameters['spp_reg']['regressor__max_depth']
@@ -367,40 +375,53 @@ def compute_gs(
                             screening=screening,
                             store_history=store_history,
                         )
+                        # spp_reg = model.set_params(preprocessor__num__binning__n_bins=n_bins, regressor__max_depth=max_depth)
+                        enc = KBinsDiscretizer(
+                            n_bins=n_bins, encode='onehot', strategy='quantile')
+                        X_binned_train = enc.fit_transform(X_train)
+                        X_binned_test = enc.fit_transform(X_test)
 
-                        spp_reg.fit(X_train, y_train)
-                        solutions = spp_reg.fit(X_train, y_train).solutions_
-                        y_hats = spp_reg.predict(X_test)
-                        cv_scores = spp_reg.score(X_test, y_test)
+                        solutions = spp_reg.fit(
+                            X_binned_train, y_train).solutions_
+                        cv_scores = spp_reg.score(X_binned_test, y_test)
 
                         lambda_list = []
                         slopes_list = []
                         for idx in range(len(solutions)):
-                            lambda_list.append(solutions[idx]["lambdas"])
-                            slopes_list.append(solutions[idx]["spp_lasso_slopes"])
+                            lambda_list.append(solutions[idx]["lambda"])
+                            slopes_list.append(
+                                solutions[idx]["spp_lasso_slopes"])
+
+                        if type(cv_scores) is np.float64:
+                            cv_scores = [cv_scores]
+
+                        # import ipdb
+                        # ipdb.set_trace()
+
+                        results = {
+                            "n_bins": [
+                                n_bins for i in range(len(cv_scores))],
+                            "max_depth": [max_depth for i in range(len(cv_scores))],
+                            "lambda": lambda_list,
+                            "score": cv_scores,
+                            "fold_number": [
+                                fold_num for i in range(len(cv_scores))
+                            ],
+                        }
+                        for i in results.keys():
+                            print(i, len(results[i]))
 
                         gs_list.append(
                             pd.DataFrame(
-                                {
-                                    "n_bins": [n_bins for i in range(len(cv_scores))],
-                                    "max_depth": [
-                                        max_depth for i in range(len(cv_scores))
-                                    ],
-                                    "lambda": lambda_list,
-                                    "coefs": slopes_list,
-                                    "score": cv_scores,
-                                    "pred": y_hats,
-                                    "fold_number": [
-                                        fold_num for i in range(len(cv_scores))
-                                    ],
-                                }
+                                results
                             )
                         )
 
             gs_dataframe = pd.concat(gs_list)
 
             gs_groupby_params = (
-                gs_dataframe.groupby(by=["n_bins", "max_depth", "lambda"])["score"]
+                gs_dataframe.groupby(
+                    by=["n_bins", "max_depth", "lambda"])["score"]
                 .mean()
                 .reset_index()
             )
@@ -408,16 +429,9 @@ def compute_gs(
             results_gs = {
                 "best_score": gs_groupby_params["score"].max(),
                 "best_params": gs_groupby_params.loc[
-                    gs_groupby_params["score"] == gs_groupby_params["score"].max(),
+                    gs_groupby_params["score"] == gs_groupby_params["score"].max(
+                    ),
                     ["n_bins", "max_depth", "lambda"],
-                ],
-                "best_coefs": gs_groupby_params.loc[
-                    gs_groupby_params["score"] == gs_groupby_params["score"].max(),
-                    "coefs",
-                ],
-                "best_pred": gs_groupby_params.loc[
-                    gs_groupby_params["score"] == gs_groupby_params["score"].max(),
-                    "pred",
                 ],
             }
 
