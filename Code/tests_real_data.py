@@ -423,14 +423,16 @@ def compute_gs(
                 .mean()
                 .reset_index()
             )
+            best_params = gs_groupby_params.loc[
+                gs_groupby_params["score"] == gs_groupby_params["score"].max(
+                )]["n_bins", "max_depth", "lambda"]
 
             results_gs = {
                 "best_score": gs_groupby_params["score"].max(),
-                "best_params": gs_groupby_params.loc[
-                    gs_groupby_params["score"] == gs_groupby_params["score"].max(
-                    ),
-                    ["n_bins", "max_depth", "lambda"],
-                ],
+                "best_params": {'n_bins': best_params.iloc[0, 0],
+                                'max_depth': best_params.iloc[0, 1],
+                                'lambda': best_params.iloc[0, 2]
+                                },
             }
 
         gs_models[name] = results_gs
