@@ -343,24 +343,13 @@ def compute_gs(
 
             gs_list = []
 
-            # X = pd.DataFrame(X, index=X[:, 0])
-            # y = pd.DataFrame(y)
-
-            # change the order of the for loop
             fold_num = 0
             for train_index, test_index in kf.split(X):
                 fold_num += 1
                 print("TRAIN:", train_index, "TEST:", test_index)
-                # shuffled_ind_train = np.array(shuffle(train_index))
-                # shuffled_ind_test = np.array(shuffle(test_index))
                 X_train, X_test = X.iloc[train_index].values, X.iloc[test_index].values
                 y_train, y_test = y[train_index], y[test_index]
 
-                # X_train, X_test = X.iloc[shuffled_ind_train], X.iloc[shuffled_ind_test]
-                # y_train, y_test = y.iloc[shuffled_ind_train], y.iloc[shuffled_ind_test]
-
-                # n_bins_list = tuned_parameters['spp_reg']['preprocessor__num__binning__n_bins']
-                # max_depth_list = tuned_parameters['spp_reg']['regressor__max_depth']
                 n_bins_list = [2, 3, 4, 5]
                 max_depth_list = [2, 3, 4, 5]
 
@@ -427,12 +416,20 @@ def compute_gs(
                 .mean()
                 .reset_index()
             )
+
             best_params = gs_groupby_params.loc[
                 gs_groupby_params["score"] == gs_groupby_params["score"].max(
                 ), ["n_bins", "max_depth", "lambda"]]
 
+            print('fold_num = ', fold_num)
+            print('best_params = ', best_params)
+
+            best_score = gs_groupby_params["score"].max()
+
+            print('best_score = ', best_score)
+
             results_gs = {
-                "best_score": gs_groupby_params["score"].max(),
+                "best_score": best_score,
                 "best_params": {'n_bins': best_params.iloc[0, 0],
                                 'max_depth': best_params.iloc[0, 1],
                                 'lambda': best_params.iloc[0, 2]
@@ -457,7 +454,7 @@ def main():
     lmbda = 1.0
     epsilon = 1e-7
     f = 10
-    n_splits = 5
+    n_splits = 2
     screening = True
     store_history = True
     n_epochs = 10000
