@@ -133,49 +133,6 @@ def test_crossval_spp():
 
 def main():
 
-    # # Paramters
-    # dim1 = 10
-    # dim2 = 10
-    # n_bins = 5
-    # n_samples = 1000
-    # lmbda = 0.1
-    # epsilon = 1e-7
-    # f = 10
-    # n_splits = 5
-    # screening = True
-    # store_history = True
-    # n_epochs = 1000
-    # n_jobs = 1
-    # encode = "onehot"
-    # strategy = "quantile"
-    # n_bins = 3
-    # max_depth = 2
-    # n_val_gs = 100
-    # tol = 1e-08
-    # n_lambda = 100
-    # lambda_max_ratio = 0.5
-    # lambdas = [0.5]
-    # n_active_max = 100
-
-    # X, y = checkerboard(dim1=dim1, dim2=dim2, n_samples=n_samples,
-    #                     n_bins=n_bins)
-
-    # X_train, X_test, y_train, y_test = \
-    #     train_test_split(X, y, test_size=.4, random_state=42)
-
-    # X_train = pd.DataFrame(X_train)
-    # X_test = pd.DataFrame(X_test)
-    # print('X_train = ', X_train)
-    # print('X_test = ', X_test)
-
-    # cat_feats = categorical_features(X_train)
-    # print('cat_feats = ', cat_feats)
-
-    # num_feats = numeric_features(X_train)
-    # print('num_feats = ', num_feats)
-    # num_feats_test = numeric_features(X_test)
-    # print('num_feats_test = ', num_feats_test)
-
     test_crossval_spp()
 
 
