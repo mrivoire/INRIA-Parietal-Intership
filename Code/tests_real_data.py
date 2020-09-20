@@ -343,15 +343,15 @@ def compute_gs(
 
             gs_list = []
 
-            fold_num = 0
-            for train_index, test_index in kf.split(X):
-                fold_num += 1
-                print("TRAIN:", train_index, "TEST:", test_index)
+            for fold_num, (train_index, test_index) in enumerate(kf.split(X), 1):
+                # print("TRAIN:", train_index, "TEST:", test_index)
                 X_train, X_test = X.iloc[train_index].values, X.iloc[test_index].values
                 y_train, y_test = y[train_index], y[test_index]
 
-                n_bins_list = [2, 3, 4, 5]
-                max_depth_list = [2, 3, 4, 5]
+                # n_bins_list = [2, 3, 4, 5]
+                # max_depth_list = [2, 3, 4, 5]
+                n_bins_list = [2, 3, 4]
+                max_depth_list = [2, 3]
 
                 for n_bins in n_bins_list:
                     for max_depth in max_depth_list:
@@ -380,10 +380,9 @@ def compute_gs(
 
                         lambda_list = []
                         slopes_list = []
-                        for idx in range(len(solutions)):
-                            lambda_list.append(solutions[idx]["lambda"])
-                            slopes_list.append(
-                                solutions[idx]["spp_lasso_slopes"])
+                        for this_sol in solutions:
+                            lambda_list.append(this_sol["lambda"])
+                            slopes_list.append(this_sol["spp_lasso_slopes"])
 
                         if type(cv_scores) is np.float64:
                             cv_scores = [cv_scores]
@@ -392,14 +391,11 @@ def compute_gs(
                         # ipdb.set_trace()
 
                         results = {
-                            "n_bins": [
-                                n_bins for i in range(len(cv_scores))],
-                            "max_depth": [max_depth for i in range(len(cv_scores))],
+                            "n_bins": [n_bins] * len(cv_scores),
+                            "max_depth": [max_depth] * len(cv_scores),
                             "lambda": lambda_list,
                             "score": cv_scores,
-                            "fold_number": [
-                                fold_num for i in range(len(cv_scores))
-                            ],
+                            "fold_number": [fold_num] * len(cv_scores),
                         }
 
                         gs_list.append(

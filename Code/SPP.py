@@ -1101,7 +1101,7 @@ class SPPRegressor():
         scores = []
         for y_hat in y_hats.T:
             # scores.append(r2_score(y, y_hat))
-            scores.append(mean_squared_error(y, y_hat))
+            scores.append(-mean_squared_error(y, y_hat))
 
         if len(scores) == 1:
             scores = scores[0]

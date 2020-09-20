@@ -575,6 +575,7 @@ class Lasso(BaseEstimator, RegressorMixin):
                 self.store_history,
             )
         else:
+            X = np.asfortranarray(X)
             (
                 beta_hat_cyclic_cd_true,
                 residuals,

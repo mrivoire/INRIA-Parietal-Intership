@@ -1,51 +1,43 @@
 import numpy as np
 import pandas as pd
+import pytest
 
-from checkerboard import checkerboard
-from sklearn.model_selection import train_test_split
-from tests_real_data import get_models, compute_gs
 from sklearn.preprocessing import PolynomialFeatures
 from sklearn.linear_model import LassoCV
 from sklearn.preprocessing import KBinsDiscretizer
-from tests_real_data import numeric_features, categorical_features
+
+from checkerboard import checkerboard
+from tests_real_data import get_models, compute_gs
 
 
 def test_crossval_spp():
     # Paramters
     dim1 = 10
     dim2 = 10
-    n_bins = 2
-    n_samples = 1000
+    n_bins = 3
+    n_samples = 3000
+
     lmbda = 0.1
     epsilon = 1e-7
     f = 10
     n_splits = 2
+
     screening = True
     store_history = True
     n_epochs = 1000
     n_jobs = 1
-    encode = "onehot"
-    strategy = "quantile"
-    n_bins = 3
     max_depth = 2
-    n_val_gs = 100
-    tol = 1e-08
+    tol = 1e-8
     n_lambda = 100
     lambda_max_ratio = 0.5
-    lambdas = [0.2, 0.1, 0.01]
+    lambdas = [1, 0.5, 0.2, 0.1, 0.01]
     n_active_max = 100
 
     X, y = checkerboard(dim1=dim1, dim2=dim2, n_samples=n_samples,
                         n_bins=n_bins)
+    X = pd.DataFrame(X)
 
-    X_train, X_test, y_train, y_test = \
-        train_test_split(X, y, test_size=.4, random_state=42)
-
-    X_train = pd.DataFrame(X_train)
-    X_test = pd.DataFrame(X_test)
-
-    # X_train = pd.DataFrame(X_train)
-    models, tuned_params = get_models(X=X_train,
+    models, tuned_params = get_models(X=X,
                                       n_lambda=n_lambda,
                                       lambdas=lambdas,
                                       lambda_lasso=lmbda,
@@ -60,6 +52,13 @@ def test_crossval_spp():
                                       screening=screening,
                                       store_history=store_history)
 
+    # Save time
+    del models['lasso']
+    del models['lasso_cv']
+    del models['ridge_cv']
+    del models['rf']
+    del models['xgb']
+
     print('models = ', models)
     print('tuned_params = ', tuned_params)
     # How to use the best max_depth to perform the binning of X_train whereas
@@ -67,8 +66,8 @@ def test_crossval_spp():
     # We need to use get_models befor gs_models but we need to have the
     # best_max_depth to run get_models to perform a good binning process
     # How to handle that ?
-    gs_models = compute_gs(X=X_train,
-                           y=y_train,
+    gs_models = compute_gs(X=X,
+                           y=y,
                            models=models,
                            tuned_parameters=tuned_params,
                            n_splits=n_splits,
@@ -87,6 +86,7 @@ def test_crossval_spp():
 
     best_score_spp = gs_models['spp_reg']['best_score']
     best_params_spp = gs_models['spp_reg']['best_params']
+
     best_n_bins = best_params_spp['n_bins']
     best_max_depth = best_params_spp['max_depth']
     best_lambda_spp = best_params_spp['lambda']
@@ -97,51 +97,38 @@ def test_crossval_spp():
     # best_max_depth provided by the grid search of spp
     enc = KBinsDiscretizer(
         n_bins=best_n_bins, encode='onehot', strategy='quantile')
-    X_binned_train = enc.fit_transform(X_train)
-    X_binned_test = enc.transform(X_test)
+    X_binned = enc.fit_transform(X)
 
     poly = PolynomialFeatures(order=best_max_depth,
                               include_bias=False,
                               interaction_only=True)
+    X_poly = poly.fit_transform(X_binned)
 
-    poly_train = poly.fit_transform(X_binned_train)
-    poly_test = poly.transform(X_binned_test)
+    n_samples = X_binned.shape[0]
+    alphas_lassoCV = np.array(lambdas) / n_samples
 
-    alphas_lassoCV = [1 / X_binned_train.shape[0],
-                      0.5 / X_binned_train.shape[0],
-                      0.2 / X_binned_train.shape[0],
-                      0.1 / X_binned_train.shape[0],
-                      0.01 / X_binned_train.shape[0]]
-
-    reg_lassoCV = LassoCV(eps=0.001,
-                          n_alphas=100,
-                          alphas=alphas_lassoCV,
+    reg_lassoCV = LassoCV(alphas=alphas_lassoCV,
                           fit_intercept=False,
                           normalize=False,
-                          precompute='auto',
                           max_iter=n_epochs,
                           tol=tol,
-                          copy_X=True,
                           cv=n_splits,
-                          verbose=False,
-                          n_jobs=None,
-                          positive=False,
-                          random_state=None,
-                          selection='cyclic').fit(poly_train, y_train)
-
-    score_lassoCV = reg_lassoCV.score(
-        X=poly_test, y=y_test, sample_weight=None)
+                          verbose=False).fit(X_poly, y)
 
     best_alpha_lassoCV = reg_lassoCV.alpha_
-    best_lambda_lassoCV = best_alpha_lassoCV * X_train.shape[0]
+    best_lambda_lassoCV = best_alpha_lassoCV * n_samples
+
+    mse_per_lambda_lassoCV = reg_lassoCV.mse_path_.mean(axis=1)
+    best_mse_LassoCV = -mse_per_lambda_lassoCV.min()
 
     print('best_lambda_lassoCV = ', best_lambda_lassoCV)
     print('best_lambda_spp = ', best_lambda_spp)
-    print('score_lassoCV = ', score_lassoCV)
+    print('score_lassoCV = ', best_mse_LassoCV)
     print('best_score_spp = ', best_score_spp)
 
-    # np.testing.assert_allclose(best_lambda_lassoCV, best_lambda_spp, rtol=1e-8)
-    # np.testing.assert_allclose(best_score_spp, score_lassoCV, rtol=1e-8)
+    assert best_lambda_lassoCV == best_lambda_spp
+    assert n_bins == best_n_bins
+    assert best_mse_LassoCV == pytest.approx(best_score_spp, abs=1e-2)
 
 
 def main():
