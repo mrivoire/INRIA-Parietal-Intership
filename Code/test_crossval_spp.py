@@ -14,12 +14,12 @@ def test_crossval_spp():
     # Paramters
     dim1 = 10
     dim2 = 10
-    n_bins = 5
+    n_bins = 2
     n_samples = 1000
     lmbda = 0.1
     epsilon = 1e-7
     f = 10
-    n_splits = 5
+    n_splits = 2
     screening = True
     store_history = True
     n_epochs = 1000
@@ -32,7 +32,7 @@ def test_crossval_spp():
     tol = 1e-08
     n_lambda = 100
     lambda_max_ratio = 0.5
-    lambdas = None
+    lambdas = [0.2, 0.1, 0.01]
     n_active_max = 100
 
     X, y = checkerboard(dim1=dim1, dim2=dim2, n_samples=n_samples,
@@ -47,7 +47,7 @@ def test_crossval_spp():
     # X_train = pd.DataFrame(X_train)
     models, tuned_params = get_models(X=X_train,
                                       n_lambda=n_lambda,
-                                      lambdas=None,
+                                      lambdas=lambdas,
                                       lambda_lasso=lmbda,
                                       n_bins=n_bins,
                                       max_depth=max_depth,
@@ -107,9 +107,15 @@ def test_crossval_spp():
     poly_train = poly.fit_transform(X_binned_train)
     poly_test = poly.transform(X_binned_test)
 
+    alphas_lassoCV = [1 / X_binned_train.shape[0],
+                      0.5 / X_binned_train.shape[0],
+                      0.2 / X_binned_train.shape[0],
+                      0.1 / X_binned_train.shape[0],
+                      0.01 / X_binned_train.shape[0]]
+
     reg_lassoCV = LassoCV(eps=0.001,
                           n_alphas=100,
-                          alphas=None,
+                          alphas=alphas_lassoCV,
                           fit_intercept=False,
                           normalize=False,
                           precompute='auto',
