@@ -8,7 +8,7 @@ from sklearn.linear_model import Lasso
 from sklearn.metrics import r2_score
 from sklearn.utils import check_random_state
 from cd_solver_lasso_numba import sparse_cd
-
+from sklearn.metrics import mean_squared_error
 
 #######################################################################
 #                   Safe Pattern Pruning Algorithm
@@ -701,10 +701,10 @@ def from_key_to_interactions_feature(csc_data, csc_ind, csc_indptr,
 
 # @njit
 def spp_solver(X_binned, y,
-               n_lambda, lambdas, max_depth, epsilon, f, n_epochs, tol, 
-               lambda_max_ratio, n_active_max, screening=True, 
+               n_lambda, lambdas, max_depth, epsilon, f, n_epochs, tol,
+               lambda_max_ratio, n_active_max, screening=True,
                store_history=True):
-               # n_lmbda = n_lambda, lmbda_max_ratio, n_active_max
+    # n_lmbda = n_lambda, lmbda_max_ratio, n_active_max
     """Safe Patterns Pruning Algorithm
        Scan the tree from the root to the leaves and prunes out the subtrees
        which statisfie the SPPC(t) criterion
@@ -751,11 +751,11 @@ def spp_solver(X_binned, y,
     # tree are pruned out and the active set is empty.
 
     if lambdas is None:
-        lambdas_grid = np.logspace(np.log10(lambda_max * lambda_max_ratio), 
+        lambdas_grid = np.logspace(np.log10(lambda_max * lambda_max_ratio),
                                    np.log10(lambda_max), num=n_lambda)[::-1]
     else:
         lambdas_grid = np.sort(lambdas)[::-1]
-                   
+
     # add an argument lmbda_0_ratio (= 1/2 for istance) to always keep lmbda_max
     # x np.logspace()
 
@@ -788,7 +788,6 @@ def spp_solver(X_binned, y,
 
     for lmbda_t in lambdas_grid:
 
-        print('lmbda_t = ', lmbda_t)
         # Pre-solve : solve the optimization problem with the new lambda on
         # the previous optimal set of features. (epsilon not too small ~ 10^-8)
         # use the implemented lasso with as input only the previous
@@ -923,9 +922,6 @@ def spp_solver(X_binned, y,
                 epsilon=epsilon, f=f, n_epochs=n_epochs, screening=screening,
                 store_history=store_history)
 
-            print('beta_hat_t: ', beta_hat_t)
-            print('sum of safeset_membership: ', sum(safeset_membership))
-
             active_set_data = List([List([0.])])
             active_set_ind = List([List([0])])
             active_set_keys = List([List([0])])
@@ -952,7 +948,7 @@ def spp_solver(X_binned, y,
             solutions_dict['keys'] = active_set_keys
             solutions_dict['spp_lasso_slopes'] = beta_hat_t_sparse
 
-            if len(active_set_indptr_csc) + 1 >= n_active_max:
+            if len(active_set_keys) >= n_active_max:
                 break
 
         solutions.append(solutions_dict)
@@ -980,13 +976,13 @@ def spp_solver(X_binned, y,
 
 
 class SPPRegressor():
-    def __init__(self, n_lambda, lambdas, max_depth, epsilon, f, n_epochs, tol, 
+    def __init__(self, n_lambda, lambdas, max_depth, epsilon, f, n_epochs, tol,
                  lambda_max_ratio, n_active_max, screening, store_history):
         # quel est le plus petit lmbda qu'on s'autorise à chercher
         # goal : solver ayant les memes perfs en étant plus rapides
         # self.lmbda = lmbda
         self.n_lambda = n_lambda
-        self.lambdas = lambdas 
+        self.lambdas = lambdas
         self.max_depth = max_depth
         self.epsilon = epsilon
         self.f = f
@@ -1054,8 +1050,7 @@ class SPPRegressor():
         X_binned_indptr = X_binned.indptr
 
         n_samples = X_binned.shape[0]
-        print('n_samples = ', n_samples)
-        print('dim solutions = ', len(self.solutions_))
+
         y_hats = np.zeros((n_samples, len(self.solutions_)))
 
         for i in range(len(self.solutions_)):
@@ -1075,8 +1070,6 @@ class SPPRegressor():
                 y_hat[interfeat_ind] += slope * np.array(interfeat_data)
 
             y_hats[:, i] = y_hat
-            print('shape y_hat = ', y_hat.shape)
-            print('n_samples = ', n_samples)
 
         if y_hats.shape[1] == 1:
             y_hats = y_hats[:, 0]
@@ -1107,7 +1100,8 @@ class SPPRegressor():
 
         scores = []
         for y_hat in y_hats.T:
-            scores.append(r2_score(y, y_hat))
+            # scores.append(r2_score(y, y_hat))
+            scores.append(mean_squared_error(y, y_hat))
 
         if len(scores) == 1:
             scores = scores[0]
@@ -1130,7 +1124,7 @@ def main():
     n_bins = 3
     max_depth = 2
     n_lambda = 1
-    # if n_lmbda is none otherwise list lmbdas 
+    # if n_lmbda is none otherwise list lmbdas
     tol = 1e-08
     lambda_max_ratio = 0.5
     n_active_max = 100
@@ -1142,13 +1136,9 @@ def main():
     enc = KBinsDiscretizer(n_bins=n_bins, encode=encode, strategy=strategy)
     X_binned = enc.fit_transform(X)
     X_binned = X_binned.tocsc()
-    print("X_binned = ", X_binned)
     X_binned_data = X_binned.data
-    print("X_binned_data = ", X_binned_data)
     X_binned_indices = X_binned.indices
-    print("X_binned_indices = ", X_binned_indices)
     X_binned_indptr = X_binned.indptr
-    print("X_binned_indptr = ", X_binned_indptr)
 
     ################################################################
     #                           Lasso
@@ -1227,7 +1217,7 @@ def main():
     # solutions = \
     #     spp_solver(X_binned, y=y, n_lambda=n_lambda, lambdas=lambdas,
     #                max_depth=max_depth, epsilon=epsilon, f=f,
-    #                n_epochs=n_epochs, tol=tol, 
+    #                n_epochs=n_epochs, tol=tol,
     #                lambda_max_ratio=lambda_max_ratio,
     #                n_active_max=n_active_max, screening=screening,
     #                store_history=store_history)
@@ -1251,7 +1241,7 @@ def main():
                                  residuals=residuals, max_depth=max_depth)
 
     # lambdas = [lmbda_max * lambda_max_ratio]
-    lambdas =[0.5]
+    lambdas = [0.5]
     # Binning process
     enc = KBinsDiscretizer(n_bins=n_bins, encode=encode,
                            strategy=strategy)
@@ -1261,8 +1251,8 @@ def main():
     spp_reg = SPPRegressor(n_lambda=n_lambda,
                            lambdas=lambdas,
                            max_depth=max_depth,
-                           epsilon=epsilon, f=f, n_epochs=n_epochs, tol=tol, 
-                           lambda_max_ratio=lambda_max_ratio, 
+                           epsilon=epsilon, f=f, n_epochs=n_epochs, tol=tol,
+                           lambda_max_ratio=lambda_max_ratio,
                            n_active_max=n_active_max,
                            screening=screening, store_history=store_history)
 
@@ -1273,6 +1263,7 @@ def main():
     print('non-zeros elemnts of y_hats = ', np.count_nonzero(y_hats))
     # cv_scores = spp_reg.score(X_binned, y)
     # print('cv_scores = ', cv_scores)
+
 
 if __name__ == "__main__":
     main()
