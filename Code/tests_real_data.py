@@ -329,6 +329,7 @@ def compute_gs(
         if name != "spp_reg":
             gs = GridSearchCV(
                 model, cv=n_splits, param_grid=tuned_parameters[name], n_jobs=n_jobs,
+                scoring='neg_mean_squared_error',
             )
 
             gs.fit(X, y)
