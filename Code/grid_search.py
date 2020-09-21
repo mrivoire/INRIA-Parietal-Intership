@@ -64,41 +64,31 @@ def time_convert(X):
 
 def get_models(
     X,
-    n_lambda,
-    lambdas,
-    lambda_lasso,
     n_bins,
-    max_depth,
-    epsilon,
-    f,
-    n_epochs,
-    tol,
-    lambda_max_ratio,
-    n_active_max,
-    screening,
-    store_history,
+    kwargs_lasso,
+    kwargs_spp
 ):
     """
     X: numpy.ndarray(), shape = (n_samples, n_features)
         features matrix
 
-    n_lambda: int 
+    n_lambda: int
         number of lambda parameters in the grid search
 
     lambdas: list of floats
-        list of lambda parameters 
-        if it is None, then we create a log-scale grid of lambdas 
+        list of lambda parameters
+        if it is None, then we create a log-scale grid of lambdas
 
-    lambda_lasso: float 
-        regularization parameter for the Lasso 
+    lambda_lasso: float
+        regularization parameter for the Lasso
 
-    n_bins: int 
+    n_bins: int
         number of bins in the binning process
 
-    max_depth: int 
+    max_depth: int
         maximum order of interactions
 
-    epsilon: float 
+    epsilon: float
         tolerance for the dual gap
 
     f: int
@@ -107,16 +97,16 @@ def get_models(
     n_epochs: int
         number of iterations until convergence of the sparse_cd algorithm
 
-    tol: float 
+    tol: float
         tolerance
 
-    lambda_max_ratio: float 
+    lambda_max_ratio: float
         lambda_max_ratio * lambda_max is the min value of the grid search
 
 
     n_active_max: int
-        defines the maximum number of active features that we accept in the 
-        active set so that the latter might not be too large and that the 
+        defines the maximum number of active features that we accept in the
+        active set so that the latter might not be too large and that the
         resolution of the optimization problem might be tractable
 
     screening: bool, default = True
@@ -138,11 +128,10 @@ def get_models(
         steps=[
             ("imputer", SimpleImputer(strategy="median")),
             ("scaler", StandardScaler()),
-            (
-                "binning",
+            ("binning",
                 KBinsDiscretizer(n_bins=n_bins, encode="onehot",
                                  strategy="quantile"),
-            ),
+             ),
         ]
     )
 
@@ -181,21 +170,14 @@ def get_models(
     tuned_parameters = {}
 
     # Lasso
-    lasso = Lasso(
-        lmbda=lambda_lasso,
-        epsilon=epsilon,
-        f=f,
-        n_epochs=n_epochs,
-        screening=screening,
-        store_history=store_history,
-    )
+    lasso = Lasso(**kwargs_lasso)
     models["lasso"] = Pipeline(
         steps=[("preprocessor", preprocessor), ("regressor", lasso)]
     )
     lmbdas = np.logspace(-4, -0.5, 3)
     tuned_parameters["lasso"] = {
         "regressor__lmbda": lmbdas,
-        "preprocessor__num__binning__n_bins": [2, 3, 4, 5],
+        "preprocessor__num__binning__n_bins": [2, 3, 4],
     }
 
     # LassoCV
@@ -204,7 +186,7 @@ def get_models(
                ("regressor", linear_model.LassoCV()), ]
     )
     tuned_parameters["lasso_cv"] = {
-        "preprocessor__num__binning__n_bins": [2, 3, 4, 5]}
+        "preprocessor__num__binning__n_bins": [2, 3, 4]}
 
     # RidgeCV
     models["ridge_cv"] = Pipeline(
@@ -212,7 +194,7 @@ def get_models(
                ("regressor", linear_model.RidgeCV()), ]
     )
     tuned_parameters["ridge_cv"] = {
-        "preprocessor__num__binning__n_bins": [2, 3, 4, 5]}
+        "preprocessor__num__binning__n_bins": [2, 3, 4]}
 
     # XGBoost
     xgb = XGBRegressor()
@@ -233,26 +215,14 @@ def get_models(
     tuned_parameters["rf"] = {"regressor__max_depth": [2, 3, 4, 5]}
 
     # SPP Regressor
-    spp_reg = SPPRegressor(
-        n_lambda,
-        lambdas,
-        max_depth,
-        epsilon,
-        f,
-        n_epochs,
-        tol,
-        lambda_max_ratio,
-        n_active_max,
-        screening,
-        store_history,
-    )
+    spp_reg = SPPRegressor(**kwargs_spp)
     models["spp_reg"] = Pipeline(
         steps=[("preprocessor", preprocessor), ("regressor", spp_reg)]
     )
 
     tuned_parameters["spp_reg"] = {
-        "preprocessor__num__binning__n_bins": [2, 3, 4, 5],
-        "regressor__max_depth": [2, 3, 4, 5],
+        "preprocessor__num__binning__n_bins": [2, 3, 4],
+        "regressor__max_depth": [2, 3],
     }
 
     return models, tuned_parameters
@@ -364,36 +334,30 @@ def compute_gs(
 
             for fold_num, (train_index, test_index) in enumerate(kf.split(X), 1):
                 # print("TRAIN:", train_index, "TEST:", test_index)
-                X_train, X_test = X.iloc[train_index].values, X.iloc[test_index].values
+                X_train, X_test = X.iloc[train_index], X.iloc[test_index]
                 y_train, y_test = y[train_index], y[test_index]
 
-                n_bins_list = [2, 3, 4]
-                max_depth_list = [2, 3]
+                n_bins_list = tuned_parameters['spp_reg']['preprocessor__num__binning__n_bins']
+                max_depth_list = tuned_parameters['spp_reg']['regressor__max_depth']
 
                 for n_bins in n_bins_list:
                     for max_depth in max_depth_list:
-                        spp_reg = SPPRegressor(
-                            n_lambda=n_lambda,
-                            lambdas=lambdas,
-                            max_depth=max_depth,
-                            epsilon=epsilon,
-                            f=f,
-                            n_epochs=n_epochs,
-                            tol=tol,
-                            lambda_max_ratio=lambda_max_ratio,
-                            n_active_max=n_active_max,
-                            screening=screening,
-                            store_history=store_history,
-                        )
+                        spp_reg = model.set_params(preprocessor__num__binning__n_bins=n_bins, regressor__max_depth=max_depth)
 
-                        enc = KBinsDiscretizer(
-                            n_bins=n_bins, encode='onehot', strategy='quantile')
-                        X_binned_train = enc.fit_transform(X_train)
-                        X_binned_test = enc.transform(X_test)
+                        # enc = KBinsDiscretizer(
+                        #     n_bins=n_bins, encode='onehot', strategy='quantile')
+                        # X_binned_train = enc.fit_transform(X_train)
+                        # X_binned_test = enc.transform(X_test)
 
-                        solutions = spp_reg.fit(
-                            X_binned_train, y_train).solutions_
-                        cv_scores = spp_reg.score(X_binned_test, y_test)
+                        # solutions = spp_reg.fit(
+                        #     X_binned_train, y_train).solutions_
+                        # cv_scores = spp_reg.score(X_binned_test, y_test)
+
+                        # solutions = spp_reg.fit(
+                        #     X_train, y_train).solutions_
+                        spp_reg.fit(X_train, y_train)
+                        solutions = ...
+                        cv_scores = spp_reg.score(X_test, y_test)
 
                         lambda_list = []
                         slopes_list = []
@@ -474,6 +438,29 @@ def main():
     lambdas = [1, 0.5, 0.2, 0.1, 0.01]
     n_active_max = 100
 
+    kwargs_spp = {
+        "n_lambda": n_lambda,
+        "lambdas": lambdas,
+        "max_depth": max_depth,
+        "epsilon": epsilon,
+        "f": f,
+        "n_epochs": n_epochs,
+        "tol": tol,
+        "lambda_max_ratio": lambda_max_ratio,
+        "n_active_max": n_active_max,
+        "screening": screening,
+        "store_history": store_history,
+    }
+
+    kwargs_lasso = {
+        "lmbda": lmbda_lasso,
+        "epsilon": epsilon,
+        "f": f,
+        "n_epochs": n_epochs,
+        "screening": screening,
+        "store_history": store_history,
+    }
+
     datasets = [
         "auto_prices",
         "lacrimes",
@@ -505,25 +492,44 @@ def main():
 
     X, y = load_auto_prices()
 
-    X = X[:100]
-    y = y[:100]
+    X = X[:1000]
+    y = y[:1000]
+
+    # models, tuned_parameters = get_models(
+    #     X=X,
+    #     n_lambda=n_lambda,
+    #     lambdas=lambdas,
+    #     lambda_lasso=lmbda_lasso,
+    #     n_bins=n_bins,
+    #     max_depth=max_depth,
+    #     epsilon=epsilon,
+    #     f=f,
+    #     n_epochs=n_epochs,
+    #     tol=tol,
+    #     lambda_max_ratio=lambda_max_ratio,
+    #     n_active_max=n_active_max,
+    #     screening=screening,
+    #     store_history=store_history,
+    # )
 
     models, tuned_parameters = get_models(
         X=X,
-        n_lambda=n_lambda,
-        lambdas=lambdas,
-        lambda_lasso=lmbda_lasso,
         n_bins=n_bins,
-        max_depth=max_depth,
-        epsilon=epsilon,
-        f=f,
-        n_epochs=n_epochs,
-        tol=tol,
-        lambda_max_ratio=lambda_max_ratio,
-        n_active_max=n_active_max,
-        screening=screening,
-        store_history=store_history,
+        kwargs_lasso=kwargs_lasso,
+        kwargs_spp=kwargs_spp
     )
+
+    del models['lasso']
+    del models['lasso_cv']
+    del models['ridge_cv']
+    del models['rf']
+    del models['xgb']
+
+    del tuned_parameters['lasso']
+    del tuned_parameters['lasso_cv']
+    del tuned_parameters['ridge_cv']
+    del tuned_parameters['rf']
+    del tuned_parameters['xgb']
 
     gs_models = compute_gs(
         X=X,

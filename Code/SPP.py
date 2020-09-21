@@ -9,6 +9,7 @@ from sklearn.metrics import r2_score
 from sklearn.utils import check_random_state
 from cd_solver_lasso_numba import sparse_cd
 from sklearn.metrics import mean_squared_error
+from sklearn.base import BaseEstimator, RegressorMixin
 
 #######################################################################
 #                   Safe Pattern Pruning Algorithm
@@ -975,7 +976,7 @@ def spp_solver(X_binned, y,
 # que je fais)
 
 
-class SPPRegressor():
+class SPPRegressor(BaseEstimator, RegressorMixin):
     def __init__(self, n_lambda, lambdas, max_depth, epsilon, f, n_epochs, tol,
                  lambda_max_ratio, n_active_max, screening, store_history):
         # quel est le plus petit lmbda qu'on s'autorise à chercher
