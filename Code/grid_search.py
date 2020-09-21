@@ -155,7 +155,8 @@ def get_models(
             ("num", numeric_transformer, numeric_feats),
             ("cat", categorical_transformer, categorical_feats),
             ("time", time_transformer, time_feats),
-        ]
+        ],
+        sparse_threshold=1  # we must have sparse output
     )
 
     rf_preprocessor = ColumnTransformer(
