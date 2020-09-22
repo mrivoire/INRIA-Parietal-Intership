@@ -380,6 +380,8 @@ def compute_gs(
     gs_models = {}
 
     for name, model in models.items():
+        print('name = ', name)
+        print('model = ', model)
         if name != "spp_reg":
             gs = GridSearchCV(
                 model, cv=n_splits, param_grid=tuned_parameters[name], n_jobs=n_jobs,
@@ -411,8 +413,12 @@ def compute_gs(
                         spp_reg = model.set_params(
                             preprocessor__num__binning__n_bins=n_bins, regressor__max_depth=max_depth)
 
-                        solutions = spp_reg.fit(
-                            X_train, y_train).steps[1][1].solutions_
+                        print('before sol')
+
+                        spp_reg.fit(X_train, y_train)
+                        solutions = spp_reg.steps[1][1].solutions_
+
+                        print('after sol')
 
                         print('solutions = ', solutions)
 
@@ -420,6 +426,7 @@ def compute_gs(
 
                         lambda_list = []
                         slopes_list = []
+
                         for this_sol in solutions:
                             lambda_list.append(this_sol["lambda"])
                             slopes_list.append(this_sol["spp_lasso_slopes"])
@@ -504,9 +511,11 @@ def main():
     n_bins = 3
     max_depth = 2
     tol = 1e-08
-    n_lambda = 100
+    n_lambda = 10
     lambda_max_ratio = 0.5
-    lambdas = [1, 0.5, 0.2, 0.1, 0.01]
+    # lambdas = [1, 0.5, 0.2, 0.1, 0.01]
+    # lambdas = None
+    lambdas = [0.1]
     n_active_max = 100
 
     kwargs_spp = {
@@ -565,23 +574,6 @@ def main():
 
     X = X[:100]
     y = y[:100]
-
-    # models, tuned_parameters = get_models(
-    #     X=X,
-    #     n_lambda=n_lambda,
-    #     lambdas=lambdas,
-    #     lambda_lasso=lmbda_lasso,
-    #     n_bins=n_bins,
-    #     max_depth=max_depth,
-    #     epsilon=epsilon,
-    #     f=f,
-    #     n_epochs=n_epochs,
-    #     tol=tol,
-    #     lambda_max_ratio=lambda_max_ratio,
-    #     n_active_max=n_active_max,
-    #     screening=screening,
-    #     store_history=store_history,
-    # )
 
     models, tuned_parameters = get_models(
         X=X,
