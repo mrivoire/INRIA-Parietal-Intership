@@ -94,24 +94,61 @@ def time_convert(X):
 
 def get_models(
     X,
-    n_lambda,
-    lambdas,
-    lambda_lasso,
     n_bins,
-    max_depth,
-    epsilon,
-    f,
-    n_epochs,
-    tol,
-    lambda_max_ratio,
-    n_active_max,
-    screening,
-    store_history,
+    kwargs_lasso,
+    kwargs_spp
 ):
+    """
+    X: numpy.ndarray(), shape = (n_samples, n_features)
+        features matrix
+
+    n_lambda: int
+        number of lambda parameters in the grid search
+
+    lambdas: list of floats
+        list of lambda parameters
+        if it is None, then we create a log-scale grid of lambdas
+
+    lambda_lasso: float
+        regularization parameter for the Lasso
+
+    n_bins: int
+        number of bins in the binning process
+
+    max_depth: int
+        maximum order of interactions
+
+    epsilon: float
+        tolerance for the dual gap
+
+    f: int
+        frequency
+
+    n_epochs: int
+        number of iterations until convergence of the sparse_cd algorithm
+
+    tol: float
+        tolerance
+
+    lambda_max_ratio: float
+        lambda_max_ratio * lambda_max is the min value of the grid search
+
+
+    n_active_max: int
+        defines the maximum number of active features that we accept in the
+        active set so that the latter might not be too large and that the
+        resolution of the optimization problem might be tractable
+
+    screening: bool, default = True
+        defines whether or not one adds screening to the solver
+
+    store_history: bool, default = True
+        defines whether or not one stores the values of the parameters
+        while the solver is running
+
+    """
+
     # Pipeline
-    # **kwargs_lasso, **kwargs_spp
-    # kwargs_lasso = dict, kwargs_spp = dict
-    # call **kwargs_lasso, **kwargs_spp
 
     time_feats = time_features(X)
     time_transformer = FunctionTransformer(time_convert)
@@ -121,11 +158,10 @@ def get_models(
         steps=[
             ("imputer", SimpleImputer(strategy="median")),
             ("scaler", StandardScaler()),
-            (
-                "binning",
+            ("binning",
                 KBinsDiscretizer(n_bins=n_bins, encode="onehot",
                                  strategy="quantile"),
-            ),
+             ),
         ]
     )
 
@@ -149,7 +185,8 @@ def get_models(
             ("num", numeric_transformer, numeric_feats),
             ("cat", categorical_transformer, categorical_feats),
             ("time", time_transformer, time_feats),
-        ]
+        ],
+        sparse_threshold=1  # we must have sparse output
     )
 
     rf_preprocessor = ColumnTransformer(
@@ -164,21 +201,14 @@ def get_models(
     tuned_parameters = {}
 
     # Lasso
-    lasso = Lasso(
-        lmbda=lambda_lasso,
-        epsilon=epsilon,
-        f=f,
-        n_epochs=n_epochs,
-        screening=screening,
-        store_history=store_history,
-    )
+    lasso = Lasso(**kwargs_lasso)
     models["lasso"] = Pipeline(
         steps=[("preprocessor", preprocessor), ("regressor", lasso)]
     )
     lmbdas = np.logspace(-4, -0.5, 3)
     tuned_parameters["lasso"] = {
         "regressor__lmbda": lmbdas,
-        "preprocessor__num__binning__n_bins": [2, 3, 4, 5],
+        "preprocessor__num__binning__n_bins": [2, 3, 4],
     }
 
     # LassoCV
@@ -187,7 +217,7 @@ def get_models(
                ("regressor", linear_model.LassoCV()), ]
     )
     tuned_parameters["lasso_cv"] = {
-        "preprocessor__num__binning__n_bins": [2, 3, 4, 5]}
+        "preprocessor__num__binning__n_bins": [2, 3, 4]}
 
     # RidgeCV
     models["ridge_cv"] = Pipeline(
@@ -195,7 +225,7 @@ def get_models(
                ("regressor", linear_model.RidgeCV()), ]
     )
     tuned_parameters["ridge_cv"] = {
-        "preprocessor__num__binning__n_bins": [2, 3, 4, 5]}
+        "preprocessor__num__binning__n_bins": [2, 3, 4]}
 
     # XGBoost
     xgb = XGBRegressor()
@@ -216,26 +246,14 @@ def get_models(
     tuned_parameters["rf"] = {"regressor__max_depth": [2, 3, 4, 5]}
 
     # SPP Regressor
-    spp_reg = SPPRegressor(
-        n_lambda,
-        lambdas,
-        max_depth,
-        epsilon,
-        f,
-        n_epochs,
-        tol,
-        lambda_max_ratio,
-        n_active_max,
-        screening,
-        store_history,
-    )
+    spp_reg = SPPRegressor(**kwargs_spp)
     models["spp_reg"] = Pipeline(
         steps=[("preprocessor", preprocessor), ("regressor", spp_reg)]
     )
 
     tuned_parameters["spp_reg"] = {
-        "preprocessor__num__binning__n_bins": [2, 3, 4, 5],
-        "regressor__max_depth": [2, 3, 4, 5],
+        "preprocessor__num__binning__n_bins": [2, 3, 4],
+        "regressor__max_depth": [2, 3],
     }
 
     return models, tuned_parameters
@@ -313,6 +331,43 @@ def compute_gs(
     n_splits: int
         number of folds
 
+    n_lambda: int 
+        number of lambda parameters in the grid search
+
+    lambdas: list of floats
+        list of lambda parameters 
+        if it is None, then we create a log-scale grid of lambdas 
+
+    max_depth: int 
+        maximum order of interactions
+
+    epsilon: float 
+        dual gap tolerance 
+
+    f: int
+        frequency
+
+    n_epochs: int
+        number of iterations until convergence of the sparse_cd algorithm
+
+    tol: float 
+        tolerance
+
+    lambda_max_ratio: float 
+        lambda_max_ratio * lambda_max is the min value of the grid search
+
+    n_active_max: int
+        defines the maximum number of active features that we accept in the 
+        active set so that the latter might not be too large and that the 
+        resolution of the optimization problem might be tractable
+
+    screening: bool, default = True
+        defines whether or not one adds screening to the solver
+
+    store_history: bool, default = True
+        defines whether or not one stores the values of the parameters
+        while the solver is running
+
     n_jobs: int
         number of jobs in parallel
 
@@ -321,7 +376,6 @@ def compute_gs(
     cv_scores: dict
         cross validation scores for different models
     """
-    # X = np.array(X.rename_axis('ID'))
     y = np.array(y).astype("float")
     gs_models = {}
 
@@ -346,38 +400,34 @@ def compute_gs(
 
             for fold_num, (train_index, test_index) in enumerate(kf.split(X), 1):
                 # print("TRAIN:", train_index, "TEST:", test_index)
-                X_train, X_test = X.iloc[train_index].values, X.iloc[test_index].values
+                X_train, X_test = X.iloc[train_index], X.iloc[test_index]
                 y_train, y_test = y[train_index], y[test_index]
 
-                # n_bins_list = [2, 3, 4, 5]
-                # max_depth_list = [2, 3, 4, 5]
-                n_bins_list = [2, 3, 4]
-                max_depth_list = [2, 3]
+                n_bins_list = tuned_parameters['spp_reg']['preprocessor__num__binning__n_bins']
+                max_depth_list = tuned_parameters['spp_reg']['regressor__max_depth']
 
                 for n_bins in n_bins_list:
                     for max_depth in max_depth_list:
-                        spp_reg = SPPRegressor(
-                            n_lambda=n_lambda,
-                            lambdas=lambdas,
-                            max_depth=max_depth,
-                            epsilon=epsilon,
-                            f=f,
-                            n_epochs=n_epochs,
-                            tol=tol,
-                            lambda_max_ratio=lambda_max_ratio,
-                            n_active_max=n_active_max,
-                            screening=screening,
-                            store_history=store_history,
-                        )
-                        # spp_reg = model.set_params(preprocessor__num__binning__n_bins=n_bins, regressor__max_depth=max_depth)
-                        enc = KBinsDiscretizer(
-                            n_bins=n_bins, encode='onehot', strategy='quantile')
-                        X_binned_train = enc.fit_transform(X_train)
-                        X_binned_test = enc.transform(X_test)
+                        spp_reg = model.set_params(
+                            preprocessor__num__binning__n_bins=n_bins, regressor__max_depth=max_depth)
 
+                        # enc = KBinsDiscretizer(
+                        #     n_bins=n_bins, encode='onehot', strategy='quantile')
+                        # X_binned_train = enc.fit_transform(X_train)
+                        # X_binned_test = enc.transform(X_test)
+
+                        # solutions = spp_reg.fit(
+                        #     X_binned_train, y_train).solutions_
+                        # cv_scores = spp_reg.score(X_binned_test, y_test)
+
+                        # solutions = spp_reg.fit(
+                        #     X_train, y_train).solutions_
                         solutions = spp_reg.fit(
-                            X_binned_train, y_train).solutions_
-                        cv_scores = spp_reg.score(X_binned_test, y_test)
+                            X_train, y_train).steps[1][1].solutions_
+
+                        print('solutions = ', solutions)
+
+                        cv_scores = spp_reg.score(X_test, y_test)
 
                         lambda_list = []
                         slopes_list = []
@@ -387,9 +437,6 @@ def compute_gs(
 
                         if type(cv_scores) is np.float64:
                             cv_scores = [cv_scores]
-
-                        # import ipdb
-                        # ipdb.set_trace()
 
                         results = {
                             "n_bins": [n_bins] * len(cv_scores),
@@ -425,6 +472,14 @@ def compute_gs(
 
             print('best_score = ', best_score)
 
+            best_n_bins = best_params.iloc[0, 0]
+            best_max_depth = best_params.iloc[0, 1]
+            best_lambda = best_params.iloc[0, 2]
+
+            print('best_n_bins = ', best_n_bins)
+            print('best_max_depth = ', best_max_depth)
+            print('best_lambda = ', best_lambda)
+
             results_gs = {
                 "best_score": best_score,
                 "best_params": {'n_bins': best_params.iloc[0, 0],
@@ -433,11 +488,10 @@ def compute_gs(
                                 },
             }
 
-        gs_models[name] = results_gs
+            # import ipdb
+            # ipdb.set_trace()
 
-        # test on a synthetic dataset such as checkerboard and compare optimal
-        # params with the ones obtained with lasso cv on polynomial features
-        # (function already implemented)
+        gs_models[name] = results_gs
 
     return gs_models
 
@@ -448,23 +502,22 @@ def main():
     #                           Parameters
     ####################################################################
 
-    lmbda = 1.0
+    lmbda_lasso = 1.0
     epsilon = 1e-7
     f = 10
     n_splits = 2
     screening = True
     store_history = True
     n_epochs = 10000
-    n_jobs = 4
-    encode = "onehot"
-    strategy = "quantile"
+    n_jobs = 1
+    # encode = "onehot"
+    # strategy = "quantile"
     n_bins = 3
     max_depth = 2
-    n_val_gs = 100
     tol = 1e-08
     n_lambda = 100
     lambda_max_ratio = 0.5
-    lambdas = [0.5]
+    lambdas = [1, 0.5, 0.2, 0.1, 0.01]
     n_active_max = 100
 
     kwargs_spp = {
@@ -482,37 +535,13 @@ def main():
     }
 
     kwargs_lasso = {
-        "lmbda": lmbda,
+        "lmbda": lmbda_lasso,
         "epsilon": epsilon,
         "f": f,
         "n_epochs": n_epochs,
         "screening": screening,
         "store_history": store_history,
     }
-
-    ######################################################################
-    #                  Auto Label Function For Bar Plots
-    ######################################################################
-
-    def autolabel(rects, scale):
-        """Attach a text label above each bar in *rects*, displaying its
-        height.
-        """
-
-        for rect in rects:
-            height = rect.get_height()
-            ax.annotate(
-                "{}".format(round(height * scale, 0) / scale),
-                xy=(rect.get_x() + rect.get_width() / 2, height),
-                xytext=(0, 3),  # 3 points vertical offset
-                textcoords="offset points",
-                ha="center",
-                va="bottom",
-            )
-
-    #########################################################################
-    #                       Auto Prices Dataset
-    #########################################################################
 
     datasets = [
         "auto_prices",
@@ -522,166 +551,192 @@ def main():
         "housing_prices",
     ]
 
-    for i in range(len(datasets)):
-        if datasets[i] == "auto_prices":
-            X, y = load_auto_prices()
-            data_name = "auto_prices"
-        if datasets[i] == "lacrimes":
-            continue
-            X, y = load_lacrimes()
-            data_name = "lacrimes"
-        if datasets[i] == "black_friday":
-            continue
-            X, y = load_black_friday()
-            data_name = "black_friday"
-        if datasets[i] == "nyc_taxi":
-            continue
-            X, y = load_nyc_taxi()
-            data_name = "nyc_taxi"
-        if datasets[i] == "housing_prices":
-            continue
-            load_housing_prices()
-            data_name = "housing_prices"
+    # for i in range(len(datasets)):
+    #     if datasets[i] == "auto_prices":
+    #         X, y = load_auto_prices()
+    #         data_name = "auto_prices"
+    #     if datasets[i] == "lacrimes":
+    #         continue
+    #         X, y = load_lacrimes()
+    #         data_name = "lacrimes"
+    #     if datasets[i] == "black_friday":
+    #         continue
+    #         X, y = load_black_friday()
+    #         data_name = "black_friday"
+    #     if datasets[i] == "nyc_taxi":
+    #         continue
+    #         X, y = load_nyc_taxi()
+    #         data_name = "nyc_taxi"
+    #     if datasets[i] == "housing_prices":
+    #         continue
+    #         load_housing_prices()
+    #         data_name = "housing_prices"
 
-        X = X[:10]
-        y = y[:10]
-        models, tuned_parameters = get_models(
-            X=X,
-            n_lambda=n_lambda,
-            lambdas=lambdas,
-            lambda_lasso=lmbda,
-            n_bins=n_bins,
-            max_depth=max_depth,
-            epsilon=epsilon,
-            f=f,
-            n_epochs=n_epochs,
-            tol=tol,
-            lambda_max_ratio=lambda_max_ratio,
-            n_active_max=n_active_max,
-            screening=screening,
-            store_history=store_history,
-        )
+    X, y = load_auto_prices()
 
-        print("models = ", models)
-        print("tuned_params = ", tuned_parameters)
+    X = X[:100]
+    y = y[:100]
 
-        # cv_scores = compute_cv(
-        #     X=X, y=y, models=models, n_splits=n_splits, n_jobs=n_jobs
-        # )
+    # models, tuned_parameters = get_models(
+    #     X=X,
+    #     n_lambda=n_lambda,
+    #     lambdas=lambdas,
+    #     lambda_lasso=lmbda_lasso,
+    #     n_bins=n_bins,
+    #     max_depth=max_depth,
+    #     epsilon=epsilon,
+    #     f=f,
+    #     n_epochs=n_epochs,
+    #     tol=tol,
+    #     lambda_max_ratio=lambda_max_ratio,
+    #     n_active_max=n_active_max,
+    #     screening=screening,
+    #     store_history=store_history,
+    # )
 
-        # print("cv_scores = ", cv_scores)
+    models, tuned_parameters = get_models(
+        X=X,
+        n_bins=n_bins,
+        kwargs_lasso=kwargs_lasso,
+        kwargs_spp=kwargs_spp
+    )
 
-        # list_cv_scores = []
+    del models['lasso']
+    del models['lasso_cv']
+    del models['ridge_cv']
+    del models['rf']
+    del models['xgb']
 
-        # for k, v in cv_scores.items():
-        #     print(f"{k}: {v}")
-        #     list_cv_scores.append(v)
+    del tuned_parameters['lasso']
+    del tuned_parameters['lasso_cv']
+    del tuned_parameters['ridge_cv']
+    del tuned_parameters['rf']
+    del tuned_parameters['xgb']
 
-        # print("cv_scores without tuning params = ", list_cv_scores)
+    gs_models = compute_gs(
+        X=X,
+        y=y,
+        models=models,
+        tuned_parameters=tuned_parameters,
+        n_splits=n_splits,
+        n_lambda=n_lambda,
+        lambdas=lambdas,
+        max_depth=max_depth,
+        epsilon=epsilon,
+        f=f,
+        n_epochs=n_epochs,
+        tol=tol,
+        lambda_max_ratio=lambda_max_ratio,
+        n_active_max=n_active_max,
+        screening=screening,
+        store_history=store_history,
+        n_jobs=n_jobs,
+    )
 
-        gs_models = compute_gs(
-            X=X,
-            y=y,
-            models=models,
-            tuned_parameters=tuned_parameters,
-            n_splits=n_splits,
-            n_lambda=n_lambda,
-            lambdas=lambdas,
-            max_depth=max_depth,
-            epsilon=epsilon,
-            f=f,
-            n_epochs=n_epochs,
-            tol=tol,
-            lambda_max_ratio=lambda_max_ratio,
-            n_active_max=n_active_max,
-            screening=screening,
-            store_history=store_history,
-            n_jobs=1,
-        )
+    print("gs_models = ", gs_models)
+    best_score_spp = gs_models["spp_reg"]["best_score"]
+    best_params_spp = gs_models["spp_reg"]["best_params"]
 
-        print("gs_models = ", gs_models)
-        best_score_spp = gs_models["spp_reg"]["best_score"]
-        best_params_spp = gs_models["spp_reg"]["best_params"]
+    print('best_score_spp = ', best_score_spp)
+    print('best_params = ', best_params_spp)
 
-        print('best_score_spp = ', best_score_spp)
-        print('best_params = ', best_params_spp)
-        # list_gs_scores = []
-        # scores = pd.DataFrame(
-        #     {"model": [], "best_cv_score": [], "best_param": []}
-        # )
+    # list_gs_scores = []
+    # scores = pd.DataFrame(
+    #     {"model": [], "best_cv_score": [], "best_param": []}
+    # )
 
-        # for k, v in gs_scores.items():
-        #     print(f"{k} -- best params = {v.best_params_}")
-        #     print(f"{k} -- cv scores = {v.best_score_}")
-        #     list_gs_scores.append(v.best_score_)
-        #     scores = scores.append(
-        #         pd.DataFrame(
-        #             {
-        #                 "model": [k],
-        #                 "best_cv_score": [v.best_score_],
-        #                 "best_param": [v.best_params_],
-        #             }
-        #         )
-        #     )
+    # for k, v in gs_scores.items():
+    #     print(f"{k} -- best params = {v.best_params_}")
+    #     print(f"{k} -- cv scores = {v.best_score_}")
+    #     list_gs_scores.append(v.best_score_)
+    #     scores = scores.append(
+    #         pd.DataFrame(
+    #             {
+    #                 "model": [k],
+    #                 "best_cv_score": [v.best_score_],
+    #                 "best_param": [v.best_params_],
+    #             }
+    #         )
+    #     )
 
-        # print("Housing Prices Dataset with 100 samples")
-        # print("cv_score with tuning params = ", list_gs_scores)
+    # print("Housing Prices Dataset with 100 samples")
+    # print("cv_score with tuning params = ", list_gs_scores)
 
-        # print(scores)
-        # scores.to_csv(
-        #     "/home/mrivoire/Documents/M2DS_Polytechnique/INRIA-Parietal-Intership/Code/"
-        #     + data_name
-        #     + ".csv",
-        #     index=False,
-        # )
+    # print(scores)
+    # scores.to_csv(
+    #     "/home/mrivoire/Documents/M2DS_Polytechnique/INRIA-Parietal-Intership/Code/"
+    #     + data_name
+    #     + ".csv",
+    #     index=False,
+    # )
 
-        #######################################################################
-        #                         Bar Plots CV Scores
-        #######################################################################
+    #######################################################################
+    #                         Bar Plots CV Scores
+    #######################################################################
 
-        # labels = ["Lasso", "Lasso_cv", "Ridge_cv", "XGB", "RF"]
+    ######################################################################
+    #                  Auto Label Function For Bar Plots
+    ######################################################################
 
-        # x = np.arange(len(labels))  # the label locations
-        # width = 0.35  # the width of the bars
+    # def autolabel(rects, scale):
+    #     """Attach a text label above each bar in *rects*, displaying its
+    #     height.
+    #     """
 
-        # fig, ax = plt.subplots()
-        # rects1 = ax.bar(x, list_gs_scores, width)
-        # # Add some text for labels, title and custom x-axis tick labels, etc.
-        # ax.set_ylabel("CV Scores")
-        # ax.set_title("Crossval Scores By Predictive Model With Tuning For 100 Samples")
-        # ax.set_xticks(x)
-        # ax.set_xticklabels(labels)
-        # ax.legend()
+    #     for rect in rects:
+    #         height = rect.get_height()
+    #         ax.annotate(
+    #             "{}".format(round(height * scale, 0) / scale),
+    #             xy=(rect.get_x() + rect.get_width() / 2, height),
+    #             xytext=(0, 3),  # 3 points vertical offset
+    #             textcoords="offset points",
+    #             ha="center",
+    #             va="bottom",
+    #         )
 
-        # autolabel(rects1, 1000)
+    # labels = ["Lasso", "Lasso_cv", "Ridge_cv", "XGB", "RF"]
 
-        # fig.tight_layout()
+    # x = np.arange(len(labels))  # the label locations
+    # width = 0.35  # the width of the bars
 
-        # plt.show()
+    # fig, ax = plt.subplots()
+    # rects1 = ax.bar(x, list_gs_scores, width)
+    # # Add some text for labels, title and custom x-axis tick labels, etc.
+    # ax.set_ylabel("CV Scores")
+    # ax.set_title("Crossval Scores By Predictive Model With Tuning For 100 Samples")
+    # ax.set_xticks(x)
+    # ax.set_xticklabels(labels)
+    # ax.legend()
 
-        #######################################################################
-        #                         Bar Plots CV Time
-        #######################################################################
+    # autolabel(rects1, 1000)
 
-        # labels = ["Lasso", "Lasso_cv", "Ridge_cv", "XGB", "RF"]
+    # fig.tight_layout()
 
-        # x = np.arange(len(labels))  # the label locations
-        # width = 0.35  # the width of the bars
+    # plt.show()
 
-        # fig, ax = plt.subplots()
-        # rects1 = ax.bar(x, execution_time_list, width)
-        # # Add some text for labels, title and custom x-axis tick labels, etc.
-        # ax.set_ylabel("Running Time")
-        # ax.set_title("Running Time By Predictive Model With Tuning For 100 Samples")
-        # ax.set_xticks(x)
-        # ax.set_xticklabels(labels)
-        # ax.legend()
+    #######################################################################
+    #                         Bar Plots CV Time
+    #######################################################################
 
-        # autolabel(rects1, 1000)
+    # labels = ["Lasso", "Lasso_cv", "Ridge_cv", "XGB", "RF"]
 
-        # fig.tight_layout()
+    # x = np.arange(len(labels))  # the label locations
+    # width = 0.35  # the width of the bars
 
-        # plt.show()
+    # fig, ax = plt.subplots()
+    # rects1 = ax.bar(x, execution_time_list, width)
+    # # Add some text for labels, title and custom x-axis tick labels, etc.
+    # ax.set_ylabel("Running Time")
+    # ax.set_title("Running Time By Predictive Model With Tuning For 100 Samples")
+    # ax.set_xticks(x)
+    # ax.set_xticklabels(labels)
+    # ax.legend()
+
+    # autolabel(rects1, 1000)
+
+    # fig.tight_layout()
+
+    # plt.show()
 
 
 if __name__ == "__main__":
