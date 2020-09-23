@@ -17,7 +17,7 @@ def test_compute_gs():
     n_bins = 3
     n_samples = 3000
 
-    lmbda = 0.1
+    lambda_lasso = 0.1
     epsilon = 1e-7
     f = 10
     n_splits = 2
@@ -33,24 +33,39 @@ def test_compute_gs():
     lambdas = [1, 0.5, 0.2, 0.1, 0.01]
     n_active_max = 100
 
+    kwargs_spp = {
+        "n_lambda": n_lambda,
+        "lambdas": lambdas,
+        "max_depth": max_depth,
+        "epsilon": epsilon,
+        "f": f,
+        "n_epochs": n_epochs,
+        "tol": tol,
+        "lambda_max_ratio": lambda_max_ratio,
+        "n_active_max": n_active_max,
+        "screening": screening,
+        "store_history": store_history,
+    }
+
+    kwargs_lasso = {
+        "lmbda": lambda_lasso,
+        "epsilon": epsilon,
+        "f": f,
+        "n_epochs": n_epochs,
+        "screening": screening,
+        "store_history": store_history,
+    }
+
     X, y = checkerboard(dim1=dim1, dim2=dim2, n_samples=n_samples,
                         n_bins=n_bins)
     X = pd.DataFrame(X)
 
-    models, tuned_params = get_models(X=X,
-                                      n_lambda=n_lambda,
-                                      lambdas=lambdas,
-                                      lambda_lasso=lmbda,
-                                      n_bins=n_bins,
-                                      max_depth=max_depth,
-                                      epsilon=epsilon,
-                                      f=f,
-                                      n_epochs=n_epochs,
-                                      tol=tol,
-                                      lambda_max_ratio=lambda_max_ratio,
-                                      n_active_max=n_active_max,
-                                      screening=screening,
-                                      store_history=store_history)
+    models, tuned_params = get_models(
+        X=X,
+        n_bins=n_bins,
+        kwargs_lasso=kwargs_lasso,
+        kwargs_spp=kwargs_spp
+    )
 
     # Save time
     del models['lasso']
@@ -133,7 +148,7 @@ def test_compute_gs():
 
 def main():
 
-    test_crossval_spp()
+    test_compute_gs()
 
 
 if __name__ == "__main__":
