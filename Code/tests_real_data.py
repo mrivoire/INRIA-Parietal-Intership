@@ -2,24 +2,6 @@
 Experiments on real data with categorical variables
 
 """
-import numpy as np
-import time
-import matplotlib.pyplot as plt
-from numpy.core import numeric
-import pandas as pd
-
-from xgboost import XGBRegressor
-from sklearn.ensemble import RandomForestRegressor
-from sklearn.preprocessing import KBinsDiscretizer
-from sklearn.model_selection import cross_val_score
-from sklearn import linear_model
-from sklearn.compose import ColumnTransformer
-from sklearn.pipeline import Pipeline
-from sklearn.impute import SimpleImputer
-from sklearn.preprocessing import StandardScaler, OneHotEncoder
-from sklearn.model_selection import GridSearchCV
-from sklearn.preprocessing import FunctionTransformer
-from cd_solver_lasso_numba import Lasso
 from dataset import (
     load_auto_prices,
     load_lacrimes,
@@ -27,9 +9,6 @@ from dataset import (
     load_nyc_taxi,
     load_housing_prices,
 )
-from SPP import SPPRegressor
-from sklearn.model_selection import KFold
-from sklearn.utils import shuffle
 
 from grid_search import get_models, compute_gs
 
@@ -82,35 +61,6 @@ def main():
         "screening": screening,
         "store_history": store_history,
     }
-
-    datasets = [
-        "auto_prices",
-        "lacrimes",
-        "black_friday",
-        "nyc_taxi",
-        "housing_prices",
-    ]
-
-    # for i in range(len(datasets)):
-    #     if datasets[i] == "auto_prices":
-    #         X, y = load_auto_prices()
-    #         data_name = "auto_prices"
-    #     if datasets[i] == "lacrimes":
-    #         continue
-    #         X, y = load_lacrimes()
-    #         data_name = "lacrimes"
-    #     if datasets[i] == "black_friday":
-    #         continue
-    #         X, y = load_black_friday()
-    #         data_name = "black_friday"
-    #     if datasets[i] == "nyc_taxi":
-    #         continue
-    #         X, y = load_nyc_taxi()
-    #         data_name = "nyc_taxi"
-    #     if datasets[i] == "housing_prices":
-    #         continue
-    #         load_housing_prices()
-    #         data_name = "housing_prices"
 
     X, y = load_auto_prices()
 

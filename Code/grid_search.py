@@ -3,9 +3,6 @@ Experiments on real data with categorical variables
 
 """
 import numpy as np
-import time
-import matplotlib.pyplot as plt
-from numpy.core import numeric
 import pandas as pd
 
 from xgboost import XGBRegressor
@@ -22,14 +19,9 @@ from sklearn.preprocessing import FunctionTransformer
 from cd_solver_lasso_numba import Lasso
 from dataset import (
     load_auto_prices,
-    load_lacrimes,
-    load_black_friday,
-    load_nyc_taxi,
-    load_housing_prices,
 )
 from SPP import SPPRegressor
 from sklearn.model_selection import KFold
-from sklearn.utils import shuffle
 
 # from pandas_profiling import ProfileReport
 
