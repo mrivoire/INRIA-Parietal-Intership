@@ -92,6 +92,11 @@ def time_convert(X):
 ################################################################
 
 
+################################################################
+#                       Grid Search
+################################################################
+
+
 def get_models(
     X,
     n_bins,
@@ -380,6 +385,8 @@ def compute_gs(
     gs_models = {}
 
     for name, model in models.items():
+        print('name = ', name)
+        print('model = ', model)
         if name != "spp_reg":
             gs = GridSearchCV(
                 model, cv=n_splits, param_grid=tuned_parameters[name], n_jobs=n_jobs,
@@ -405,25 +412,16 @@ def compute_gs(
 
                 n_bins_list = tuned_parameters['spp_reg']['preprocessor__num__binning__n_bins']
                 max_depth_list = tuned_parameters['spp_reg']['regressor__max_depth']
-
                 for n_bins in n_bins_list:
                     for max_depth in max_depth_list:
                         spp_reg = model.set_params(
                             preprocessor__num__binning__n_bins=n_bins, regressor__max_depth=max_depth)
 
-                        # enc = KBinsDiscretizer(
-                        #     n_bins=n_bins, encode='onehot', strategy='quantile')
-                        # X_binned_train = enc.fit_transform(X_train)
-                        # X_binned_test = enc.transform(X_test)
+                        spp_reg.fit(X_train, y_train)
+                        solutions = spp_reg.steps[1][1].solutions_
 
-                        # solutions = spp_reg.fit(
-                        #     X_binned_train, y_train).solutions_
-                        # cv_scores = spp_reg.score(X_binned_test, y_test)
-
-                        # solutions = spp_reg.fit(
-                        #     X_train, y_train).solutions_
-                        solutions = spp_reg.fit(
-                            X_train, y_train).steps[1][1].solutions_
+                        # import ipdb
+                        # ipdb.set_trace()
 
                         print('solutions = ', solutions)
 
@@ -431,6 +429,7 @@ def compute_gs(
 
                         lambda_list = []
                         slopes_list = []
+
                         for this_sol in solutions:
                             lambda_list.append(this_sol["lambda"])
                             slopes_list.append(this_sol["spp_lasso_slopes"])
@@ -487,9 +486,6 @@ def compute_gs(
                                 'lambda': best_params.iloc[0, 2]
                                 },
             }
-
-            # import ipdb
-            # ipdb.set_trace()
 
         gs_models[name] = results_gs
 
