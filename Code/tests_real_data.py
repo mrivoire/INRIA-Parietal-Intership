@@ -2,6 +2,7 @@
 Experiments on real data with categorical variables
 
 """
+import pandas as pd
 from dataset import (
     load_auto_prices,
     load_lacrimes,
@@ -74,17 +75,17 @@ def main():
         kwargs_spp=kwargs_spp
     )
 
-    del models['lasso']
-    del models['lasso_cv']
-    del models['ridge_cv']
-    del models['rf']
-    del models['xgb']
+    # del models['lasso']
+    # del models['lasso_cv']
+    # del models['ridge_cv']
+    # del models['rf']
+    # del models['xgb']
 
-    del tuned_parameters['lasso']
-    del tuned_parameters['lasso_cv']
-    del tuned_parameters['ridge_cv']
-    del tuned_parameters['rf']
-    del tuned_parameters['xgb']
+    # del tuned_parameters['lasso']
+    # del tuned_parameters['lasso_cv']
+    # del tuned_parameters['ridge_cv']
+    # del tuned_parameters['rf']
+    # del tuned_parameters['xgb']
 
     gs_models = compute_gs(
         X=X,
@@ -112,6 +113,23 @@ def main():
 
     print('best_score_spp = ', best_score_spp)
     print('best_params = ', best_params_spp)
+
+    list_df = []
+
+    for model in gs_models.keys():
+        df = pd.DataFrame(gs_models[model])
+        df["model"] = model
+        list_df.append(df)
+
+    results = pd.concat(list_df)
+
+    print('gs_models_df = ', results)
+
+    # gs_models_df.columns = [
+    #     'best_params_spp', 'best_score_spp']
+
+    results.to_csv(
+        r'/home/mrivoire/Documents/M2DS_Polytechnique/INRIA-Parietal-Intership/Code/results_auto_prices.csv', index=False)
 
     # list_gs_scores = []
     # scores = pd.DataFrame(
