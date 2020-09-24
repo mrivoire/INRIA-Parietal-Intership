@@ -852,7 +852,7 @@ def spp_solver(X_binned, y,
         solutions_dict = {}
         solutions_dict['lambda'] = lmbda_t
 
-        if abs(G_lmbda) < tol:
+        if G_lmbda < tol:
             print('The current active set has already reached the support' +
                   ' of the optimal model')
 

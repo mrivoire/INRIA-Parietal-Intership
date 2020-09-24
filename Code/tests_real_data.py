@@ -64,8 +64,8 @@ def main():
 
     X, y = load_auto_prices()
 
-    X = X[:100]
-    y = y[:100]
+    X = X[:1000]
+    y = y[:1000]
 
     models, tuned_parameters = get_models(
         X=X,
