@@ -753,7 +753,7 @@ def spp_solver(X_binned, y,
 
     if lambdas is None:
         lambdas_grid = np.logspace(np.log10(lambda_max * lambda_max_ratio),
-                                   np.log10(lambda_max), num=n_lambda)[::-1]
+                                   np.log10(0.99*lambda_max), num=n_lambda)[::-1]
     else:
         lambdas_grid = np.sort(lambdas)[::-1]
 
