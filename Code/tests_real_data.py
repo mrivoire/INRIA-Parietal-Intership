@@ -64,10 +64,10 @@ def main():
         "store_history": store_history,
     }
 
-    X, y = load_lacrimes()
+    X, y = load_auto_prices()
 
-    X = X[:1000]
-    y = y[:1000]
+    X = X
+    y = y
 
     models, tuned_parameters = get_models(
         X=X,
@@ -144,7 +144,7 @@ def main():
     print('models = ', models)
 
     bar_plots(best_scores=best_scores, labels=models,
-              dataset_name='LA Crimes', scale=1000)
+              dataset_name='Auto Prices', scale=1000)
 
     # list_gs_scores = []
     # scores = pd.DataFrame(
