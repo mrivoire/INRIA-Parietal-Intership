@@ -1,0 +1,17 @@
+passer en params à spp_solver la grid prédéfinie 
+scaling de y dans le solver ou dans load_data faire y divisé par la norme L2
+Si ça ne fonctionne pas ajouter 1-epsilon dans la condition de pruning
+test unitaire 
+
+scoring metrics : MSE 
+
+Create plots on the datasets for which the solver works
+
+liste vide après safe prune et on lance sparse cd sur une liste vide => bug
+
+scaling and improvement of the solution if required
+Make plots with n = 1000
+Estimation of the number of total features
+Improvement with the same grid for each fold 
+Scaling of the loss with 1/n
+

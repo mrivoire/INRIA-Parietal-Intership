@@ -12,6 +12,7 @@ from dataset import (
 )
 
 from grid_search import get_models, compute_gs
+from bar_plots import bar_plots
 
 
 def main():
@@ -63,7 +64,7 @@ def main():
         "store_history": store_history,
     }
 
-    X, y = load_auto_prices()
+    X, y = load_lacrimes()
 
     X = X[:1000]
     y = y[:1000]
@@ -122,14 +123,28 @@ def main():
         list_df.append(df)
 
     results = pd.concat(list_df)
+    print('results = ', results)
 
-    print('gs_models_df = ', results)
+    results_to_plot = results.groupby(
+        by=['model'])['best_score'].min().reset_index()
 
-    # gs_models_df.columns = [
-    #     'best_params_spp', 'best_score_spp']
+    print('results_to_plot = ', results_to_plot)
 
-    results.to_csv(
+    results_to_plot.to_csv(
         r'/home/mrivoire/Documents/M2DS_Polytechnique/INRIA-Parietal-Intership/Code/results_auto_prices.csv', index=False)
+
+    df = pd.read_csv(
+        '/home/mrivoire/Documents/M2DS_Polytechnique/INRIA-Parietal-Intership/Code/results_auto_prices.csv')
+
+    df.head()
+
+    best_scores = list(- df['best_score'])
+    print('best_scores = ', best_scores)
+    models = list(df['model'])
+    print('models = ', models)
+
+    bar_plots(best_scores=best_scores, labels=models,
+              dataset_name='LA Crimes', scale=1000)
 
     # list_gs_scores = []
     # scores = pd.DataFrame(

@@ -4,7 +4,7 @@ import pandas as pd
 import ipdb
 import time
 import matplotlib
-import matplotlib.pyplot as plt    
+import matplotlib.pyplot as plt
 
 from numpy.random import randn
 from scipy.linalg import toeplitz
@@ -468,7 +468,7 @@ def sparse_cd(
                 # Computation of the active set
                 for j in range(n_features):
                     if safeset_membership[j] == 1:
-                        start, end = X_indptr[j : j + 2]
+                        start, end = X_indptr[j: j + 2]
                         dot = 0.0
                         norm = 0.0
 
@@ -491,7 +491,7 @@ def sparse_cd(
                     break
 
     return (
-        beta, 
+        beta,
         residuals,
         primal_hist,
         dual_hist,
@@ -549,7 +549,7 @@ class Lasso(BaseEstimator, RegressorMixin):
             X_indices = X.indices
             X_indptr = X.indptr
 
-            (   
+            (
                 beta_hat_cyclic_cd_true,
                 residuals,
                 primal_hist,
@@ -732,7 +732,7 @@ def main():
     encode = "onehot"
     strategy = "quantile"
 
-    X, y = simu(beta, n_samples=n_samples, corr=0.5, for_logreg=False, 
+    X, y = simu(beta, n_samples=n_samples, corr=0.5, for_logreg=False,
                 random_state=rng)
 
     # X = csc_matrix(X)
@@ -746,7 +746,6 @@ def main():
     X_binned_indices = X_binned.indices
     X_binned_indptr = X_binned.indptr
 
-    
     (beta_hat_cyclic_cd_true_sparse,
         residuals,
         primal_hist_sparse,
@@ -1112,7 +1111,7 @@ def main():
 
     fig.tight_layout()
     plt.show()
-    
+
     bins = ['2', '3', '4']
     x = np.arange(len(bins))  # the label locations
     width = 0.35  # the width of the bars
@@ -1224,7 +1223,7 @@ def main():
 
     fig.tight_layout()
     plt.show()
-    
+
     bins = ['2', '3', '4']
     x = np.arange(len(bins))  # the label locations
     width = 0.35  # the width of the bars

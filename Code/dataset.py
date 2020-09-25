@@ -2,6 +2,8 @@ import pandas as pd
 from sklearn import datasets
 import joblib
 import faulthandler
+import numpy
+from numpy import linalg
 
 
 def read_csv(filePath):
@@ -16,6 +18,7 @@ def load_housing_prices():
     X_train = read_csv(fname_train)
     X = X_train  # keep only train data
     y = X['SalePrice']
+    y = y / linalg.norm(y, ord=2)
     X = X.drop('SalePrice', axis=1)
 
     for col in X.columns:
@@ -36,6 +39,7 @@ def load_auto_prices():
 
     X, y = mem.cache(datasets.fetch_openml)(
         data_id=1189, return_X_y=True, as_frame=True)
+    y = y / linalg.norm(y, ord=2)
     return X, y
 
 
@@ -50,6 +54,7 @@ def load_lacrimes():
 
     X, y = mem.cache(datasets.fetch_openml)(
         data_id=42160, return_X_y=True, as_frame=True)
+    y = y / linalg.norm(y, ord=2)
 
     X['Date_Reported'] = pd.to_datetime(X['Date_Reported'])
     X['Date_Occurred'] = pd.to_datetime(X['Date_Occurred'])
@@ -72,6 +77,7 @@ def load_black_friday():
 
     X, y = mem.cache(datasets.fetch_openml)(
         data_id=41540, return_X_y=True, as_frame=True)
+    y = y / linalg.norm(y, ord=2)
 
     age_mapping = {
         '0-17': 15,
@@ -99,6 +105,7 @@ def load_nyc_taxi():
 
     X, y = mem.cache(datasets.fetch_openml)(
         data_id=42208, return_X_y=True, as_frame=True)
+    y = y / linalg.norm(y, ord=2)
 
     X['lpep_pickup_datetime'] = pd.to_datetime(X['lpep_pickup_datetime'])
     X['lpep_dropoff_datetime'] = pd.to_datetime(X['lpep_dropoff_datetime'])
