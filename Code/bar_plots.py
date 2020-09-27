@@ -1,6 +1,7 @@
 import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
+import seaborn as sns
 
 
 def autolabel(rects, ax, scale):
@@ -14,30 +15,36 @@ def autolabel(rects, ax, scale):
                     ha='center', va='bottom')
 
 
-def bar_plots(best_scores, labels, dataset_name, n_samples, n_features):
+def bar_plots(df):
+
+    best_scores = list(- df['best_score'])
+    models = list(df['model'])
+    dataset_name = df['data'].unique()[0]
+    n_samples = df['n_samples'].unique()[0]
+    n_features = df['n_features'].unique()[0]
 
     plot_title = 'Dataset : ' + dataset_name + \
         ' (n_samples: ' + str(n_samples) + \
         ', n_features : ' + str(n_features) + ' )'
 
-    x = np.arange(len(labels))  # the label locations
+    x = np.arange(len(models))  # the label locations
     width = 0.35  # the width of the bars
 
     fig, ax = plt.subplots()
 
-    barlist = plt.bar(x, best_scores, width, label=labels)
-    barlist[0].set_color('r')
-    barlist[1].set_color('y')
-    barlist[2].set_color('g')
-    barlist[3].set_color('b')
-    barlist[4].set_color('c')
-    barlist[5].set_color('m')
+    barlist = plt.bar(x, best_scores, width, label=models)
+    color_range = sns.color_palette("tab10")
+    barlist[0].set_color(color_range[0])
+    barlist[1].set_color(color_range[1])
+    barlist[2].set_color(color_range[2])
+    barlist[3].set_color(color_range[3])
+    barlist[4].set_color(color_range[4])
+    barlist[5].set_color(color_range[5])
 
     ax.set_ylabel('MSE')
     ax.set_title(plot_title)
     ax.set_xticks(x)
-    ax.set_xticklabels(labels)
-    # ax.legend()
+    ax.set_xticklabels(models)
 
     fig.tight_layout()
 

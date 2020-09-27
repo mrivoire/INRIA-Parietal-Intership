@@ -150,6 +150,9 @@ def main():
     results_to_plot = results.groupby(
         by=['model'])['best_score'].min().reset_index()
 
+    results_to_plot['data'] = data
+    results_to_plot['n_samples'] = n_samples
+    results_to_plot['n_features'] = X.shape[1]
     print('results_to_plot = ', results_to_plot)
 
     results_to_plot.to_csv(
@@ -160,13 +163,7 @@ def main():
 
     df.head()
 
-    best_scores = list(- df['best_score'])
-    print('best_scores = ', best_scores)
-    models = list(df['model'])
-    print('models = ', models)
-
-    bar_plots(best_scores=best_scores, labels=models,
-              dataset_name=data, n_samples=n_samples, n_features=X.shape[1])
+    bar_plots(df=df)
 
     # list_gs_scores = []
     # scores = pd.DataFrame(
