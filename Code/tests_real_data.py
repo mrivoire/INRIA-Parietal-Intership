@@ -78,11 +78,11 @@ def main():
     elif data == 'black_friday':
         X, y = load_black_friday()
     elif data == 'housing_prices':
-        X, y = load_housing_prices
+        X, y = load_housing_prices()
     elif data == 'la_crimes':
-        X, y = load_lacrimes
+        X, y = load_lacrimes()
     elif data == 'NYC_taxis':
-        X, y = load_nyc_taxi
+        X, y = load_nyc_taxi()
     else:
         raise ValueError("Dataset not implemented for " + data)
 
