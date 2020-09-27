@@ -90,6 +90,8 @@ def main():
         n_samples = int(n_samples)
         X = X[:n_samples]
         y = y[:n_samples]
+    else:
+        n_samples = X.shape[0]
 
     models, tuned_parameters = get_models(
         X=X,
