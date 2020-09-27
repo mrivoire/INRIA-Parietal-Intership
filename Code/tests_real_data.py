@@ -2,6 +2,9 @@
 Experiments on real data with categorical variables
 
 """
+import numbers
+from re import error
+import sys
 import pandas as pd
 from dataset import (
     load_auto_prices,
@@ -16,6 +19,12 @@ from bar_plots import bar_plots
 
 
 def main():
+
+    data = sys.argv[1]
+    if len(sys.argv) > 2:
+        n_samples = sys.argv[2]
+    else:
+        n_samples = None
 
     ####################################################################
     #                           Parameters
@@ -64,10 +73,23 @@ def main():
         "store_history": store_history,
     }
 
-    X, y = load_auto_prices()
+    if data == 'auto_prices':
+        X, y = load_auto_prices()
+    elif data == 'black_friday':
+        X, y = load_black_friday()
+    elif data == 'housing_prices':
+        X, y = load_housing_prices
+    elif data == 'la_crimes':
+        X, y = load_lacrimes
+    elif data == 'NYC_taxis':
+        X, y = load_nyc_taxi
+    else:
+        raise ValueError("Dataset not implemented for " + data)
 
-    X = X
-    y = y
+    if n_samples is not None:
+        n_samples = int(n_samples)
+        X = X[:n_samples]
+        y = y[:n_samples]
 
     models, tuned_parameters = get_models(
         X=X,
@@ -131,10 +153,10 @@ def main():
     print('results_to_plot = ', results_to_plot)
 
     results_to_plot.to_csv(
-        r'/home/mrivoire/Documents/M2DS_Polytechnique/INRIA-Parietal-Intership/Code/results_auto_prices.csv', index=False)
+        data + '_results.csv', index=False)
 
     df = pd.read_csv(
-        '/home/mrivoire/Documents/M2DS_Polytechnique/INRIA-Parietal-Intership/Code/results_auto_prices.csv')
+        data + '_results.csv')
 
     df.head()
 
@@ -144,7 +166,7 @@ def main():
     print('models = ', models)
 
     bar_plots(best_scores=best_scores, labels=models,
-              dataset_name='Auto Prices', scale=1000)
+              dataset_name=data, n_samples=n_samples, n_features=X.shape[1])
 
     # list_gs_scores = []
     # scores = pd.DataFrame(

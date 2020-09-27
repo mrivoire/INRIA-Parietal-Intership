@@ -14,9 +14,11 @@ def autolabel(rects, ax, scale):
                     ha='center', va='bottom')
 
 
-def bar_plots(best_scores, labels, dataset_name, scale):
+def bar_plots(best_scores, labels, dataset_name, n_samples, n_features):
 
-    plot_title = 'Best CV Scores Distribution Over ' + dataset_name + ' Dataset'
+    plot_title = 'Dataset : ' + dataset_name + \
+        ' (n_samples: ' + str(n_samples) + \
+        ', n_features : ' + str(n_features) + ' )'
 
     x = np.arange(len(labels))  # the label locations
     width = 0.35  # the width of the bars
