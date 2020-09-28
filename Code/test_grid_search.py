@@ -26,7 +26,7 @@ def test_compute_gs():
     store_history = True
     n_epochs = 1000
     n_jobs = 1
-    max_depth = 2
+    max_depth = 3
     tol = 1e-8
     n_lambda = 100
     lambda_max_ratio = 0.5
@@ -105,6 +105,9 @@ def test_compute_gs():
     best_n_bins = best_params_spp['n_bins']
     best_max_depth = best_params_spp['max_depth']
     best_lambda_spp = best_params_spp['lambda']
+    print('best_n_bins = ', best_n_bins)
+    print('best_max_depth = ', best_max_depth)
+    print('best_lambda_spp = ', best_lambda_spp)
 
     # order = max_depth
     # To compare the lambda values we have to run the polynomial features on a
@@ -136,13 +139,9 @@ def test_compute_gs():
     mse_per_lambda_lassoCV = reg_lassoCV.mse_path_.mean(axis=1)
     best_mse_LassoCV = -mse_per_lambda_lassoCV.min()
 
-    print('best_lambda_lassoCV = ', best_lambda_lassoCV)
-    print('best_lambda_spp = ', best_lambda_spp)
-    print('score_lassoCV = ', best_mse_LassoCV)
-    print('best_score_spp = ', best_score_spp)
-
     assert best_lambda_lassoCV == best_lambda_spp
     assert n_bins == best_n_bins
+    assert best_max_depth == 2
     assert best_mse_LassoCV == pytest.approx(best_score_spp, abs=1e-2)
 
 
