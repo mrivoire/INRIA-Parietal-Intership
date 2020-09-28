@@ -200,6 +200,7 @@ def cyclic_coordinate_descent(
 
             # Update of the residuals
             delta_beta_j = old_beta_j - beta[j]
+            print('delta_beta_j = ', delta_beta_j)
             if delta_beta_j != 0.0:
                 for i in range(n_samples):
                     residuals[i] += delta_beta_j * X[i, j]
@@ -230,6 +231,7 @@ def cyclic_coordinate_descent(
 
             # Computation of the dual gap
             G_lmbda = P_lmbda - D_lmbda
+            print('G_lmbda = ', G_lmbda)
 
             # Objective function related to the primal
             if store_history:

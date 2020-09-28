@@ -589,17 +589,17 @@ def main():
         kwargs_spp=kwargs_spp
     )
 
-    del models['lasso']
-    del models['lasso_cv']
-    del models['ridge_cv']
-    del models['rf']
-    del models['xgb']
+    # del models['lasso']
+    # del models['lasso_cv']
+    # del models['ridge_cv']
+    # del models['rf']
+    # del models['xgb']
 
-    del tuned_parameters['lasso']
-    del tuned_parameters['lasso_cv']
-    del tuned_parameters['ridge_cv']
-    del tuned_parameters['rf']
-    del tuned_parameters['xgb']
+    # del tuned_parameters['lasso']
+    # del tuned_parameters['lasso_cv']
+    # del tuned_parameters['ridge_cv']
+    # del tuned_parameters['rf']
+    # del tuned_parameters['xgb']
 
     gs_models = compute_gs(
         X=X,

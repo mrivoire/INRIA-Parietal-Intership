@@ -43,7 +43,7 @@ def main():
     n_bins = 3
     max_depth = 2
     tol = 1e-08
-    n_lambda = 10
+    n_lambda = 100
     lambda_max_ratio = (1 / 20)
     # lambdas = [1, 0.5, 0.2, 0.1, 0.01]
     lambdas = None
@@ -157,6 +157,8 @@ def main():
     results_to_plot['n_features'] = X.shape[1]
     print('results_to_plot = ', results_to_plot)
 
+    # We can put the following code in the function bar_plots by passing
+    # 'dataset_name' as input parameter and replacing data by dataset_name
     results_to_plot.to_csv(
         data + '_results.csv', index=False)
 
