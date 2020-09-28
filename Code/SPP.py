@@ -587,7 +587,7 @@ def safe_prune_rec(X_binned_data, X_binned_indices, X_binned_indptr,
 
     if sppc_t >= 1:
 
-        if abs(inner_prod) + safe_sphere_radius * np.sqrt(v_t) >= 1:
+        if abs(inner_prod) + safe_sphere_radius * np.sqrt(v_t) >= 1:  # add -epsilon
             safe_set_data.append(inter_feat_data)
             safe_set_ind.append(inter_feat_ind)
             key = current_key.copy()

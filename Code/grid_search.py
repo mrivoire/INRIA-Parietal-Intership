@@ -92,6 +92,10 @@ def time_convert(X):
 def get_models(
     X,
     n_bins,
+    n_bins_less_bins,
+    max_depth_less_bins,
+    n_bins_more_bins,
+    max_depth_more_bins,
     kwargs_lasso,
     kwargs_spp
 ):
@@ -235,22 +239,56 @@ def get_models(
         "regressor__n_estimators": [30, 100],
     }
 
-    # Random Forest
+    # Random Forest With A Single Tree (finite depth)
+    dt = RandomForestRegressor(n_estimators=1)
+    models["dt"] = Pipeline(
+        steps=[("preprocessor", rf_preprocessor), ("regressor", dt)]
+    )
+    tuned_parameters["dt"] = {"regressor__max_depth": max_depth_less_bins}
+
+    # Random Forest With A Single Tree (infinite depth)
+    infinite_dt = RandomForestRegressor(n_estimators=1)
+    models["infinite_dt"] = Pipeline(
+        steps=[("preprocessor", rf_preprocessor), ("regressor", infinite_dt)]
+    )
+    tuned_parameters["infinite_dt"] = {"regressor__max_depth": [None]}
+
+    # Random Forest With 100 Trees (default value)(finite depth)
     rf = RandomForestRegressor()
     models["rf"] = Pipeline(
         steps=[("preprocessor", rf_preprocessor), ("regressor", rf)]
     )
-    tuned_parameters["rf"] = {"regressor__max_depth": [2, 3, 4, 5]}
+    tuned_parameters["rf"] = {"regressor__max_depth": max_depth_less_bins}
 
-    # SPP Regressor
-    spp_reg = SPPRegressor(**kwargs_spp)
-    models["spp_reg"] = Pipeline(
-        steps=[("preprocessor", preprocessor), ("regressor", spp_reg)]
+    # Random Forest With 100 Trees (default value)(infinite depth)
+    infinite_rf = RandomForestRegressor()
+    models["infinite_rf"] = Pipeline(
+        steps=[("preprocessor", rf_preprocessor), ("regressor", infinite_rf)]
+    )
+    tuned_parameters["infinite_rf"] = {"regressor__max_depth": [None]}
+
+    # SPP Regressor less bins
+    spp_reg_less_bins = SPPRegressor(**kwargs_spp)
+    models["spp_reg_less_bins"] = Pipeline(
+        steps=[("preprocessor", preprocessor),
+               ("regressor", spp_reg_less_bins)]
     )
 
-    tuned_parameters["spp_reg"] = {
-        "preprocessor__num__binning__n_bins": [2, 3, 4],
-        "regressor__max_depth": [2, 3],
+    tuned_parameters["spp_reg_less_bins"] = {
+        "preprocessor__num__binning__n_bins": n_bins_less_bins,
+        "regressor__max_depth": max_depth_less_bins,
+    }
+
+    # SPP Regressor less bins
+    spp_reg_more_bins = SPPRegressor(**kwargs_spp)
+    models["spp_reg_more_bins"] = Pipeline(
+        steps=[("preprocessor", preprocessor),
+               ("regressor", spp_reg_more_bins)]
+    )
+
+    tuned_parameters["spp_reg_more_bins"] = {
+        "preprocessor__num__binning__n_bins": n_bins_more_bins,
+        "regressor__max_depth": max_depth_more_bins,
     }
 
     return models, tuned_parameters
@@ -379,7 +417,7 @@ def compute_gs(
     for name, model in models.items():
         print('name = ', name)
         print('model = ', model)
-        if name != "spp_reg":
+        if 'spp' not in name:
             gs = GridSearchCV(
                 model, cv=n_splits, param_grid=tuned_parameters[name], n_jobs=n_jobs,
                 scoring='neg_mean_squared_error',
@@ -402,8 +440,8 @@ def compute_gs(
                 X_train, X_test = X.iloc[train_index], X.iloc[test_index]
                 y_train, y_test = y[train_index], y[test_index]
 
-                n_bins_list = tuned_parameters['spp_reg']['preprocessor__num__binning__n_bins']
-                max_depth_list = tuned_parameters['spp_reg']['regressor__max_depth']
+                n_bins_list = tuned_parameters[name]['preprocessor__num__binning__n_bins']
+                max_depth_list = tuned_parameters[name]['regressor__max_depth']
                 for n_bins in n_bins_list:
                     for max_depth in max_depth_list:
                         spp_reg = model.set_params(
@@ -581,10 +619,18 @@ def main():
     #     screening=screening,
     #     store_history=store_history,
     # )
+    n_bins_less_bins = [3]
+    n_bins_more_bins = [10]
+    max_depth_less_bins = [2, 3, 4, 5, 6]
+    max_depth_more_bins = [2, 3, 4]
 
     models, tuned_parameters = get_models(
         X=X,
         n_bins=n_bins,
+        n_bins_less_bins=n_bins_less_bins,
+        max_depth_less_bins=max_depth_less_bins,
+        n_bins_more_bins=n_bins_more_bins,
+        max_depth_more_bins=max_depth_more_bins,
         kwargs_lasso=kwargs_lasso,
         kwargs_spp=kwargs_spp
     )
@@ -621,12 +667,12 @@ def main():
         n_jobs=n_jobs,
     )
 
-    print("gs_models = ", gs_models)
-    best_score_spp = gs_models["spp_reg"]["best_score"]
-    best_params_spp = gs_models["spp_reg"]["best_params"]
+    # print("gs_models = ", gs_models)
+    # best_score_spp = gs_models["spp_reg"]["best_score"]
+    # best_params_spp = gs_models["spp_reg"]["best_params"]
 
-    print('best_score_spp = ', best_score_spp)
-    print('best_params = ', best_params_spp)
+    # print('best_score_spp = ', best_score_spp)
+    # print('best_params = ', best_params_spp)
 
     # list_gs_scores = []
     # scores = pd.DataFrame(

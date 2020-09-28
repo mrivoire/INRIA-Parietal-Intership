@@ -2,6 +2,7 @@
 Experiments on real data with categorical variables
 
 """
+import itertools
 import numbers
 from re import error
 import sys
@@ -16,6 +17,7 @@ from dataset import (
 
 from grid_search import get_models, compute_gs
 from bar_plots import bar_plots
+from estimation_n_interfeats import estimate_n_interfeats
 
 
 def main():
@@ -73,16 +75,42 @@ def main():
         "store_history": store_history,
     }
 
+    n_interfeats = estimate_n_interfeats(n_features=15, n_bins=3, max_depth=6)
+    print('n_interfeats = ', n_interfeats)
+
+    X, y = load_housing_prices()
+    print(X.shape)
+
     if data == 'auto_prices':
         X, y = load_auto_prices()
+        n_bins_more_bins = [10]
+        max_depth_more_bins = [2, 3, 4]
+        n_bins_less_bins = [3]
+        max_depth_less_bins = [2, 3, 4, 5, 6]
     elif data == 'black_friday':
         X, y = load_black_friday()
+        n_bins_more_bins = [10]
+        max_depth_more_bins = [2, 3, 4, 5]
+        n_bins_less_bins = [3]
+        max_depth_less_bins = [2, 3, 4, 5, 6, 7, 8, 9]
     elif data == 'housing_prices':
         X, y = load_housing_prices()
+        n_bins_more_bins = [10]
+        max_depth_more_bins = [2]
+        n_bins_less_bins = [3]
+        max_depth_less_bins = [2, 3]
     elif data == 'la_crimes':
         X, y = load_lacrimes()
+        n_bins_more_bins = [10]
+        max_depth_more_bins = [2, 3, 4]
+        n_bins_less_bins = [3]
+        max_depth_less_bins = [2, 3, 4, 5]
     elif data == 'NYC_taxis':
         X, y = load_nyc_taxi()
+        n_bins_more_bins = [10]
+        max_depth_more_bins = [2, 3, 4]
+        n_bins_less_bins = [3]
+        max_depth_less_bins = [2, 3, 4, 5, 6]
     else:
         raise ValueError("Dataset not implemented for " + data)
 
@@ -96,6 +124,10 @@ def main():
     models, tuned_parameters = get_models(
         X=X,
         n_bins=n_bins,
+        n_bins_less_bins=n_bins_less_bins,
+        max_depth_less_bins=max_depth_less_bins,
+        n_bins_more_bins=n_bins_more_bins,
+        max_depth_more_bins=max_depth_more_bins,
         kwargs_lasso=kwargs_lasso,
         kwargs_spp=kwargs_spp
     )
@@ -133,41 +165,41 @@ def main():
     )
 
     print("gs_models = ", gs_models)
-    best_score_spp = gs_models["spp_reg"]["best_score"]
-    best_params_spp = gs_models["spp_reg"]["best_params"]
+    # best_score_spp = gs_models["spp_reg"]["best_score"]
+    # best_params_spp = gs_models["spp_reg"]["best_params"]
 
-    print('best_score_spp = ', best_score_spp)
-    print('best_params = ', best_params_spp)
+    # print('best_score_spp = ', best_score_spp)
+    # print('best_params = ', best_params_spp)
 
-    list_df = []
+    # list_df = []
 
-    for model in gs_models.keys():
-        df = pd.DataFrame(gs_models[model])
-        df["model"] = model
-        list_df.append(df)
+    # for model in gs_models.keys():
+    #     df = pd.DataFrame(gs_models[model])
+    #     df["model"] = model
+    #     list_df.append(df)
 
-    results = pd.concat(list_df)
-    print('results = ', results)
+    # results = pd.concat(list_df)
+    # print('results = ', results)
 
-    results_to_plot = results.groupby(
-        by=['model'])['best_score'].min().reset_index()
+    # results_to_plot = results.groupby(
+    #     by=['model'])['best_score'].min().reset_index()
 
-    results_to_plot['data'] = data
-    results_to_plot['n_samples'] = n_samples
-    results_to_plot['n_features'] = X.shape[1]
-    print('results_to_plot = ', results_to_plot)
+    # results_to_plot['data'] = data
+    # results_to_plot['n_samples'] = n_samples
+    # results_to_plot['n_features'] = X.shape[1]
+    # print('results_to_plot = ', results_to_plot)
 
-    # We can put the following code in the function bar_plots by passing
-    # 'dataset_name' as input parameter and replacing data by dataset_name
-    results_to_plot.to_csv(
-        data + '_results.csv', index=False)
+    # # We can put the following code in the function bar_plots by passing
+    # # 'dataset_name' as input parameter and replacing data by dataset_name
+    # results_to_plot.to_csv(
+    #     data + '_results.csv', index=False)
 
-    df = pd.read_csv(
-        data + '_results.csv')
+    # df = pd.read_csv(
+    #     data + '_results.csv')
 
-    df.head()
+    # df.head()
 
-    bar_plots(df=df)
+    # bar_plots(df=df)
 
     # list_gs_scores = []
     # scores = pd.DataFrame(
