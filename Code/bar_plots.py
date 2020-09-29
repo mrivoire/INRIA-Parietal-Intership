@@ -41,6 +41,9 @@ def bar_plots(df):
     barlist[3].set_color(color_range[3])
     barlist[4].set_color(color_range[4])
     barlist[5].set_color(color_range[5])
+    barlist[6].set_color(color_range[6])
+    barlist[7].set_color(color_range[7])
+    barlist[8].set_color(color_range[8])
 
     ax.set_ylabel('MSE')
     ax.set_title(plot_title)

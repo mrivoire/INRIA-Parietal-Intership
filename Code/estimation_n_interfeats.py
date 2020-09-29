@@ -7,15 +7,15 @@ def estimate_n_interfeats(n_features, n_bins, max_depth):
 
     n_interfeats = 0
     for k in range(max_depth):
-        n_interfeats = binom(n_binned_feats, k)
+        n_interfeats += binom(n_binned_feats, k)
 
     return n_interfeats
 
 
 def main():
-    n_features = 80
-    n_bins = 3
-    max_depth = 3
+    n_features = 15
+    n_bins = 10
+    max_depth = 4
 
     n_interfeats = estimate_n_interfeats(
         n_features=n_features, n_bins=n_bins, max_depth=max_depth)

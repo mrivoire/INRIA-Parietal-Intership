@@ -18,6 +18,8 @@ from dataset import (
 from grid_search import get_models, compute_gs
 from bar_plots import bar_plots
 from estimation_n_interfeats import estimate_n_interfeats
+from SPP import max_val
+from sklearn.preprocessing import KBinsDiscretizer
 
 
 def main():
@@ -77,9 +79,6 @@ def main():
 
     n_interfeats = estimate_n_interfeats(n_features=15, n_bins=3, max_depth=6)
     print('n_interfeats = ', n_interfeats)
-
-    X, y = load_housing_prices()
-    print(X.shape)
 
     if data == 'auto_prices':
         X, y = load_auto_prices()
@@ -165,41 +164,46 @@ def main():
     )
 
     print("gs_models = ", gs_models)
-    # best_score_spp = gs_models["spp_reg"]["best_score"]
-    # best_params_spp = gs_models["spp_reg"]["best_params"]
+    best_score_spp_more_bins = gs_models["spp_reg_more_bins"]["best_score"]
+    best_params_spp_more_bins = gs_models["spp_reg_more_bins"]["best_params"]
 
-    # print('best_score_spp = ', best_score_spp)
-    # print('best_params = ', best_params_spp)
+    print('best_score_spp_more_bins = ', best_score_spp_more_bins)
+    print('best_params_spp_more_bins = ', best_params_spp_more_bins)
 
-    # list_df = []
+    best_score_spp_less_bins = gs_models["spp_reg_less_bins"]["best_score"]
+    best_params_spp_less_bins = gs_models["spp_reg_less_bins"]["best_params"]
+    print('best_score_spp_less_bins = ', best_score_spp_less_bins)
+    print('best_params_spp_less_bins = ', best_params_spp_less_bins)
 
-    # for model in gs_models.keys():
-    #     df = pd.DataFrame(gs_models[model])
-    #     df["model"] = model
-    #     list_df.append(df)
+    list_df = []
 
-    # results = pd.concat(list_df)
-    # print('results = ', results)
+    for model in gs_models.keys():
+        df = pd.DataFrame(gs_models[model])
+        df["model"] = model
+        list_df.append(df)
 
-    # results_to_plot = results.groupby(
-    #     by=['model'])['best_score'].min().reset_index()
+    results = pd.concat(list_df)
+    print('results = ', results)
 
-    # results_to_plot['data'] = data
-    # results_to_plot['n_samples'] = n_samples
-    # results_to_plot['n_features'] = X.shape[1]
-    # print('results_to_plot = ', results_to_plot)
+    results_to_plot = results.groupby(
+        by=['model'])['best_score'].min().reset_index()
 
-    # # We can put the following code in the function bar_plots by passing
-    # # 'dataset_name' as input parameter and replacing data by dataset_name
-    # results_to_plot.to_csv(
-    #     data + '_results.csv', index=False)
+    results_to_plot['data'] = data
+    results_to_plot['n_samples'] = n_samples
+    results_to_plot['n_features'] = X.shape[1]
+    print('results_to_plot = ', results_to_plot)
 
-    # df = pd.read_csv(
-    #     data + '_results.csv')
+    # We can put the following code in the function bar_plots by passing
+    # 'dataset_name' as input parameter and replacing data by dataset_name
+    results_to_plot.to_csv(
+        data + '_results.csv', index=False)
 
-    # df.head()
+    df = pd.read_csv(
+        data + '_results.csv')
 
-    # bar_plots(df=df)
+    df.head()
+
+    bar_plots(df=df)
 
     # list_gs_scores = []
     # scores = pd.DataFrame(
