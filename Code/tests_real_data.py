@@ -186,11 +186,17 @@ def main():
     print('results = ', results)
 
     results_to_plot = results.groupby(
-        by=['model'])['best_score'].min().reset_index()
-
+        by=['model'])[['best_score', 'n_active_features']].min().reset_index()
     results_to_plot['data'] = data
     results_to_plot['n_samples'] = n_samples
     results_to_plot['n_features'] = X.shape[1]
+    results_to_plot['best_nbins_spp_more_bins'] = gs_models["spp_reg_more_bins"]["best_params"]['n_bins']
+    results_to_plot['best_maxdepth_spp_more_bins'] = gs_models["spp_reg_more_bins"]["best_params"]['max_depth']
+    results_to_plot['best_lambda_spp_more_bins'] = gs_models["spp_reg_more_bins"]["best_params"]['lambda']
+    results_to_plot['best_nbins_spp_less_bins'] = gs_models["spp_reg_less_bins"]["best_params"]['n_bins']
+    results_to_plot['best_maxdepth_spp_less_bins'] = gs_models["spp_reg_less_bins"]["best_params"]['max_depth']
+    results_to_plot['best_lambda_spp_less_bins'] = gs_models["spp_reg_less_bins"]["best_params"]['lambda']
+
     print('results_to_plot = ', results_to_plot)
 
     # We can put the following code in the function bar_plots by passing

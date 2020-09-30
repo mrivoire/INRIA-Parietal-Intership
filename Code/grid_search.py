@@ -429,6 +429,14 @@ def compute_gs(
                 "best_score": gs.best_score_,
                 "best_params": gs.best_params_,
             }
+            if (name == 'lasso_cv') | (name == 'ridge_cv'):
+                best_slopes = gs.best_estimator_['regressor'].coef_
+                n_active_features = np.count_nonzero(best_slopes)
+                results_gs = {
+                    "best_score": gs.best_score_,
+                    "best_params": gs.best_params_,
+                    "n_active_features": n_active_features
+                }
 
         else:
             kf = KFold(n_splits=n_splits, random_state=None, shuffle=False)
@@ -473,6 +481,7 @@ def compute_gs(
                             "lambda": lambda_list,
                             "score": cv_scores,
                             "fold_number": [fold_num] * len(cv_scores),
+                            "slopes": slopes_list
                         }
 
                         gs_list.append(
@@ -508,6 +517,11 @@ def compute_gs(
             print('best_n_bins = ', best_n_bins)
             print('best_max_depth = ', best_max_depth)
             print('best_lambda = ', best_lambda)
+            print('lambda_list = ', len(lambda_list))
+
+            idx_best_lambda = list(gs_dataframe['lambda']).index(best_lambda)
+            best_slopes = list(gs_dataframe['slopes'])[idx_best_lambda]
+            n_active_features = len(best_slopes)
 
             results_gs = {
                 "best_score": best_score,
@@ -515,6 +529,7 @@ def compute_gs(
                                 'max_depth': best_params.iloc[0, 1],
                                 'lambda': best_params.iloc[0, 2]
                                 },
+                "n_active_features": n_active_features,
             }
 
         gs_models[name] = results_gs
@@ -667,7 +682,7 @@ def main():
         n_jobs=n_jobs,
     )
 
-    # print("gs_models = ", gs_models)
+    print("gs_models = ", gs_models)
     # best_score_spp = gs_models["spp_reg"]["best_score"]
     # best_params_spp = gs_models["spp_reg"]["best_params"]
 
