@@ -48,11 +48,11 @@ def main():
     max_depth = 2
     tol = 1e-08
     n_lambda = 100
-    lambda_max_ratio = (1 / 20)
+    lambda_max_ratio = (1 / 50)
     # lambdas = [1, 0.5, 0.2, 0.1, 0.01]
     lambdas = None
     # lambdas = [0.1]
-    n_active_max = 100
+    n_active_max = 200
 
     kwargs_spp = {
         "n_lambda": n_lambda,
@@ -181,9 +181,7 @@ def main():
         df["model"] = name
         list_df.append(df)
 
-    # Here do a Merge.
-    # results = pd.concat(list_df)
-
+    results = pd.concat(list_df)
 
     print('results = ', results)
 

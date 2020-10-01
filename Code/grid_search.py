@@ -420,28 +420,35 @@ def compute_gs(
     gs_models = {}
 
     for name, model in models.items():
-        print('name = ', name)
         if 'spp' not in name:
             gs = GridSearchCV(
                 model, cv=n_splits, param_grid=tuned_parameters[name], n_jobs=n_jobs,
-                scoring='neg_mean_squared_error',
+                scoring='neg_mean_squared_error', return_train_score=True,
             )
 
             gs.fit(X, y)
+
+            mean_test_score = gs.cv_results_['mean_test_score']
+            mean_train_score = gs.cv_results_['mean_train_score']
+            params = gs.cv_results_['params']
 
             if (name == 'lasso_cv') | (name == 'ridge_cv'):
                 best_slopes = gs.best_estimator_['regressor'].coef_
                 n_active = np.count_nonzero(best_slopes)
                 results_gs = {
-                    "best_score": gs.best_score_,
+                    "best_test_score": gs.best_score_,
                     "best_params": gs.best_params_,
                     "n_active": n_active
                 }
             else:
                 results_gs = {
-                    "best_score": gs.best_score_,
+                    "best_test_score": gs.best_score_,
                     "best_params": gs.best_params_,
                 }
+
+            idx_best_score = params.index(results_gs["best_params"])
+            best_train_score = mean_train_score[idx_best_score]
+            results_gs['best_train_score'] = best_train_score
 
         else:
             kf = KFold(n_splits=n_splits, random_state=None, shuffle=False)
@@ -463,24 +470,31 @@ def compute_gs(
                         spp_reg.fit(X_train, y_train)
                         solutions = spp_reg.steps[1][1].solutions_
 
-                        cv_scores = spp_reg.score(X_test, y_test)
+                        cv_scores_test = spp_reg.score(X_test, y_test)
+                        cv_scores_train = spp_reg.score(X_train, y_train)
 
                         lambda_list = []
                         n_active_list = []
 
                         for this_sol in solutions:
                             lambda_list.append(this_sol["lambda"])
-                            n_active_list.append(len(this_sol["spp_lasso_slopes"]))
+                            n_active_list.append(
+                                len(this_sol["spp_lasso_slopes"]))
 
-                        if type(cv_scores) is np.float64:
-                            cv_scores = [cv_scores]
+                        if type(cv_scores_test) is np.float64:
+                            cv_scores_test = [cv_scores_test]
+
+                        if type(cv_scores_train) is np.float64:
+                            cv_scores_train = [cv_scores_train]
 
                         results = {
-                            "n_bins": [n_bins] * len(cv_scores),
-                            "max_depth": [max_depth] * len(cv_scores),
+                            "n_bins": [n_bins] * len(cv_scores_test),
+                            "max_depth": [max_depth] * len(cv_scores_test),
                             "lambda": lambda_list,
-                            "score": cv_scores,
-                            "fold_number": [fold_num] * len(cv_scores),
+                            "lambda_idx": [i for i in range(len(lambda_list))],
+                            "test_score": cv_scores_test,
+                            "train_score": cv_scores_train,
+                            "fold_number": [fold_num] * len(cv_scores_test),
                             "n_active": n_active_list
                         }
 
@@ -490,32 +504,37 @@ def compute_gs(
 
             gs_groupby_params = (
                 gs_dataframe.groupby(
-                    by=["n_bins", "max_depth", "lambda"])[["score", "n_active"]]
+                    by=["n_bins", "max_depth", "lambda"])[["test_score", "train_score", "lambda_idx", "n_active"]]
                 .mean()
                 .reset_index()
             )
 
             ind_best_score = (
-                gs_groupby_params["score"] == gs_groupby_params["score"].max())
+                gs_groupby_params["test_score"] == gs_groupby_params["test_score"].max())
             best_params = gs_groupby_params.loc[ind_best_score, :]
 
             # If we have 2 best scores ex-aequo, take the first one
             best_params = best_params.iloc[0]
 
             print('best_params = \n', best_params)
-
-            best_score = best_params.loc['score']
+            best_train_score = best_params.loc['train_score']
+            best_test_score = best_params.loc['test_score']
             best_n_bins = best_params.loc['n_bins']
             best_max_depth = best_params.loc['max_depth']
             best_lambda = best_params.loc['lambda']
+            best_lambda_idx = best_params.loc['lambda_idx']
             n_active = best_params.loc['n_active']
 
+            print('gs_groupby_params = ', gs_groupby_params)
+
             results_gs = {
-                "best_score": best_score,
+                "best_test_score": best_test_score,
+                "best_train_score": best_train_score,
                 "best_params": {'n_bins': best_n_bins,
                                 'max_depth': best_max_depth,
                                 'lambda': best_lambda
                                 },
+                "best_lambda_idx": best_lambda_idx,
                 "n_active": n_active
             }
 
