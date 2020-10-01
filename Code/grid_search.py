@@ -70,10 +70,10 @@ def time_convert(X):
     for col, dtype in zip(X.columns, X.dtypes):
         if X[col].dtypes == "datetime64[ns]":
             col_name = str(col) + "_"
-            X[col_name + "year"] = X[col].dt.year
-            X[col_name + "weekday"] = X[col].dt.dayofweek
-            X[col_name + "yearday"] = X[col].dt.dayofyear
-            X[col_name + "time"] = X[col].dt.minute
+            # X[col_name + "year"] = X[col].dt.year
+            X[col_name + "weekday"] = (X[col].dt.dayofweek < 5).astype(int)
+            # X[col_name + "yearday"] = X[col].dt.dayofyear
+            # X[col_name + "time"] = X[col].dt.minute
             X = X.drop(columns=[col], axis=1)
 
     return X
