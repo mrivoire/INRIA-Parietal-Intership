@@ -182,64 +182,21 @@ def main():
         list_df.append(df)
 
     results = pd.concat(list_df)
+    results['n_features'] = X.shape[1]
+    results['n_samples'] = X.shape[0]
+    results['data'] = data
 
     print('results = ', results)
 
-    # results_to_plot = results.groupby(
-    #     by=['model'])[['best_score', 'n_active_features']].min().reset_index()
-    # results_to_plot['data'] = data
-    # results_to_plot['n_samples'] = n_samples
-    # results_to_plot['n_features'] = X.shape[1]
-    # results_to_plot['best_nbins_spp_more_bins'] = gs_models["spp_reg_more_bins"]["best_params"]['n_bins']
-    # results_to_plot['best_maxdepth_spp_more_bins'] = gs_models["spp_reg_more_bins"]["best_params"]['max_depth']
-    # results_to_plot['best_lambda_spp_more_bins'] = gs_models["spp_reg_more_bins"]["best_params"]['lambda']
-    # results_to_plot['best_nbins_spp_less_bins'] = gs_models["spp_reg_less_bins"]["best_params"]['n_bins']
-    # results_to_plot['best_maxdepth_spp_less_bins'] = gs_models["spp_reg_less_bins"]["best_params"]['max_depth']
-    # results_to_plot['best_lambda_spp_less_bins'] = gs_models["spp_reg_less_bins"]["best_params"]['lambda']
+    results.to_csv('/home/mrivoire/Documents/M2DS_Polytechnique/INRIA-Parietal-Intership/Code/' +
+                   data + '_results.csv', index=False)
 
-    #  print('results_to_plot = ', results_to_plot)
-
-    # We can put the following code in the function bar_plots by passing
-    # 'dataset_name' as input parameter and replacing data by dataset_name
-    results.to_csv(
-        data + '_results.csv', index=False)
-
-    df = pd.read_csv(
-        data + '_results.csv')
+    df = pd.read_csv('/home/mrivoire/Documents/M2DS_Polytechnique/INRIA-Parietal-Intership/Code/' +
+                     data + '_results.csv')
 
     df.head()
 
     bar_plots(df=df)
-
-    # list_gs_scores = []
-    # scores = pd.DataFrame(
-    #     {"model": [], "best_cv_score": [], "best_param": []}
-    # )
-
-    # for k, v in gs_scores.items():
-    #     print(f"{k} -- best params = {v.best_params_}")
-    #     print(f"{k} -- cv scores = {v.best_score_}")
-    #     list_gs_scores.append(v.best_score_)
-    #     scores = scores.append(
-    #         pd.DataFrame(
-    #             {
-    #                 "model": [k],
-    #                 "best_cv_score": [v.best_score_],
-    #                 "best_param": [v.best_params_],
-    #             }
-    #         )
-    #     )
-
-    # print("Housing Prices Dataset with 100 samples")
-    # print("cv_score with tuning params = ", list_gs_scores)
-
-    # print(scores)
-    # scores.to_csv(
-    #     "/home/mrivoire/Documents/M2DS_Polytechnique/INRIA-Parietal-Intership/Code/"
-    #     + data_name
-    #     + ".csv",
-    #     index=False,
-    # )
 
     #######################################################################
     #                         Bar Plots CV Scores
