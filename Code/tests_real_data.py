@@ -163,45 +163,47 @@ def main():
         n_jobs=n_jobs,
     )
 
-    print("gs_models = ", gs_models)
-    best_score_spp_more_bins = gs_models["spp_reg_more_bins"]["best_score"]
-    best_params_spp_more_bins = gs_models["spp_reg_more_bins"]["best_params"]
+    # print("gs_models = ", gs_models)
+    # best_score_spp_more_bins = gs_models["spp_reg_more_bins"]["best_score"]
+    # best_params_spp_more_bins = gs_models["spp_reg_more_bins"]["best_params"]
 
-    print('best_score_spp_more_bins = ', best_score_spp_more_bins)
-    print('best_params_spp_more_bins = ', best_params_spp_more_bins)
+    # print('best_score_spp_more_bins = ', best_score_spp_more_bins)
+    # print('best_params_spp_more_bins = ', best_params_spp_more_bins)
 
-    best_score_spp_less_bins = gs_models["spp_reg_less_bins"]["best_score"]
-    best_params_spp_less_bins = gs_models["spp_reg_less_bins"]["best_params"]
-    print('best_score_spp_less_bins = ', best_score_spp_less_bins)
-    print('best_params_spp_less_bins = ', best_params_spp_less_bins)
+    # best_score_spp_less_bins = gs_models["spp_reg_less_bins"]["best_score"]
+    # best_params_spp_less_bins = gs_models["spp_reg_less_bins"]["best_params"]
+    # print('best_score_spp_less_bins = ', best_score_spp_less_bins)
+    # print('best_params_spp_less_bins = ', best_params_spp_less_bins)
 
     list_df = []
-
-    for model in gs_models.keys():
-        df = pd.DataFrame(gs_models[model])
-        df["model"] = model
+    for name, model in gs_models.items():
+        df = pd.io.json.json_normalize(model, sep='_')
+        df["model"] = name
         list_df.append(df)
 
-    results = pd.concat(list_df)
+    # Here do a Merge.
+    # results = pd.concat(list_df)
+
+
     print('results = ', results)
 
-    results_to_plot = results.groupby(
-        by=['model'])[['best_score', 'n_active_features']].min().reset_index()
-    results_to_plot['data'] = data
-    results_to_plot['n_samples'] = n_samples
-    results_to_plot['n_features'] = X.shape[1]
-    results_to_plot['best_nbins_spp_more_bins'] = gs_models["spp_reg_more_bins"]["best_params"]['n_bins']
-    results_to_plot['best_maxdepth_spp_more_bins'] = gs_models["spp_reg_more_bins"]["best_params"]['max_depth']
-    results_to_plot['best_lambda_spp_more_bins'] = gs_models["spp_reg_more_bins"]["best_params"]['lambda']
-    results_to_plot['best_nbins_spp_less_bins'] = gs_models["spp_reg_less_bins"]["best_params"]['n_bins']
-    results_to_plot['best_maxdepth_spp_less_bins'] = gs_models["spp_reg_less_bins"]["best_params"]['max_depth']
-    results_to_plot['best_lambda_spp_less_bins'] = gs_models["spp_reg_less_bins"]["best_params"]['lambda']
+    # results_to_plot = results.groupby(
+    #     by=['model'])[['best_score', 'n_active_features']].min().reset_index()
+    # results_to_plot['data'] = data
+    # results_to_plot['n_samples'] = n_samples
+    # results_to_plot['n_features'] = X.shape[1]
+    # results_to_plot['best_nbins_spp_more_bins'] = gs_models["spp_reg_more_bins"]["best_params"]['n_bins']
+    # results_to_plot['best_maxdepth_spp_more_bins'] = gs_models["spp_reg_more_bins"]["best_params"]['max_depth']
+    # results_to_plot['best_lambda_spp_more_bins'] = gs_models["spp_reg_more_bins"]["best_params"]['lambda']
+    # results_to_plot['best_nbins_spp_less_bins'] = gs_models["spp_reg_less_bins"]["best_params"]['n_bins']
+    # results_to_plot['best_maxdepth_spp_less_bins'] = gs_models["spp_reg_less_bins"]["best_params"]['max_depth']
+    # results_to_plot['best_lambda_spp_less_bins'] = gs_models["spp_reg_less_bins"]["best_params"]['lambda']
 
-    print('results_to_plot = ', results_to_plot)
+    #  print('results_to_plot = ', results_to_plot)
 
     # We can put the following code in the function bar_plots by passing
     # 'dataset_name' as input parameter and replacing data by dataset_name
-    results_to_plot.to_csv(
+    results.to_csv(
         data + '_results.csv', index=False)
 
     df = pd.read_csv(

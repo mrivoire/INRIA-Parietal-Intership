@@ -421,7 +421,6 @@ def compute_gs(
 
     for name, model in models.items():
         print('name = ', name)
-        print('model = ', model)
         if 'spp' not in name:
             gs = GridSearchCV(
                 model, cv=n_splits, param_grid=tuned_parameters[name], n_jobs=n_jobs,
@@ -430,17 +429,18 @@ def compute_gs(
 
             gs.fit(X, y)
 
-            results_gs = {
-                "best_score": gs.best_score_,
-                "best_params": gs.best_params_,
-            }
             if (name == 'lasso_cv') | (name == 'ridge_cv'):
                 best_slopes = gs.best_estimator_['regressor'].coef_
-                n_active_features = np.count_nonzero(best_slopes)
+                n_active = np.count_nonzero(best_slopes)
                 results_gs = {
                     "best_score": gs.best_score_,
                     "best_params": gs.best_params_,
-                    "n_active_features": n_active_features
+                    "n_active": n_active
+                }
+            else:
+                results_gs = {
+                    "best_score": gs.best_score_,
+                    "best_params": gs.best_params_,
                 }
 
         else:
@@ -463,19 +463,14 @@ def compute_gs(
                         spp_reg.fit(X_train, y_train)
                         solutions = spp_reg.steps[1][1].solutions_
 
-                        # import ipdb
-                        # ipdb.set_trace()
-
-                        print('solutions = ', solutions)
-
                         cv_scores = spp_reg.score(X_test, y_test)
 
                         lambda_list = []
-                        slopes_list = []
+                        n_active_list = []
 
                         for this_sol in solutions:
                             lambda_list.append(this_sol["lambda"])
-                            slopes_list.append(this_sol["spp_lasso_slopes"])
+                            n_active_list.append(len(this_sol["spp_lasso_slopes"]))
 
                         if type(cv_scores) is np.float64:
                             cv_scores = [cv_scores]
@@ -486,55 +481,42 @@ def compute_gs(
                             "lambda": lambda_list,
                             "score": cv_scores,
                             "fold_number": [fold_num] * len(cv_scores),
-                            "slopes": slopes_list
+                            "n_active": n_active_list
                         }
 
-                        gs_list.append(
-                            pd.DataFrame(
-                                results
-                            )
-                        )
+                        gs_list.append(pd.DataFrame(results))
 
             gs_dataframe = pd.concat(gs_list)
 
             gs_groupby_params = (
                 gs_dataframe.groupby(
-                    by=["n_bins", "max_depth", "lambda"])["score"]
+                    by=["n_bins", "max_depth", "lambda"])[["score", "n_active"]]
                 .mean()
                 .reset_index()
             )
 
-            best_params = gs_groupby_params.loc[
-                gs_groupby_params["score"] == gs_groupby_params["score"].max(
-                ), ["n_bins", "max_depth", "lambda"]]
+            ind_best_score = (
+                gs_groupby_params["score"] == gs_groupby_params["score"].max())
+            best_params = gs_groupby_params.loc[ind_best_score, :]
 
-            print('fold_num = ', fold_num)
-            print('best_params = ', best_params)
+            # If we have 2 best scores ex-aequo, take the first one
+            best_params = best_params.iloc[0]
 
-            best_score = gs_groupby_params["score"].max()
+            print('best_params = \n', best_params)
 
-            print('best_score = ', best_score)
-
-            best_n_bins = best_params.iloc[0, 0]
-            best_max_depth = best_params.iloc[0, 1]
-            best_lambda = best_params.iloc[0, 2]
-
-            print('best_n_bins = ', best_n_bins)
-            print('best_max_depth = ', best_max_depth)
-            print('best_lambda = ', best_lambda)
-            print('lambda_list = ', len(lambda_list))
-
-            idx_best_lambda = list(gs_dataframe['lambda']).index(best_lambda)
-            best_slopes = list(gs_dataframe['slopes'])[idx_best_lambda]
-            n_active_features = len(best_slopes)
+            best_score = best_params.loc['score']
+            best_n_bins = best_params.loc['n_bins']
+            best_max_depth = best_params.loc['max_depth']
+            best_lambda = best_params.loc['lambda']
+            n_active = best_params.loc['n_active']
 
             results_gs = {
                 "best_score": best_score,
-                "best_params": {'n_bins': best_params.iloc[0, 0],
-                                'max_depth': best_params.iloc[0, 1],
-                                'lambda': best_params.iloc[0, 2]
+                "best_params": {'n_bins': best_n_bins,
+                                'max_depth': best_max_depth,
+                                'lambda': best_lambda
                                 },
-                "n_active_features": n_active_features,
+                "n_active": n_active
             }
 
         gs_models[name] = results_gs
@@ -561,9 +543,9 @@ def main():
     n_bins = 3
     max_depth = 2
     tol = 1e-08
-    n_lambda = 100
+    n_lambda = 10
     lambda_max_ratio = 0.5
-    lambdas = [1, 0.5, 0.2, 0.1, 0.01]
+    lambdas = None
     n_active_max = 100
 
     kwargs_spp = {
@@ -641,8 +623,8 @@ def main():
     # )
     n_bins_less_bins = [3]
     n_bins_more_bins = [10]
-    max_depth_less_bins = [2, 3, 4, 5, 6]
-    max_depth_more_bins = [2, 3, 4]
+    max_depth_less_bins = [2, 3]
+    max_depth_more_bins = [2, 3]
 
     models, tuned_parameters = get_models(
         X=X,
