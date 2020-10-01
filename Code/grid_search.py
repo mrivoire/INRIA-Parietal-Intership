@@ -71,6 +71,11 @@ def time_convert(X):
         if X[col].dtypes == "datetime64[ns]":
             col_name = str(col) + "_"
             # X[col_name + "year"] = X[col].dt.year
+            # One hot encoding of the days of week : 1 if the day belongs to
+            # the week and 0 if the day belongs to the weekend
+            # this enables to perform a kind of binning process of the
+            # time features : 2 different bins : one for the week and another
+            # one for the weekends
             X[col_name + "weekday"] = (X[col].dt.dayofweek < 5).astype(int)
             # X[col_name + "yearday"] = X[col].dt.dayofyear
             # X[col_name + "time"] = X[col].dt.minute
