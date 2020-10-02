@@ -1,0 +1,11 @@
+best_test_score,best_train_score,best_params_preprocessor__num__binning__n_bins,best_params_regressor__lmbda,model,n_active,best_params_regressor__alpha,best_params_regressor__n_estimators,best_params_regressor__max_depth,best_lambda_idx,best_params_n_bins,best_params_max_depth,best_params_lambda,data,n_samples,n_features
+-7.39109894484243e-07,-7.387872732610503e-07,4.0,0.005623413251903491,lasso,,,,,,,,,black_friday,166821,9
+-7.390999355826449e-07,-7.388008903095432e-07,4.0,,lasso_cv,17.0,,,,,,,,,,
+-7.391110924399976e-07,-7.387870012863479e-07,4.0,,ridge_cv,27.0,,,,,,,,,,
+-4.606418987633833e-07,-4.535383565885708e-07,,,xgb,,0.0001,100.0,,,,,,,,
+-4.75719985712579e-07,-4.6707984735088726e-07,,,dt,,,,8,,,,,,,
+-7.731836597125213e-07,-3.879664459298195e-07,,,infinite_dt,,,,,,,,,,,
+-4.6340361646751705e-07,-4.494596888881763e-07,,,rf,,,,9,,,,,,,
+-5.363502427572849e-07,-2.2120805066687767e-07,,,infinite_rf,,,,,,,,,,,
+-7.551157961816861e-07,-7.643985549427824e-07,,,spp_reg_less_bins,4.0,,,,99.0,3.0,2.0,3.751958902597568,,,
+-7.075287492237136e-07,-7.156248878777267e-07,,,spp_reg_more_bins,7.0,,,,99.0,10.0,3.0,3.751958902597568,,,

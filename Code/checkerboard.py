@@ -79,7 +79,7 @@ def decision_function_uniformstrat(x1, x2, dim1, dim2, n_bins):
     # elif ((int(x1 / bin_width_dim1) % 2) == 1) and ((int(x2 / bin_width_dim2) % 2) == 1):
     #     y = 1
 
-    # The same parity of the two quotients can also be expressed by the 
+    # The same parity of the two quotients can also be expressed by the
     # equality of the rests in the Euclidean division of each quotient par 2
     if (int(x1 / bin_width_dim1) % 2) == (int(x2 / bin_width_dim2) % 2):
         y = 1
@@ -143,8 +143,8 @@ def checkerboard(dim1, dim2, n_samples, n_bins):
     # intended to classify the samples of the training set in the same way
     # that the decision function proceeds
 
-    y = [decision_function_uniformstrat(x1=u, x2=v, dim1=dim1, dim2=dim2, 
-         n_bins=n_bins) for u, v in zip(x1, x2)]
+    y = [decision_function_uniformstrat(x1=u, x2=v, dim1=dim1, dim2=dim2,
+                                        n_bins=n_bins) for u, v in zip(x1, x2)]
 
     return np.c_[x1, x2], y
 
@@ -185,7 +185,7 @@ def plot_est(est, X, y, X_train, y_train, X_test, y_test):
         nnz = np.count_nonzero(Z[:, j])
 
         print('nnz = ', nnz)
- 
+
     # Plot the training points
     ax.scatter(X_train[:, 0], X_train[:, 1], c=y_train, cmap=cm_bright,
                edgecolors='k')
@@ -199,12 +199,14 @@ def plot_est(est, X, y, X_train, y_train, X_test, y_test):
     ax.set_yticks(())
     plt.show()
 
-# save fig en pdf 
+# save fig en pdf
+
+
 def main():
     dim1 = 10
     dim2 = 10
     n_bins = 5
-    n_samples = 1000
+    n_samples = 10000
 
     X, y = checkerboard(dim1=dim1, dim2=dim2, n_samples=n_samples,
                         n_bins=n_bins)
@@ -226,8 +228,7 @@ def main():
     lambda_max_ratio = 0.5
     n_active_max = 100
     lambdas = [0.1]
-    
-    
+
     enc = KBinsDiscretizer(n_bins=n_bins, encode=encode, strategy=strategy)
     X_binned_train = enc.fit_transform(X_train)
 
@@ -235,8 +236,8 @@ def main():
                            lambdas=lambdas,
                            max_depth=max_depth,
                            epsilon=epsilon, f=f, n_epochs=n_epochs, tol=tol,
-                           lambda_max_ratio=lambda_max_ratio, 
-                           n_active_max=n_active_max, screening=screening, 
+                           lambda_max_ratio=lambda_max_ratio,
+                           n_active_max=n_active_max, screening=screening,
                            store_history=store_history)
 
     solutions = spp_reg.fit(X_binned=X_binned_train, y=y_train).solutions_
@@ -263,7 +264,7 @@ def main():
         Lasso(alpha=0.1/X_binned_train.shape[0])
     )
     plot_est(est, X, y, X_train, y_train, X_test, y_test)
-    
+
 
 if __name__ == "__main__":
     main()
