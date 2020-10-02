@@ -66,8 +66,8 @@ def bar_plots_test_train(df):
     n_features = df['n_features'].unique()[0]
 
     plot_title = 'Dataset : ' + dataset_name + \
-        ' (n_samples: ' + str(n_samples) + \
-        ', n_features : ' + str(n_features) + ' )'
+        ' (n_samples: ' + int(n_samples) + \
+        ', n_features : ' + int(n_features) + ' )'
 
     x = np.arange(len(models))  # the label locations
     width = 0.05  # the width of the bars
@@ -99,10 +99,22 @@ def main():
     # df = pd.read_csv('/home/mrivoire/Documents/M2DS_Polytechnique/INRIA-Parietal-Intership/Code/' +
     df = pd.read_csv('./' + dataset_name + '_results.csv')
 
+    sns.set_theme(style="ticks", font_scale=1.5)
+    df = df[
+        ['best_test_score', 'best_train_score', 'model']
+    ].set_index('model').unstack().reset_index()
+    df.columns = ['data', 'model', 'MSE']
+    df.MSE *= -1
+    df.data = df.data.map({'best_test_score': 'test', 'best_train_score': 'train'})
+    plt.figure(figsize=(8, 6))
+    fig = sns.barplot(x="model", y="MSE", hue="data", data=df, palette="Paired")
+    fig.set_xticklabels(labels=fig.get_xticklabels(), rotation=45)
+    plt.tight_layout()
+    plt.show()
+
     print('df = ', df)
 
-    bar_plots_test_train(df=df)
-
+    # bar_plots_test_train(df=df)
 
 if __name__ == "__main__":
     main()
