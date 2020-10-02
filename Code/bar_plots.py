@@ -96,8 +96,8 @@ def main():
 
     dataset_name = 'black_friday'
 
-    df = pd.read_csv('/home/mrivoire/Documents/M2DS_Polytechnique/INRIA-Parietal-Intership/Code/' +
-                     dataset_name + '_results.csv')
+    # df = pd.read_csv('/home/mrivoire/Documents/M2DS_Polytechnique/INRIA-Parietal-Intership/Code/' +
+    df = pd.read_csv('./' + dataset_name + '_results.csv')
 
     print('df = ', df)
 
