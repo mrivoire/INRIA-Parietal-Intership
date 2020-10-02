@@ -48,7 +48,7 @@ def main():
     max_depth = 2
     tol = 1e-08
     n_lambda = 100
-    lambda_max_ratio = (1 / 50)
+    lambda_max_ratio = (1 / 1000)
     # lambdas = [1, 0.5, 0.2, 0.1, 0.01]
     lambdas = None
     # lambdas = [0.1]
