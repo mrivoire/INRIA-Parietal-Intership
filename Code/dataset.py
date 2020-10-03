@@ -115,24 +115,42 @@ def load_nyc_taxi():
 
 def main():
     # Load Housing Prices Dataset
-    X_housing_prices, y_housing_prices = load_housing_prices()
-    print("X = ", X_housing_prices)
+    # X_housing_prices, y_housing_prices = load_housing_prices()
+    # print("X = ", X_housing_prices)
 
     # Load Auto Prices Dataset
     X_auto_prices, y_auto_prices = load_auto_prices()
+    X_auto_prices = pd.DataFrame(X_auto_prices)
     print("X = ", X_auto_prices.dtypes)
+
+    X_auto_prices.to_csv('/home/mrivoire/Documents/M2DS_Polytechnique/INRIA-Parietal-Intership/Code/' +
+                         'X_auto_prices.csv', index=False)
+    y_auto_prices.to_csv('/home/mrivoire/Documents/M2DS_Polytechnique/INRIA-Parietal-Intership/Code/' +
+                         'y_auto_prices.csv', index=False)
 
     # Load LA Crimes Dataset
     X_lacrimes, y_lacrimes = load_lacrimes()
     print("X = ", X_lacrimes.dtypes)
+    X_lacrimes.to_csv('/home/mrivoire/Documents/M2DS_Polytechnique/INRIA-Parietal-Intership/Code/' +
+                      'X_lacrimes.csv', index=False)
+    y_lacrimes.to_csv('/home/mrivoire/Documents/M2DS_Polytechnique/INRIA-Parietal-Intership/Code/' +
+                      'y_lacrimes.csv', index=False)
 
     # Load Black Friday Dataset
     X_black_friday, y_black_friday = load_black_friday()
     print("X_black_friday = ", X_black_friday.dtypes)
+    X_black_friday.to_csv('/home/mrivoire/Documents/M2DS_Polytechnique/INRIA-Parietal-Intership/Code/' +
+                          'X_black_friday.csv', index=False)
+    y_black_friday.to_csv('/home/mrivoire/Documents/M2DS_Polytechnique/INRIA-Parietal-Intership/Code/' +
+                          'y_black_friday.csv', index=False)
 
     # Load NYC Taxi Dataset
     X_nyc_taxi, y_nyc_taxi = load_nyc_taxi()
     print("X_nyc_taxi Types = ", X_nyc_taxi.dtypes)
+    X_nyc_taxi.to_csv('/home/mrivoire/Documents/M2DS_Polytechnique/INRIA-Parietal-Intership/Code/' +
+                      'X_nyc_taxi.csv', index=False)
+    y_nyc_taxi.to_csv('/home/mrivoire/Documents/M2DS_Polytechnique/INRIA-Parietal-Intership/Code/' +
+                      'y_nyc_taxi.csv', index=False)
 
 
 if __name__ == "__main__":

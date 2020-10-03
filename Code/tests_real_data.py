@@ -83,33 +83,33 @@ def main():
     if data == 'auto_prices':
         X, y = load_auto_prices()
         n_bins_more_bins = [10]
-        max_depth_more_bins = [2, 3, 4]
+        max_depth_more_bins = [1, 2, 3, 4]
         n_bins_less_bins = [3]
-        max_depth_less_bins = [2, 3, 4, 5, 6]
+        max_depth_less_bins = [1, 2, 3, 4, 5, 6]
     elif data == 'black_friday':
         X, y = load_black_friday()
         n_bins_more_bins = [10]
-        max_depth_more_bins = [2, 3, 4, 5]
+        max_depth_more_bins = [1, 2, 3, 4, 5]
         n_bins_less_bins = [3]
-        max_depth_less_bins = [2, 3, 4, 5, 6, 7, 8, 9]
+        max_depth_less_bins = [1, 2, 3, 4, 5, 6, 7, 8, 9]
     elif data == 'housing_prices':
         X, y = load_housing_prices()
         n_bins_more_bins = [10]
-        max_depth_more_bins = [2]
+        max_depth_more_bins = [1, 2]
         n_bins_less_bins = [3]
-        max_depth_less_bins = [2, 3]
+        max_depth_less_bins = [1, 2, 3]
     elif data == 'la_crimes':
         X, y = load_lacrimes()
         n_bins_more_bins = [10]
-        max_depth_more_bins = [2, 3, 4]
+        max_depth_more_bins = [1, 2, 3, 4]
         n_bins_less_bins = [3]
-        max_depth_less_bins = [2, 3, 4, 5]
+        max_depth_less_bins = [1, 2, 3, 4, 5]
     elif data == 'NYC_taxis':
         X, y = load_nyc_taxi()
         n_bins_more_bins = [10]
-        max_depth_more_bins = [2, 3, 4]
+        max_depth_more_bins = [1, 2, 3, 4]
         n_bins_less_bins = [3]
-        max_depth_less_bins = [2, 3, 4, 5, 6]
+        max_depth_less_bins = [1, 2, 3, 4, 5, 6]
     else:
         raise ValueError("Dataset not implemented for " + data)
 
@@ -194,9 +194,9 @@ def main():
     df = pd.read_csv('/home/mrivoire/Documents/M2DS_Polytechnique/INRIA-Parietal-Intership/Code/' +
                      data + '_results.csv')
 
-    # df.head()
+    df.head()
 
-    # bar_plots(df=df)
+    bar_plots(df=df)
 
     #######################################################################
     #                         Bar Plots CV Scores

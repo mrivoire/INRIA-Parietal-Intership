@@ -22,6 +22,7 @@ from dataset import (
 )
 from SPP import SPPRegressor
 from sklearn.model_selection import KFold
+from sklearn.tree import DecisionTreeRegressor
 
 # from pandas_profiling import ProfileReport
 
@@ -244,15 +245,15 @@ def get_models(
         "regressor__n_estimators": [30, 100],
     }
 
-    # Random Forest With A Single Tree (finite depth)
-    dt = RandomForestRegressor(n_estimators=1)
+    # Decision Tree(finite depth)
+    dt = DecisionTreeRegressor()
     models["dt"] = Pipeline(
         steps=[("preprocessor", rf_preprocessor), ("regressor", dt)]
     )
     tuned_parameters["dt"] = {"regressor__max_depth": max_depth_less_bins}
 
-    # Random Forest With A Single Tree (infinite depth)
-    infinite_dt = RandomForestRegressor(n_estimators=1)
+    # Decision Tree (infinite depth)
+    infinite_dt = DecisionTreeRegressor()
     models["infinite_dt"] = Pipeline(
         steps=[("preprocessor", rf_preprocessor), ("regressor", infinite_dt)]
     )
