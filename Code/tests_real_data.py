@@ -194,9 +194,9 @@ def main():
     df = pd.read_csv('/home/mrivoire/Documents/M2DS_Polytechnique/INRIA-Parietal-Intership/Code/' +
                      data + '_results.csv')
 
-    df.head()
+    # df.head()
 
-    bar_plots(df=df)
+    # bar_plots(df=df)
 
     #######################################################################
     #                         Bar Plots CV Scores
