@@ -188,10 +188,10 @@ def main():
 
     print('results = ', results)
 
-    results.to_csv('/home/mrivoire/Documents/M2DS_Polytechnique/INRIA-Parietal-Intership/Code/' +
+    results.to_csv('./' +
                    data + '_results.csv', index=False)
 
-    df = pd.read_csv('/home/mrivoire/Documents/M2DS_Polytechnique/INRIA-Parietal-Intership/Code/' +
+    df = pd.read_csv('./' +
                      data + '_results.csv')
 
     # df.head()
