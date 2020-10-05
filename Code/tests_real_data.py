@@ -189,10 +189,10 @@ def main():
     print('results = ', results)
 
     results.to_csv('./' +
-                   data + '_results.csv', index=False)
+                   data + '_' + str(n_samples) + '_results.csv', index=False)
 
     df = pd.read_csv('./' +
-                     data + '_results.csv')
+                     data + '_' + str(n_samples) + '_results.csv')
 
     # df.head()
 
