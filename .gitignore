@@ -6,3 +6,6 @@
 *.xlsx
 /Datasets
 *.xls
+*.png
+*.zip
+*.pdf
