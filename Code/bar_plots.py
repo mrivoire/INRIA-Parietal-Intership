@@ -95,9 +95,11 @@ def bar_plots_test_train(df):
 def main():
 
     dataset_name = 'black_friday'
+    n_samples = 100
 
     # df = pd.read_csv('/home/mrivoire/Documents/M2DS_Polytechnique/INRIA-Parietal-Intership/Code/' +
-    df = pd.read_csv('./' + dataset_name + '_results.csv')
+    df = pd.read_csv('./' + dataset_name + '_' +
+                     str(n_samples) + '_results.csv')
 
     sns.set_theme(style="ticks", font_scale=1.5)
     df = df[
@@ -105,9 +107,11 @@ def main():
     ].set_index('model').unstack().reset_index()
     df.columns = ['data', 'model', 'MSE']
     df.MSE *= -1
-    df.data = df.data.map({'best_test_score': 'test', 'best_train_score': 'train'})
+    df.data = df.data.map(
+        {'best_test_score': 'test', 'best_train_score': 'train'})
     plt.figure(figsize=(8, 6))
-    fig = sns.barplot(x="model", y="MSE", hue="data", data=df, palette="Paired")
+    fig = sns.barplot(x="model", y="MSE", hue="data",
+                      data=df, palette="Paired")
     fig.set_xticklabels(labels=fig.get_xticklabels(), rotation=45)
     plt.tight_layout()
     plt.show()
@@ -115,6 +119,7 @@ def main():
     print('df = ', df)
 
     # bar_plots_test_train(df=df)
+
 
 if __name__ == "__main__":
     main()
