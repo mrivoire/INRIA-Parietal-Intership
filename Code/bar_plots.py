@@ -3,6 +3,8 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
 import seaborn as sns
+import constants_plots as cst
+import sys
 
 
 def autolabel(rects, ax, scale):
@@ -94,25 +96,42 @@ def bar_plots_test_train(df):
 
 def main():
 
-    dataset_name = 'black_friday'
-    n_samples = 100
+    dataset_name = sys.argv[1]
+    if len(sys.argv) > 2:
+        n_samples = sys.argv[2]
+    else:
+        n_samples = cst.n_samples_dict[dataset_name]
 
-    # df = pd.read_csv('/home/mrivoire/Documents/M2DS_Polytechnique/INRIA-Parietal-Intership/Code/' +
-    df = pd.read_csv('./' + dataset_name + '_' +
-                     str(n_samples) + '_results.csv')
+    dataset_name = 'black_friday'
+    n_samples = 10000
+
+    plot_title = 'Dataset : ' + cst.dataset_names_dict[dataset_name] + \
+        '\n (n_samples: ' + str(n_samples) + \
+        ', n_features : ' + str(cst.n_features_dict[dataset_name]) + ' )'
+
+    df = pd.read_csv('/home/mrivoire/Documents/M2DS_Polytechnique/Final_Results/black_friday/' + dataset_name + '_' + str(n_samples) +
+                     '_results.csv')
+    # df = pd.read_csv('./' + dataset_name + '_' +
+    #                  str(n_samples) + '_results.csv')
 
     sns.set_theme(style="ticks", font_scale=1.5)
     df = df[
         ['best_test_score', 'best_train_score', 'model']
     ].set_index('model').unstack().reset_index()
-    df.columns = ['data', 'model', 'MSE']
+    df = df.loc[df['model'] != 'lasso']
+    df['model_name'] = df['model'].map(cst.models_dict)
+    df.columns = ['data', 'model', 'MSE', 'Model']
     df.MSE *= -1
     df.data = df.data.map(
-        {'best_test_score': 'test', 'best_train_score': 'train'})
-    plt.figure(figsize=(8, 6))
-    fig = sns.barplot(x="model", y="MSE", hue="data",
-                      data=df, palette="Paired")
-    fig.set_xticklabels(labels=fig.get_xticklabels(), rotation=45)
+        cst.legend_dict)
+    fig, ax = plt.subplots(figsize=(8, 6))
+    ax.grid(True, which="both")
+    sns.barplot(x="Model", y="MSE", hue="data",
+                data=df, palette="Paired")
+    ax.set_xticklabels(labels=ax.get_xticklabels(), rotation=45, fontsize=10)
+    ax.tick_params(axis='both', which='major', labelsize=10)
+    ax.legend(loc='upper right')
+    ax.set_title(plot_title, fontsize=16)
     plt.tight_layout()
     plt.show()
 
