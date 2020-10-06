@@ -97,6 +97,9 @@ def bar_plots_test_train(df):
 def main():
 
     dataset_name = sys.argv[1]
+    if dataset_name not in cst.dataset_names_dict.keys():
+        raise ValueError(dataset_name+' is not in : ' +
+                         str(list(cst.dataset_names_dict.keys())))
     if len(sys.argv) > 2:
         n_samples = sys.argv[2]
     else:
