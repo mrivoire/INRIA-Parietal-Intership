@@ -106,7 +106,6 @@ def main():
         n_samples = cst.n_samples_dict[dataset_name]
 
     dataset_name = 'black_friday'
-    n_samples = 10000
 
     plot_title = 'Dataset : ' + cst.dataset_names_dict[dataset_name] + \
         '\n (n_samples: ' + str(n_samples) + \
@@ -137,6 +136,8 @@ def main():
     ax.set_title(plot_title, fontsize=16)
     plt.tight_layout()
     plt.show()
+    # plt.savefig('./' + dataset_name + '_' +
+    #             str(n_samples) + '_results.png')
 
     print('df = ', df)
 
