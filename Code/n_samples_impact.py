@@ -1,23 +1,30 @@
-import matplotlib
 import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
 import seaborn as sns
 import constants_plots as cst
-import sys
+
+
+params = {'axes.labelsize': 12,
+          'font.size': 12,
+          'legend.fontsize': 12,
+          'xtick.labelsize': 12,
+          'ytick.labelsize': 12}
+plt.rcParams.update(params)
 
 
 def n_samples_impact_plot(df, plot_title):
 
-    fig, ax = plt.subplots(figsize=(8, 6))
+    fig, ax = plt.subplots(figsize=(9, 5))
     ax.grid(True, which="both")
     sns.lineplot(x="log_n_samples", y="MSE", hue="Model",
                  data=df, palette="Paired")
     # ax.set_xticklabels(labels=ax.get_xticklabels(), rotation=45, fontsize=10)
-    ax.tick_params(axis='both', which='major', labelsize=10)
-    ax.legend(bbox_to_anchor=(1.25, 1.25), loc='upper right', fontsize=10)
-    ax.set_title(plot_title, fontsize=16)
+    ax.tick_params(axis='both', which='major')
+    ax.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
+    ax.set_title(plot_title)
     plt.tight_layout()
+    plt.xlabel(r'$\log(n_{samples})$')
     plt.show()
 
 
@@ -49,7 +56,7 @@ def main():
     df['log_n_samples'] = np.log10(df['n_samples'])
     df.MSE *= -1
 
-    plot_title = 'Impact of the number of samples,\n on the predictive performances for the Black Friday dataset'
+    plot_title = r'Impact of $n_{samples}$ for the Black Friday dataset'
 
     n_samples_impact_plot(df=df, plot_title=plot_title)
 
