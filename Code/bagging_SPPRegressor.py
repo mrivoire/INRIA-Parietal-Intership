@@ -63,18 +63,29 @@ class SPPBaggingRegressor(BaseEstimator, RegressorMixin):
     def predict(self, X_binned):
         """
         """
+        # y_pred = np.mean([est.predict(X)
+        #                   for est in self.baggingregressor.estimators_], axis=0)
+        y_hats = np.mean([est.predict(X_binned)
+                          for est in
+                          self.bagging_reg_.estimators_], axis=0)
 
-        y_hat = self.bagging_reg_.predict(X_binned)
-
-        return y_hat
+        return y_hats
 
     def score(self, X, y):
         """
         """
-        y_hat = self.predict(X)
-        score = -mean_squared_error(y, y_hat)
+        y_hats = self.predict(X)
+        if y_hats.ndim == 1:
+            y_hats = y_hats[:, None]
 
-        return score
+        scores = []
+        for y_hat in y_hats.T:
+            scores.append(-mean_squared_error(y, y_hat))
+
+        if len(scores) == 1:
+            scores = scores[0]
+
+        return scores
 
 
 def main():
@@ -91,7 +102,7 @@ def main():
     strategy = 'quantile'
     n_bins = 3
     max_depth = 2
-    n_lambda = 1
+    n_lambda = 5
     # if n_lmbda is none otherwise list lmbdas
     tol = 1e-08
     lambda_max_ratio = 0.5
@@ -125,12 +136,12 @@ def main():
 
     print('sol = ', spp_bagging_reg)
 
-    pred = spp_bagging_reg.predict(X_binned=X_binned)
+    y_hats = spp_bagging_reg.predict(X_binned=X_binned)
 
-    print('pred = ', pred)
+    print('pred = ', y_hats)
 
-    score = spp_bagging_reg.score(X=X_binned, y=y)
-    print('score = ', score)
+    scores = spp_bagging_reg.score(X=X_binned, y=y)
+    print('scores = ', scores)
 
 
 if __name__ == "__main__":
