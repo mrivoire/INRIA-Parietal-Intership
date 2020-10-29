@@ -23,6 +23,8 @@ from dataset import (
 from SPP import SPPRegressor
 from sklearn.model_selection import KFold
 from sklearn.tree import DecisionTreeRegressor
+from bagging_SPPRegressor import SPPBaggingRegressor
+from memory_profiler import profile
 
 # from pandas_profiling import ProfileReport
 
@@ -94,7 +96,7 @@ def time_convert(X):
 #                       Grid Search
 ################################################################
 
-
+@profile
 def get_models(
     X,
     n_bins,
@@ -102,8 +104,10 @@ def get_models(
     max_depth_less_bins,
     n_bins_more_bins,
     max_depth_more_bins,
+    n_estimators,
     kwargs_lasso,
-    kwargs_spp
+    kwargs_spp,
+    kwargs_spp_bagging
 ):
     """
     X: numpy.ndarray(), shape = (n_samples, n_features)
@@ -285,7 +289,7 @@ def get_models(
         "regressor__max_depth": max_depth_less_bins,
     }
 
-    # SPP Regressor less bins
+    # SPP Regressor more bins
     spp_reg_more_bins = SPPRegressor(**kwargs_spp)
     models["spp_reg_more_bins"] = Pipeline(
         steps=[("preprocessor", preprocessor),
@@ -295,6 +299,18 @@ def get_models(
     tuned_parameters["spp_reg_more_bins"] = {
         "preprocessor__num__binning__n_bins": n_bins_more_bins,
         "regressor__max_depth": max_depth_more_bins,
+    }
+
+    # SPP Bagging Regressor
+    spp_bagging_reg = SPPBaggingRegressor(**kwargs_spp_bagging)
+    models["spp_bagging_reg"] = Pipeline(
+        steps=[("preprocessor", preprocessor),
+               ("regressor", spp_bagging_reg)]
+    )
+    tuned_parameters["spp_bagging_reg"] = {
+        "preprocessor__num__binning__n_bins": n_bins_more_bins,
+        "regressor__max_depth": max_depth_more_bins,
+        "regressor__n_estimators": n_estimators
     }
 
     return models, tuned_parameters
@@ -335,6 +351,7 @@ def compute_cv(X, y, models, n_splits, n_jobs=1):
     return cv_scores
 
 
+@profile
 def compute_gs(
     X,
     y,
@@ -450,6 +467,85 @@ def compute_gs(
             idx_best_score = params.index(results_gs["best_params"])
             best_train_score = mean_train_score[idx_best_score]
             results_gs['best_train_score'] = best_train_score
+
+        elif 'bagging' in name:
+            kf = KFold(n_splits=n_splits, random_state=None, shuffle=False)
+
+            gs_list = []
+
+            for fold_num, (train_index, test_index) in enumerate(kf.split(X), 1):
+                # print("TRAIN:", train_index, "TEST:", test_index)
+                X_train, X_test = X.iloc[train_index], X.iloc[test_index]
+                y_train, y_test = y[train_index], y[test_index]
+
+                n_bins_list = tuned_parameters[name]['preprocessor__num__binning__n_bins']
+                max_depth_list = tuned_parameters[name]['regressor__max_depth']
+                n_estimators_list = tuned_parameters[name]['regressor__n_estimators']
+                for n_bins in n_bins_list:
+                    for max_depth in max_depth_list:
+                        for n_estimators in n_estimators_list:
+                            spp_bag_reg = model.set_params(
+                                preprocessor__num__binning__n_bins=n_bins,
+                                regressor__max_depth=max_depth,
+                                regressor__n_estimators=n_estimators)
+
+                            spp_bag_reg.fit(X_train, y_train)
+
+                            cv_scores_test = spp_bag_reg.score(X_test, y_test)
+                            cv_scores_train = spp_bag_reg.score(
+                                X_train, y_train)
+
+                            if type(cv_scores_test) is np.float64:
+                                cv_scores_test = [cv_scores_test]
+
+                            if type(cv_scores_train) is np.float64:
+                                cv_scores_train = [cv_scores_train]
+
+                            results = {
+                                "n_bins": [n_bins] * len(cv_scores_test),
+                                "max_depth": [max_depth] * len(cv_scores_test),
+                                "n_estimators": [n_estimators] * len(cv_scores_test),
+                                "test_score": cv_scores_test,
+                                "train_score": cv_scores_train,
+                                "fold_number": [fold_num] * len(cv_scores_test),
+                            }
+
+                            gs_list.append(pd.DataFrame(results))
+
+            gs_dataframe = pd.concat(gs_list)
+
+            gs_groupby_params = (
+                gs_dataframe.groupby(
+                    by=["n_bins", "max_depth", "n_estimators"])[["test_score", "train_score"]]
+                .mean()
+                .reset_index()
+            )
+
+            ind_best_score = (
+                gs_groupby_params["test_score"] == gs_groupby_params["test_score"].max())
+            best_params = gs_groupby_params.loc[ind_best_score, :]
+
+            best_params = best_params.iloc[0]
+
+            print('best_params = \n', best_params)
+            best_train_score = best_params.loc['train_score']
+            best_test_score = best_params.loc['test_score']
+            best_n_bins = best_params.loc['n_bins']
+            best_max_depth = best_params.loc['max_depth']
+            n_estimators = best_params.loc['n_estimators']
+
+            print('gs_groupby_params = ', gs_groupby_params)
+
+            results_gs = {
+                "best_test_score": best_test_score,
+                "best_train_score": best_train_score,
+                "best_params": {'n_bins': best_n_bins,
+                                'max_depth': best_max_depth,
+                                'n_estimators': n_estimators
+                                },
+            }
+
+            gs_models[name] = results_gs
 
         else:
             kf = KFold(n_splits=n_splits, random_state=None, shuffle=False)
@@ -567,6 +663,8 @@ def main():
     lambda_max_ratio = 0.5
     lambdas = None
     n_active_max = 100
+    random_state = 0
+    n_estimators = [10]
 
     kwargs_spp = {
         "n_lambda": n_lambda,
@@ -580,6 +678,22 @@ def main():
         "n_active_max": n_active_max,
         "screening": screening,
         "store_history": store_history,
+    }
+
+    kwargs_spp_bagging = {
+        "n_lambda": n_lambda,
+        "lambdas": lambdas,
+        "max_depth": max_depth,
+        "epsilon": epsilon,
+        "f": f,
+        "n_epochs": n_epochs,
+        "tol": tol,
+        "lambda_max_ratio": lambda_max_ratio,
+        "n_active_max": n_active_max,
+        "screening": screening,
+        "store_history": store_history,
+        "n_estimators": n_estimators,
+        "random_state": random_state,
     }
 
     kwargs_lasso = {
@@ -653,8 +767,10 @@ def main():
         max_depth_less_bins=max_depth_less_bins,
         n_bins_more_bins=n_bins_more_bins,
         max_depth_more_bins=max_depth_more_bins,
+        n_estimators=n_estimators,
         kwargs_lasso=kwargs_lasso,
-        kwargs_spp=kwargs_spp
+        kwargs_spp=kwargs_spp,
+        kwargs_spp_bagging=kwargs_spp_bagging,
     )
 
     # del models['lasso']
