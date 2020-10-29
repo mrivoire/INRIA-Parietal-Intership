@@ -10,6 +10,7 @@ from sklearn.utils import check_random_state
 from cd_solver_lasso_numba import sparse_cd
 from sklearn.metrics import mean_squared_error
 from sklearn.base import BaseEstimator, RegressorMixin
+from memory_profiler import profile
 
 #######################################################################
 #                   Safe Pattern Pruning Algorithm
@@ -701,6 +702,7 @@ def from_key_to_interactions_feature(csc_data, csc_ind, csc_indptr,
 
 
 # @njit
+@profile
 def spp_solver(X_binned, y,
                n_lambda, lambdas, max_depth, epsilon, f, n_epochs, tol,
                lambda_max_ratio, n_active_max, screening=True,
@@ -1043,7 +1045,7 @@ class SPPRegressor(BaseEstimator, RegressorMixin):
             predicted target vector
         """
 
-        # itérer sur les solutions et calculer le y_hat
+        # itérer sur les solutions et calculer le y_hat
         # renvoyer une liste de y_hat pour chaque lmbda
         X_binned = X_binned.tocsc()
         X_binned_data = X_binned.data
@@ -1091,7 +1093,7 @@ class SPPRegressor(BaseEstimator, RegressorMixin):
 
         Returns
         -------
-        scores: float | list
+        scores: float | list
             chosen metric : R-square
         """
         y_hats = self.predict(X)
