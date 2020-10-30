@@ -481,6 +481,7 @@ def compute_gs(
                 n_bins_list = tuned_parameters[name]['preprocessor__num__binning__n_bins']
                 max_depth_list = tuned_parameters[name]['regressor__max_depth']
                 n_estimators_list = tuned_parameters[name]['regressor__n_estimators']
+
                 for n_bins in n_bins_list:
                     for max_depth in max_depth_list:
                         for n_estimators in n_estimators_list:
@@ -664,7 +665,7 @@ def main():
     lambdas = None
     n_active_max = 100
     random_state = 0
-    n_estimators = [10]
+    n_estimators = [10, 15]
 
     kwargs_spp = {
         "n_lambda": n_lambda,
